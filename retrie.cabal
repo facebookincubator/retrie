@@ -6,6 +6,8 @@
 name: retrie
 version: 0.1.0.0
 synopsis: A powerful, easy-to-use codemodding tool for Haskell.
+homepage: https://github.com/facebookincubator/retrie
+bug-reports: https://github.com/facebookincubator/retrie/issues
 license: MIT
 license-file: LICENSE
 author: Andrew Farmer <anfarmer@fb.com>
@@ -154,3 +156,7 @@ test-suite test
     temporary,
     text,
     unordered-containers
+
+source-repository head
+  type:     git
+  location: https://github.com/facebookincubator/retrie
