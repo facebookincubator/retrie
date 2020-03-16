@@ -1,0 +1,13 @@
+# Copyright (c) Facebook, Inc. and its affiliates.
+#
+# This source code is licensed under the MIT license found in the
+# LICENSE file in the root directory of this source tree.
+#
+--adhoc "forall x. succ x = succ (succ x)"
+--iterate 4
+===
+ module Iterate where
+ 
+ main :: IO ()
+-main = print $ succ 54
++main = print $ succ (succ (succ (succ (succ 54))))

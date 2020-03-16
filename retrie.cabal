@@ -1,0 +1,156 @@
+-- Copyright (c) Facebook, Inc. and its affiliates.
+--
+-- This source code is licensed under the MIT license found in the
+-- LICENSE file in the root directory of this source tree.
+--
+name: retrie
+version: 0.1.0.0
+synopsis: A powerful, easy-to-use codemodding tool for Haskell.
+license: MIT
+license-file: LICENSE
+author: Andrew Farmer <anfarmer@fb.com>
+maintainer: Andrew Farmer <anfarmer@fb.com>
+copyright: Copyright (c) Facebook, Inc. and its affiliates.
+category: Development
+build-type: Simple
+cabal-version: >=1.10
+extra-source-files:
+  CHANGELOG.md
+  CODE_OF_CONDUCT.md
+  CONTRIBUTING.md
+  README.md
+  tests/inputs/*.custom
+  tests/inputs/*.test
+tested-with: GHC ==8.8.2 || ==8.6.5 || ==8.4.4
+
+description:
+  Retrie is a tool for codemodding Haskell. Key goals include:
+  .
+  * Speed: Efficiently rewrite in large (>1 million line) codebases.
+  * Safety: Avoids large classes of codemod-related errors.
+  * Ease-of-use: Haskell syntax instead of regular expressions. No hand-rolled AST traversals.
+  .
+  This package provides a command-line tool (@retrie@) and a library
+  ("Retrie") for making equational edits to Haskell code.
+  .
+  Please see the [README](#readme) for examples and usage.
+
+library
+  exposed-modules:
+    Retrie,
+    Retrie.AlphaEnv,
+    Retrie.CPP,
+    Retrie.Context,
+    Retrie.Debug,
+    Retrie.ExactPrint,
+    Retrie.ExactPrint.Annotated,
+    Retrie.Expr,
+    Retrie.Fixity,
+    Retrie.FreeVars,
+    Retrie.GHC,
+    Retrie.GroundTerms,
+    Retrie.Monad,
+    Retrie.Options,
+    Retrie.PatternMap.Bag,
+    Retrie.PatternMap.Class,
+    Retrie.PatternMap.Instances,
+    Retrie.Pretty,
+    Retrie.Quantifiers,
+    Retrie.Query,
+    Retrie.Replace,
+    Retrie.Rewrites,
+    Retrie.Rewrites.Function,
+    Retrie.Rewrites.Rules,
+    Retrie.Rewrites.Types,
+    Retrie.Run,
+    Retrie.Subst,
+    Retrie.Substitution,
+    Retrie.SYB,
+    Retrie.Types,
+    Retrie.Universe,
+    Retrie.Util
+  GHC-Options: -Wall
+  build-depends:
+    ansi-terminal >= 0.10.3 && < 0.11,
+    async >= 2.2.2 && < 2.3,
+    base >= 4.11 && < 4.14,
+    bytestring >= 0.10.8 && < 0.11,
+    containers >= 0.5.11 && < 0.7,
+    data-default >= 0.7.1 && < 0.8,
+    directory >= 1.3.1 && < 1.4,
+    filepath >= 1.4.2 && < 1.5,
+    ghc >= 8.4 && < 8.10,
+    ghc-exactprint >= 0.6.2 && < 0.7,
+    haskell-src-exts >= 1.23.0 && < 1.24,
+    mtl >= 2.2.2 && < 2.3,
+    optparse-applicative >= 0.15.1 && < 0.16,
+    process >= 1.6.3 && < 1.7,
+    random-shuffle >= 0.0.4 && < 0.1,
+    syb >= 0.7.1 && < 0.8,
+    text >= 1.2.3 && < 1.3,
+    transformers >= 0.5.5 && < 0.6,
+    unordered-containers >= 0.2.10 && < 0.3
+  default-language: Haskell2010
+
+executable retrie
+  main-is:
+    Main.hs
+  hs-source-dirs: bin
+  other-modules:
+  GHC-Options: -Wall
+  build-depends:
+    retrie,
+    base >= 4.11 && < 4.14,
+    data-default
+  default-language: Haskell2010
+
+executable demo
+  main-is:
+    Main.hs
+  hs-source-dirs: demo
+  other-modules:
+  GHC-Options: -Wall
+  build-depends:
+    retrie,
+    base >= 4.11 && < 4.14
+  default-language: Haskell2010
+
+test-suite test
+  type: exitcode-stdio-1.0
+  main-is: Main.hs
+  other-modules:
+    AllTests,
+    Annotated,
+    CPP,
+    Demo,
+    Dependent,
+    Exclude,
+    Golden,
+    GroundTerms,
+    Ignore,
+    ParseQualified,
+    Targets,
+    Util
+  hs-source-dirs: tests
+  default-language: Haskell2010
+  GHC-Options: -Wall
+  build-depends:
+    retrie,
+    HUnit,
+    base >= 4.11 && < 4.14,
+    containers,
+    data-default,
+    deepseq,
+    directory,
+    filepath,
+    ghc >= 8.4 && < 8.10,
+    ghc-paths,
+    mtl,
+    optparse-applicative,
+    process,
+    syb,
+    tasty,
+    tasty-hunit,
+    temporary,
+    text,
+    unordered-containers

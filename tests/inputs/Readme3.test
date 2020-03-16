@@ -1,0 +1,26 @@
+# Copyright (c) Facebook, Inc. and its affiliates.
+#
+# This source code is licensed under the MIT license found in the
+# LICENSE file in the root directory of this source tree.
+#
+--fold Readme3.maybe
+===
+ module Readme3 where
+
+ maybe :: b -> (a -> b) -> Maybe a -> b
+ maybe d f mb = case mb of
+   Nothing -> d
+   Just x -> f x
+
+ type MyMaybe = Maybe Int
+
+-{-# RULES "myRule" forall x. case x of
+-            Nothing -> Nothing
+-            Just x1 -> Just x1 = x #-}
++{-# RULES "myRule" forall x. maybe Nothing Just x = x #-}
+
+ foo :: MyMaybe
+-foo = case Just 5 of
+-  Nothing -> Nothing
+-  Just x -> Just x
++foo = maybe Nothing Just (Just 5)

@@ -1,0 +1,80 @@
+# Copyright (c) Facebook, Inc. and its affiliates.
+#
+# This source code is licensed under the MIT license found in the
+# LICENSE file in the root directory of this source tree.
+#
+-u Shadowing.foo
+===
+ module Shadowing where
+ 
+ foo :: Int -> Int
+ foo = succ
+ 
+ bar :: Int -> Int
+-bar x = foo x
++bar x = succ x
+ 
+ baz :: (Int -> Int) -> Int -> Int
+ baz foo = foo
+ 
+ quux :: Int -> Int
+ quux x =
+   let foo = pred
+   in foo x
+ 
+ boo :: Int -> Int
+ boo x =
+-  let bar = foo
++  let bar = succ
+   in let foo = pred
+          baz = foo
+      in foo x
+ 
+ foomap :: Int -> Int
+-foomap x = map (\ foo -> foo x) [succ, pred, foo]
++foomap x = map (\ foo -> foo x) [succ, pred, succ]
+ 
+ foowhere :: Int -> Int
+-foowhere x = foo (bar x)
++foowhere x = succ (bar x)
+   where
+-    bar = baz foo
++    bar = baz succ
+     baz foo = foo
+ 
+ foowhere2 :: Int -> Int
+-foowhere2 x = foo (bar x)
++foowhere2 x = succ (bar x)
+   where
+     bar = foo
+       where
+         foo = baz
+         baz = foo
+ 
+ fooguards :: Int -> Int
+ fooguards x
+-  | Just bar <- return foo = bar (foo x)
+-  | Just foo <- return foo = foo x
+-  | Just foo <- return foo, Just bar <- return foo = bar (foo x)
+-  | otherwise = foo x
++  | Just bar <- return succ = bar (succ x)
++  | Just foo <- return succ = foo x
++  | Just foo <- return succ, Just bar <- return foo = bar (foo x)
++  | otherwise = succ x
+ 
+ foomonadic :: Int -> Maybe Int
+ foomonadic x = do
+-  y <- return $ foo x
+-  foo <- return (foo . pred)
++  y <- return $ succ x
++  foo <- return (succ . pred)
+   z <- return $ foo y
+   return $ foo z
+ 
+ foomonadic2 :: Int -> Maybe Int
+ foomonadic2 x = do
+-  y <- return $ foo x
++  y <- return $ succ x
+   let foo = pred
+       z = foo y
+   return $ foo x + z

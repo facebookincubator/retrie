@@ -1,0 +1,17 @@
+# Copyright (c) Facebook, Inc. and its affiliates.
+#
+# This source code is licensed under the MIT license found in the
+# LICENSE file in the root directory of this source tree.
+#
+===
+ module DependentStmt where
+
+ -- This test rewrites foo to baz, but only in scope of 'y'.
+
+ main :: IO ()
+ main = do
+   x <- bar 7
+   foo x
+   y <- bar 54
+-  foo y
++  baz y

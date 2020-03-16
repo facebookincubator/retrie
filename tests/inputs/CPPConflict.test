@@ -1,0 +1,21 @@
+# Copyright (c) Facebook, Inc. and its affiliates.
+#
+# This source code is licensed under the MIT license found in the
+# LICENSE file in the root directory of this source tree.
+#
+--rule-forward CPPConflict.foobar
+===
+ {-# LANGUAGE CPP #-}
+ module CPPConflict where
+ 
+ -- We should NOT match this rule, as it would overwrite the CPP directives.
+ {-# RULES "foobar" forall x y. foo bar x y = foo bar y x #-}
+
+ baz x y = foo
+ #if __XXX__
+   bar
+ #else
+   somethingElse
+ #endif
+   x
+   y

@@ -1,0 +1,17 @@
+# Copyright (c) Facebook, Inc. and its affiliates.
+#
+# This source code is licensed under the MIT license found in the
+# LICENSE file in the root directory of this source tree.
+#
+-u Commas.foo
+===
+ module Commas where
+ 
+ import Debug.Trace
+ 
+ main :: IO ()
+-main = print [(foo), pred foo, foo]
++main = print [succ 4, pred (succ 4), succ 4]
+ 
+ foo :: Int
+ foo = succ 4

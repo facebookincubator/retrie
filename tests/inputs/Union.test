@@ -1,0 +1,26 @@
+# Copyright (c) Facebook, Inc. and its affiliates.
+#
+# This source code is licensed under the MIT license found in the
+# LICENSE file in the root directory of this source tree.
+#
+-l Union.fi 
+-l Union.fo
+===
+ module Union where
+ 
+ import qualified Data.Text as Text
+ 
+ {-# RULES "fi" split " " = Text.splitOn " " #-}
+ {-# RULES "fo" split "," = Text.splitOn "," #-}
+ 
+ main :: IO ()
+ main = do
+   let t = "some text, with commas, and spaces"
+-      ts = split " " t
+-      tss = [ split "," t' | t' <- ts ]
++      ts = Text.splitOn " " t
++      tss = [ Text.splitOn "," t' | t' <- ts ]
+   print tss
+ 
+ split :: Text -> Text -> [Text]
+ split = undefined

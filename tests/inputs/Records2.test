@@ -1,0 +1,23 @@
+# Copyright (c) Facebook, Inc. and its affiliates.
+#
+# This source code is licensed under the MIT license found in the
+# LICENSE file in the root directory of this source tree.
+#
+--adhoc "forall one two three four. Record { rOne = one, rTwo = two, rThree = three, rFour = four } = foo mempty { fooOne = Bar one, fooTwo = Baz (baz four) four }"
+===
+ module Records2 where
+
+ data Record = Record
+   { rOne :: String
+   , rTwo :: Int
+   , rThree :: Double
+   , rFour :: String
+   }
+
+-blah = Record
+-  { rOne = "one here"
+-  , rTwo = 54
+-  , rThree = 1.1
+-  , rFour = "and four"
+-  }
++blah = foo mempty { fooOne = Bar "one here", fooTwo = Baz (baz "and four") "and four" }

@@ -1,0 +1,27 @@
+# Copyright (c) Facebook, Inc. and its affiliates.
+#
+# This source code is licensed under the MIT license found in the
+# LICENSE file in the root directory of this source tree.
+#
+-f FooFold.foo 
+-f FooFold.baz
+===
+ module FooFold where
+ 
+ import Foo
+ 
+ foo :: [Int] -> [Int]
+ foo xs = xs ++ [1,2, 3]
+ 
+ bar :: [Int]
+-bar =    [4,5,6] ++ [1,2,3]
++bar =    foo [4,5,6]
+ 
+ newtype Baz = Baz [Int]
+ 
+ baz :: Baz -> [Int]
+ baz (Baz is) = is ++ bar
+ 
+ quux :: [Int]
+-quux = [7,8, 9 ] ++ bar
++quux = baz (Baz [7,8, 9 ])

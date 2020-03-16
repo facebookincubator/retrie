@@ -1,0 +1,58 @@
+# Copyright (c) Facebook, Inc. and its affiliates.
+#
+# This source code is licensed under the MIT license found in the
+# LICENSE file in the root directory of this source tree.
+#
+-u Parens.foo 
+-u Parens.bar 
+-u Parens.quux 
+-u Parens.blarg
+===
+ module Parens where
+ 
+ foo :: Int
+ foo = 3 + 4
+ 
+ bar :: Int
+-bar = 5 * foo
++bar = 5 * (3 + 4)
+ 
+ baz :: Int
+-baz = quux bar
++baz = foo * bar
+ 
+ baz2 :: Int
+-baz2 = foo * bar
++baz2 = (3 + 4) * 5 * foo
+ 
+ quux :: Int -> Int
+-quux x = foo * x
++quux x = (3 + 4) * x
+ 
+ splat :: Int
+-splat = undefined foo
++splat = undefined (3 + 4)
+ 
+ blarg :: Int -> Int
+ blarg =
+   case 54 of
+     0 -> pred
+     _ -> succ
+ 
+ blerg :: Int
+-blerg = blarg 42
++blerg = (case 54 of
++    0 -> pred
++    _ -> succ) 42
+ 
+ jank :: IO (Int -> Int)
+-jank = return blarg
++jank = return (case 54 of
++    0 -> pred
++    _ -> succ)
+ 
+ jenk :: IO Int
+-jenk = return $ blarg 42
++jenk = return $ (case 54 of
++    0 -> pred
++    _ -> succ) 42

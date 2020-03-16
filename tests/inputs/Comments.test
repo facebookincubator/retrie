@@ -1,0 +1,56 @@
+# Copyright (c) Facebook, Inc. and its affiliates.
+#
+# This source code is licensed under the MIT license found in the
+# LICENSE file in the root directory of this source tree.
+#
+-l Comments.old 
+-l Comments.swap 
+-l Comments.convt 
+-u Comments.oldFunc
+===
+ module Comments where
+ 
+ {-# RULES "old" forall x. oldfunc x = newfunc x #-}
+ {-# RULES "swap" forall x y. swapFunc x y = newSwapFunc y x #-}
+ {-# RULES "convt" a = alpha #-}
+ 
+ main1 :: IO ()
+ main1 =
+-  oldfunc -- note: change this to newfunc
++  newfunc -- note: change this to newfunc
+     arg
+ 
+ main2 :: IO ()
+ main2 =
+-   swapFunc
++   newSwapFunc arg2
+      -- note: swap args and update
+-     arg1 arg2
++     arg1
+ 
+ main3 :: IO ()
+ main3 =
+   [
+   f -- first
+-    a
+-  , a -- ^ second
++    alpha
++  , alpha -- ^ second
+   -- third
+-  , a
++  , alpha
+   ]
+ 
+ oldFunc x =
+   [ x
+   , x
+   ]
+ 
+-main4 = oldFunc -- comment here
++main4 = [ -- comment here
+   -- more comment
+     foo
++  , -- comment here
++  -- more comment
++    foo
++  ]

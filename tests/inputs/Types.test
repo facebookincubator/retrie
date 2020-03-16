@@ -1,0 +1,28 @@
+# Copyright (c) Facebook, Inc. and its affiliates.
+#
+# This source code is licensed under the MIT license found in the
+# LICENSE file in the root directory of this source tree.
+#
+-l Types.ascribe
+-r Types.ascribe
+--type-forward Types.Pointless
+--type-forward Types.Fn
+===
+ module Types where
+ 
+ {-# RULES "ascribe" forall a b c f x y. (f :: a -> b -> c) x y = f (x :: a) (y :: b) :: c #-}
+ 
+-main :: IO (Pointless ())
++main :: IO ()
+ main = do
+-  print $ (foo :: Int -> String -> Bool) 54 "yolo"
+-  print $ (bar ("swaggins" :: Text) (True :: Bool) :: Maybe Int)
++  print $ (foo (54 :: Int) ("yolo" :: String) :: Bool)
++  print $ (bar :: Text -> Bool -> Maybe Int) "swaggins" True
+ 
+ type Pointless a = a
+ type Fn a b = a -> b
+ 
+-blah :: IO (Fn Int Bool)
++blah :: IO (Int -> Bool)
+ blah = return (> 0)

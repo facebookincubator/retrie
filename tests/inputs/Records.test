@@ -1,0 +1,24 @@
+# Copyright (c) Facebook, Inc. and its affiliates.
+#
+# This source code is licensed under the MIT license found in the
+# LICENSE file in the root directory of this source tree.
+#
+--adhoc "forall r i. r { rOne = i } = r { rOne = i + 12 }"
+--adhoc "forall s. Record { rTwo = s } = Record { rTwo = s ++ s }"
+===
+ module Records where
+
+ data Record = Record
+   { rOne :: Int
+   , rTwo :: String
+   }
+
+ defR :: Record
+ defR = Record 1 "record"
+
+ main :: IO ()
+ main = do
+-  print $ defR { rOne = 42 }
+-  print $ Record { rTwo = "foo" }
++  print $ defR { rOne = 42 + 12 }
++  print $ Record { rTwo = "foo" ++ "foo" }

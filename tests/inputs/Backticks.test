@@ -1,0 +1,24 @@
+# Copyright (c) Facebook, Inc. and its affiliates.
+#
+# This source code is licensed under the MIT license found in the
+# LICENSE file in the root directory of this source tree.
+#
+-u Backticks.foo
+===
+ module Backticks where
+ 
+ main :: IO ()
+-main = print $ foo `bar` [1..10]
++main = print $ (baz `div` quux 10) `bar` [1..10]
+ 
+ foo :: Int
+ foo = baz `div` quux 10
+ 
+ bar :: Int -> [Int] -> Int
+ bar x xs = x + sum xs
+
+ baz :: Int
+ baz = 100
+
+ quux :: Int -> Int
+ quux x = x - 1

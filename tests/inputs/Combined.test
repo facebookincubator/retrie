@@ -1,0 +1,85 @@
+# Copyright (c) Facebook, Inc. and its affiliates.
+#
+# This source code is licensed under the MIT license found in the
+# LICENSE file in the root directory of this source tree.
+#
+-l Union.fo
+-l Types.ascribe
+-u Parens.foo -u Parens.bar
+-l Union.fi
+-u Parens.quux -u Parens.blarg
+-r Types.ascribe
+-f Operator.f
+--import "import Combined"
+===
+ module Combined where
++import Operator
+ 
+ main :: IO ()
+ main = do
+   let t = "some text, with commas, and spaces"
+-      ts = split " " t
+-      tss = [ split "," t' | t' <- ts ]
++      ts = Text.splitOn " " t
++      tss = [ Text.splitOn "," t' | t' <- ts ]
+   print tss
+ 
+ main :: IO (Pointless ())
+ main = do
+-  print $ (foo :: Int -> String -> Bool) 54 "yolo"
+-  print $ (bar ("swaggins" :: Text) (True :: Bool) :: Maybe Int)
++  print $ (foo (54 :: Int) ("yolo" :: String) :: Bool)
++  print $ (bar :: Text -> Bool -> Maybe Int) "swaggins" True
+ 
+ #define CPPVALUE 1
+
+ foo :: Int
+ foo = 3 + 4
+ 
+ bar :: Int
+-bar = 5 *    foo
++bar = 5 *    (3 + 4)
+ 
+ baz :: Int
+-baz = quux bar
++baz = foo * bar
+ 
+ baz2 :: Int
+-baz2 = foo * bar
++baz2 = (3 + 4) * 5 * foo
+ 
+ quux :: Int -> Int
+-quux x = foo * x
++quux x = (3 + 4) * x
+ 
+ splat :: Int
+-splat = undefined foo
++splat = undefined (3 + 4)
+ 
+ blarg :: Int -> Int
+ blarg =
+   case 54 of
+     0 -> pred
+     _ -> succ
+ 
+ blerg :: Int
+-blerg = blarg 42
++blerg = (case 54 of
++    0 -> pred
++    _ -> succ) 42
+ 
+ jank :: IO (Int -> Int)
+-jank = return blarg
++jank = return (case 54 of
++    0 -> pred
++    _ -> succ)
+ 
+ jenk :: IO Int
+-jenk = return $ blarg 42
++jenk = return $ (case 54 of
++    0 -> pred
++    _ -> succ) 42
+
+ mneh :: Bool
+-mneh = 3 == 2
++mneh = f 3

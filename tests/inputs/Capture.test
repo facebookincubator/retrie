@@ -1,0 +1,60 @@
+# Copyright (c) Facebook, Inc. and its affiliates.
+#
+# This source code is licensed under the MIT license found in the
+# LICENSE file in the root directory of this source tree.
+#
+-u Capture.foo
+-u Capture.bar
+-u Capture.baz
+-u Capture.baz2
+-u Capture.quux
+-u Capture.stmts
+===
+ module Capture where
+
+ y = 5
+ xy9 = 4
+
+ -- basic: y should get renamed so it doesn't capture substitution
+ foo :: Int -> Int -> Int
+ foo x y = x + y
+
+-test1 = print $ map (foo y) [4]
++test1 = print $ map (\ y1 -> y + y1) [4]
+
+ -- reverse: ensure substition for 'x' doesn't happen under lambda
+ bar :: Int -> Int -> Int
+ bar x y = y + (\x -> y + x) x
+
+-test2 = print $ map (bar y) [4]
++test2 = print $ map (\ y1 -> y1 + (\x -> y1 + x) y) [4]
+
+ -- double: renaming outer y to y1 forces inner y1 to become y2
+ baz :: Int -> Int -> Int
+ baz x y = y + (\y1 -> y + y1) x
+
+-test3 = print $ map (baz y) [4]
++test3 = print $ map (\ y1 -> y1 + (\y2 -> y1 + y2) y) [4]
+
+ -- double2: same as double, make sure var incrementing works
+ -- for longer vars and past 9
+ baz2 :: Int -> Int -> Int
+ baz2 x xy9 = xy9 + (\xy10 -> xy9 + xy10) x
+
+-test4 = print $ map (baz2 xy9) [4]
++test4 = print $ map (\ xy10 -> xy10 + (\xy11 -> xy10 + xy11) xy9) [4]
+
+ -- let: works for let expressions
+ quux :: Int -> Int
+ quux x = let y = 5 in x + y
+
+  -- TODO: fix parens in result
+-test5 = print $ quux y
++test5 = print $ (let y1 = 5 in y + y1)
+
+ -- stmts
+ stmts :: Int -> IO Int
+ stmts x = do y <- return x; print (x + y)
+
+-test6 = stmts y
++test6 = do y1 <- return y; print (y + y1)

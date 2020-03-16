@@ -1,0 +1,33 @@
+# Copyright (c) Facebook, Inc. and its affiliates.
+#
+# This source code is licensed under the MIT license found in the
+# LICENSE file in the root directory of this source tree.
+#
+--type-backward Types3.Foo
+--type-backward Types3.Foo2
+--type-backward Types3.MyMaybe
+===
+ module Types3 where
+ 
+ bleh :: HashMap Foo Foo
+ bleh = HashMap.empty
+ 
+-blech :: Maybe Foo
++blech :: MyMaybe Foo
+ blech = Just 54
+ 
+-blech2 :: MyMaybe Bar
++blech2 :: MyMaybe Foo
+ blech2 = blech
+ 
+-blech3 :: MyMaybe (Either String Bar2)
++blech3 :: MyMaybe Foo2
+ blech3 = Nothing
+ 
+ type Foo = Bar
+ type Bar = Int
+ 
+ type Foo2 = Either String Bar2
+ type Bar2 = Int
+ 
+ type MyMaybe a = Maybe a

@@ -1,0 +1,29 @@
+# Copyright (c) Facebook, Inc. and its affiliates.
+#
+# This source code is licensed under the MIT license found in the
+# LICENSE file in the root directory of this source tree.
+#
+-l PatBind.rule
+-l PatBind.infix
+===
+ module PatBind where
+
+ {-# RULES
+ "rule" forall a. let (x,y) = one a in f x = let (y,x) = two a in f x
+   #-}
+
+ {-# RULES
+ "infix" forall a. let x1:x2:xs = flipFirst a in f x2 x1 = let x1:x2:xs = a in f x1 x2
+   #-}
+
+ zzz :: ()
+-zzz = let (alpha, beta) = one global
+-       in f alpha
++zzz = let (y,x) = two global
++       in f x
+
+ yyy :: ()
+-yyy = let snd:fst:xs = flipFirst global
+-       in f fst snd
++yyy = let x1:x2:xs = global
++       in f x1 x2

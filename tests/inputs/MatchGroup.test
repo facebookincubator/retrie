@@ -1,0 +1,20 @@
+# Copyright (c) Facebook, Inc. and its affiliates.
+#
+# This source code is licensed under the MIT license found in the
+# LICENSE file in the root directory of this source tree.
+#
+-u MatchGroup.foo
+===
+ module MatchGroup where
+ 
+ foo :: [a] -> a
+ foo [] = error "foo: empty list"
+ foo (x:xs) = x
+ 
+ main :: IO ()
+ main = do
+   -- unfold tests
+-  print (foo [])
++  print (error "foo: empty list")
+-  print $ foo (1:[2])
++  print $ 1

@@ -1,0 +1,61 @@
+# Copyright (c) Facebook, Inc. and its affiliates.
+#
+# This source code is licensed under the MIT license found in the
+# LICENSE file in the root directory of this source tree.
+#
+--adhoc "forall f g xs. map f (map g xs) = map (f . g) xs"
+-u CPP.otherthing
+===
+ {-# LANGUAGE CPP #-}
+ module CPP where
+ 
+ #define TRUE 1
+
+ infixr 0 $
+
+ main :: IO ()
+ main = print $ foo (bar [1..10])
+ 
+ foo :: Int -> Int
+ foo x = x - 2
+ 
+ #if TRUE
+ bar :: [Int] -> Int
+ bar ys = length (filter even zs)
+   where
+-    zs = map (+1) (map (*3) ys)
++    zs = map ((+1) . (*3)) ys
+ #endif
+
+ #if TRUE
+ bar2 :: [Int] -> Int
+ bar2 ys = length (filter even zs)
+   where
+-    zs = map (+2) (map (*3) ys)
++    zs = map ((+2) . (*3)) ys
+ #else
+ bar2 :: [Int] -> Int
+ bar2 ys = length (filter even zs)
+   where
+-    zs = map (+2) (map (*4) ys)
++    zs = map ((+2) . (*4)) ys
+
+ otherthing :: Maybe a -> Int
+ otherthing mb = case mb of
+   Just{} -> 1
+   Nothing -> 0
+
+ useit :: Int
+-useit = otherthing (Just 54)
++useit = case Just 54 of
++  Just{} -> 1
++  Nothing -> 0
+
+ #if TRUE
+ useit2 :: Int
+-useit2 = otherthing (Just 42)
++useit2 = case Just 42 of
++  Just{} -> 1
++  Nothing -> 0
+ #endif
+ #endif

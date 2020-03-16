@@ -1,0 +1,58 @@
+# Copyright (c) Facebook, Inc. and its affiliates.
+#
+# This source code is licensed under the MIT license found in the
+# LICENSE file in the root directory of this source tree.
+#
+-f Recursion.foo
+--type-backward Recursion.Foo
+--rule-forward Recursion.foo
+--rule-backward Recursion.foo
+--adhoc "forall x y. blarg x y = dupa x y"
+===
+ module Recursion where
+
+ -- Goal of these tests is to make sure rewriting doesn't introduce unintended 
+ -- recursion. It doesn't protect against infinite mutual recursion, but we can
+ -- at least spot self-recursion.
+ 
+ -- foo should not be rewritten
+ foo :: Int -> Int
+ foo = foldr bar baz
+
+ quux :: Int -> Int
+-quux = foldr bar baz
++quux = foo
+
+ -- Foo should not be rewritten
+ type Foo a = Bar a Int
+-type Quux b = Bar b Int
++type Quux b = Foo b
+
+ -- The rule should not be rewritten
+ {-# RULES "foo" forall f g xs. map f (map g xs) = map (f . g) xs #-}
+-blah = map succ (map pred [1..2])
++blah = map (succ . pred) [1..2]
+
+-bleh = map (succ . pred) [1..10]
++bleh = map succ (map pred [1..10])
+
+ -- dupa should not be rewritten by the adhoc rule
+ dupa x y = blarg x y
+-dupa2 = blarg some args
++dupa2 = dupa some args
+
+ main :: IO ()
+ main = do
+   let
+     dupa x y = blarg x y
+-    dupa2 = blarg some otherargs
++    dupa2 = dupa some otherargs
+
+   dupa <- blarg "notok" "ok"
+-  dupa2 <- blarg "notok" "ok"
++  dupa2 <- dupa "notok" "ok"
+
+   let
+    -- no args
+    dupa = blarg "foo" "bar"
+   return ()

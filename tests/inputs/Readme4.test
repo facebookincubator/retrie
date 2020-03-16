@@ -1,0 +1,21 @@
+# Copyright (c) Facebook, Inc. and its affiliates.
+#
+# This source code is licensed under the MIT license found in the
+# LICENSE file in the root directory of this source tree.
+#
+--rule-forward Readme4.myRule
+===
+ module Readme4 where
+
+ maybe :: b -> (a -> b) -> Maybe a -> b
+ maybe d f mb = case mb of
+   Nothing -> d
+   Just x -> f x
+
+ type MyMaybe = Maybe Int
+
+ {-# RULES "myRule" forall x. maybe Nothing Just x = x #-}
+
+ foo :: MyMaybe
+-foo = maybe Nothing Just (Just 5)
++foo = Just 5
