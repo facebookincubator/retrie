@@ -39,7 +39,15 @@ withFakeRepoCmds initCmd ignoreFile ignoredFiles allFiles f =
       writeFile filePath fp
 
 withFakeHgRepo :: [FilePath] -> [FilePath] -> (FilePath -> IO ()) -> IO ()
-withFakeHgRepo = withFakeRepoCmds "hg init" ".gitignore"
+withFakeHgRepo ignoredFiles allFiles f =
+  withFakeRepoCmds "hg init" ".hgignore" ignoredFiles allFiles $ \dir -> do
+    -- Tell 'hg' which ignore file to use for the repo, because Facebook's
+    -- 'hg' looks at .gitignore by default.
+    writeFile (dir </> ".hg" </> "hgrc") $ unlines
+      [ "[ui]"
+      , "ignore = .hgignore"
+      ]
+    f dir
 
 withFakeGitRepo :: [FilePath] -> [FilePath] -> (FilePath -> IO ()) -> IO ()
 withFakeGitRepo = withFakeRepoCmds "git init" ".gitignore"
