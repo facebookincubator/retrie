@@ -9,6 +9,7 @@ module Retrie.Util where
 import Control.Applicative
 import Control.Concurrent.Async
 import Control.Exception
+import Control.Monad
 import Data.Bifunctor (second)
 import Data.List
 import System.Exit
@@ -49,61 +50,70 @@ debugPrint verbosity header ls
   | otherwise = mapM_ putStrLn (header:ls)
 
 -- | Returns predicate which says whether filepath is ignored by VCS.
-vcsIgnorePred :: FilePath -> IO (Maybe (FilePath -> Bool))
-vcsIgnorePred fp = do
-  (gitPred, hgPred) <- concurrently (gitIgnorePred fp) (hgIgnorePred fp)
+vcsIgnorePred :: Verbosity -> FilePath -> IO (Maybe (FilePath -> Bool))
+vcsIgnorePred verbosity fp = do
+  -- We just try to run both 'git' and 'hg' here. Only one should succeed,
+  -- because a directory can't be both a git repo and an hg repo.
+  -- If both fail, then the whole predicate is Nothing and we keep going
+  -- without ignoring any files. Not ideal, but ignoring is just a convenience
+  -- to save wasted time rewriting ignored files, so not the end of the world.
+  (gitPred, hgPred) <-
+    concurrently (gitIgnorePred verbosity fp) (hgIgnorePred verbosity fp)
   return $ gitPred <|> hgPred
 
 -- | Read .gitignore in dir and if successful, return predicate for whether
 -- given repo path should be ignored.
-gitIgnorePred :: FilePath -> IO (Maybe (FilePath -> Bool))
-gitIgnorePred targetDir = do
-  let
-    cmd =
-      (proc "git"
-        [ "ls-files"
-        , "--ignored"
-        , "--exclude-standard"
-        , "--others"
-        , "--directory"
-        , targetDir
-        ])
-      { cwd = Just targetDir }
-  (ec, fps, _) <- readCreateProcessWithExitCode cmd ""
-  case ec of
-    ExitSuccess -> do
-      let
-        (ifiles, idirs) = partition hasExtension
-          [ normalise $ targetDir </> dropTrailingPathSeparator f
-          | f <- lines fps ]
-      return $ Just (\fp -> fp `elem` ifiles || any (`isPrefixOf` fp) idirs)
-    ExitFailure _ -> return Nothing
+gitIgnorePred :: Verbosity -> FilePath -> IO (Maybe (FilePath -> Bool))
+gitIgnorePred verbosity targetDir = ignoreWorker "gitIgnorePred: " verbosity targetDir id $
+  proc "git"
+    [ "ls-files"
+    , "--ignored"
+    , "--exclude-standard"
+    , "--others"
+    , "--directory"
+    , targetDir
+    ]
 
 -- | Read .hgignore in dir and if successful, return predicate for whether
 -- given repo path should be ignored.
-hgIgnorePred :: FilePath -> IO (Maybe (FilePath -> Bool))
-hgIgnorePred targetDir = do
-  let
-    cmd =
-      (proc "hg"
-        [ "status"
-        , "--ignored"
-        , "--no-status"
-        , "-I"
-        , "re:.*\\.hs$"
-        ])
-      { cwd = Just targetDir }
-  (ec, fps, _) <- readCreateProcessWithExitCode cmd ""
+hgIgnorePred :: Verbosity -> FilePath -> IO (Maybe (FilePath -> Bool))
+hgIgnorePred verbosity targetDir =
+  -- .hg looks like an extension, so have to add this after the partition
+  ignoreWorker "hgIgnorePred: " verbosity targetDir (normalise (targetDir </> ".hg") :) $
+    proc "hg"
+      [ "status"
+      , "--ignored"
+      , "--no-status"
+      , "-I"
+      , "re:.*\\.hs$"
+      ]
+
+ignoreWorker
+  :: String
+  -> Verbosity
+  -> FilePath
+  -> ([FilePath] -> [FilePath])
+  -> CreateProcess
+  -> IO (Maybe (FilePath -> Bool))
+ignoreWorker prefix verbosity targetDir extraDirs cmd = handle (handler prefix verbosity) $ do
+  let command = cmd { cwd = Just targetDir }
+  (ec, fps, err) <- readCreateProcessWithExitCode command ""
   case ec of
     ExitSuccess -> do
       let
         (ifiles, dirs) = partition hasExtension
           [ normalise $ targetDir </> dropTrailingPathSeparator f
           | f <- lines fps ]
-        -- .hg looks like an extension, so have to add this after the partition
-        idirs = normalise (targetDir </> ".hg") : dirs
+        idirs = extraDirs dirs
       return $ Just $ \fp -> fp `elem` ifiles || any (`isPrefixOf` fp) idirs
-    ExitFailure _ -> return Nothing
+    ExitFailure _ -> do
+      when (verbosity > Normal) $ putStrLn $ prefix ++ err
+      return Nothing
+
+handler :: String -> Verbosity -> IOError -> IO (Maybe a)
+handler prefix verbosity err = do
+  when (verbosity > Normal) $ putStrLn $ prefix ++ show err
+  return Nothing
 
 -- | Like 'try', but rethrows async exceptions.
 trySync :: IO a -> IO (Either SomeException a)

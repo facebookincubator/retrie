@@ -43,7 +43,7 @@ assertStuff repo (Just p) = do
 hgTest :: Test
 hgTest = TestLabel "hg ignore" $ TestCase $
   withFakeHgRepo ignoredFiles allFiles $ \repo -> do
-    maybePredicate <- hgIgnorePred repo
+    maybePredicate <- hgIgnorePred Loud repo
     assertStuff repo maybePredicate
     case maybePredicate of
       Just p ->
@@ -54,14 +54,14 @@ hgTest = TestLabel "hg ignore" $ TestCase $
 gitTest :: Test
 gitTest = TestLabel "git ignore" $ TestCase $
   withFakeGitRepo ignoredFiles allFiles $ \repo ->
-    gitIgnorePred repo >>= assertStuff repo
+    gitIgnorePred Loud repo >>= assertStuff repo
 
 unifiedTest1 :: Test
 unifiedTest1 = TestLabel "vcs ignore on git repo" $ TestCase $
   withFakeGitRepo ignoredFiles allFiles $ \repo ->
-    vcsIgnorePred repo >>= assertStuff repo
+    vcsIgnorePred Loud repo >>= assertStuff repo
 
 unifiedTest2 :: Test
 unifiedTest2 = TestLabel "vcs ignore on hg repo" $ TestCase $
   withFakeHgRepo ignoredFiles allFiles $ \repo ->
-    vcsIgnorePred repo >>= assertStuff repo
+    vcsIgnorePred Loud repo >>= assertStuff repo

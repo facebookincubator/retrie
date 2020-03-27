@@ -347,7 +347,7 @@ getTargetFiles :: Options_ a b -> [GroundTerms] -> IO [FilePath]
 -- This selects all files if the list of rewrites is empty
 getTargetFiles opts [] = getTargetFiles opts [mempty]
 getTargetFiles Options{..} gtss = do
-  ignorePred <- maybe onIgnoreErr return =<< vcsIgnorePred targetDir
+  ignorePred <- maybe onIgnoreErr return =<< vcsIgnorePred verbosity targetDir
   let ignore fp = ignorePred fp || extraIgnorePred fp
   fpSets <- forM (dedup gtss) $ \ gts -> do
     -- See Note [Ground Terms]
