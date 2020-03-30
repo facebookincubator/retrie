@@ -100,8 +100,10 @@ instance PatternMap UMap where
   mEmpty = UMap mEmpty mEmpty mEmpty
 
   mUnion :: UMap a -> UMap a -> UMap a
-  mUnion (UMap x1 x2 x3) (UMap y1 y2 y3) =
-    UMap (mUnion x1 y1) (mUnion x2 y2) (mUnion x3 y3)
+  mUnion m1 m2 = UMap
+    (unionOn umExpr m1 m2)
+    (unionOn umStmt m1 m2)
+    (unionOn umType m1 m2)
 
   mAlter :: AlphaEnv -> Quantifiers -> Universe -> A a -> UMap a -> UMap a
   mAlter env vs u f m = go u

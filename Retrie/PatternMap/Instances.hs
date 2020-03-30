@@ -37,7 +37,10 @@ instance PatternMap TupArgMap where
   mEmpty = TupArgMap mEmpty mEmpty
 
   mUnion :: TupArgMap a -> TupArgMap a -> TupArgMap a
-  mUnion (TupArgMap p1 m1) (TupArgMap p2 m2) = TupArgMap (mUnion p1 p2) (mUnion m1 m2)
+  mUnion m1 m2 = TupArgMap
+    { tamPresent = unionOn tamPresent m1 m2
+    , tamMissing = unionOn tamMissing m1 m2
+    }
 
   mAlter :: AlphaEnv -> Quantifiers -> Key TupArgMap -> A a -> TupArgMap a -> TupArgMap a
   mAlter env vs tupArg f m = go (unLoc tupArg)
@@ -74,7 +77,10 @@ instance PatternMap BoxityMap where
   mEmpty = BoxityMap mEmpty mEmpty
 
   mUnion :: BoxityMap a -> BoxityMap a -> BoxityMap a
-  mUnion (BoxityMap b1 u1) (BoxityMap b2 u2) = BoxityMap (mUnion b1 b2) (mUnion u1 u2)
+  mUnion m1 m2 = BoxityMap
+    { boxBoxed = unionOn boxBoxed m1 m2
+    , boxUnboxed = unionOn boxUnboxed m1 m2
+    }
 
   mAlter :: AlphaEnv -> Quantifiers -> Key BoxityMap -> A a -> BoxityMap a -> BoxityMap a
   mAlter env vs Boxed   f m = m { boxBoxed   = mAlter env vs () f (boxBoxed m) }
@@ -99,7 +105,10 @@ instance PatternMap VMap where
   mUnion :: VMap a -> VMap a -> VMap a
   mUnion VMEmpty m = m
   mUnion m VMEmpty = m
-  mUnion (VM b1 f1) (VM b2 f2) = VM (mUnion b1 b2) (mUnion f1 f2)
+  mUnion m1 m2 = VM
+    { bvmap = unionOn bvmap m1 m2
+    , fvmap = unionOn fvmap m1 m2
+    }
 
   mAlter :: AlphaEnv -> Quantifiers -> Key VMap -> A a -> VMap a -> VMap a
   mAlter env vs v f VMEmpty = mAlter env vs v f (VM mEmpty mEmpty)
@@ -143,17 +152,17 @@ instance PatternMap LMap where
   mUnion :: LMap a -> LMap a -> LMap a
   mUnion LMEmpty m = m
   mUnion m LMEmpty = m
-  mUnion (LM a1 b1 c1 d1 e1 f1 g1 h1 i1)
-         (LM a2 b2 c2 d2 e2 f2 g2 h2 i2) =
-          LM (mUnion a1 a2)
-             (mUnion b1 b2)
-             (mUnion c1 c2)
-             (mUnion d1 d2)
-             (mUnion e1 e2)
-             (mUnion f1 f2)
-             (mUnion g1 g2)
-             (mUnion h1 h2)
-             (mUnion i1 i2)
+  mUnion m1 m2 = LM
+    { lmChar = unionOn lmChar m1 m2
+    , lmCharPrim = unionOn lmCharPrim m1 m2
+    , lmString = unionOn lmString m1 m2
+    , lmStringPrim = unionOn lmStringPrim m1 m2
+    , lmInt = unionOn lmInt m1 m2
+    , lmIntPrim = unionOn lmIntPrim m1 m2
+    , lmWordPrim = unionOn lmWordPrim m1 m2
+    , lmInt64Prim = unionOn lmInt64Prim m1 m2
+    , lmWord64Prim = unionOn lmWord64Prim m1 m2
+    }
 
   mAlter :: AlphaEnv -> Quantifiers -> Key LMap -> A a -> LMap a -> LMap a
   mAlter env vs lit f LMEmpty = mAlter env vs lit f emptyLMapWrapper
@@ -216,8 +225,11 @@ instance PatternMap OLMap where
   mUnion :: OLMap a -> OLMap a -> OLMap a
   mUnion OLMEmpty m = m
   mUnion m OLMEmpty = m
-  mUnion (OLM a1 b1 c1) (OLM a2 b2 c2) =
-    OLM (mUnion a1 a2) (mUnion b1 b2) (mUnion c1 c2)
+  mUnion m1 m2 = OLM
+    { olmIntegral = unionOn olmIntegral m1 m2
+    , olmFractional = unionOn olmFractional m1 m2
+    , olmIsString = unionOn olmIsString m1 m2
+    }
 
   mAlter :: AlphaEnv -> Quantifiers -> Key OLMap -> A a -> OLMap a -> OLMap a
   mAlter env vs lv f OLMEmpty = mAlter env vs lv f emptyOLMapWrapper
@@ -309,29 +321,29 @@ instance PatternMap EMap where
   mUnion :: EMap a -> EMap a -> EMap a
   mUnion EMEmpty m = m
   mUnion m EMEmpty = m
-  mUnion (EM a1 b1 c1 d1 e1 f1 g1 h1 i1 j1 k1 l1 m1 n1 o1 p1 q1 r1 s1 t1 u1)
-         (EM a2 b2 c2 d2 e2 f2 g2 h2 i2 j2 k2 l2 m2 n2 o2 p2 q2 r2 s2 t2 u2) =
-          EM (mUnion a1 a2)
-             (mUnion b1 b2)
-             (mUnion c1 c2)
-             (mUnion d1 d2)
-             (mUnion e1 e2)
-             (mUnion f1 f2)
-             (mUnion g1 g2)
-             (mUnion h1 h2)
-             (mUnion i1 i2)
-             (mUnion j1 j2)
-             (mUnion k1 k2)
-             (mUnion l1 l2)
-             (mUnion m1 m2)
-             (mUnion n1 n2)
-             (mUnion o1 o2)
-             (mUnion p1 p2)
-             (mUnion q1 q2)
-             (mUnion r1 r2)
-             (mUnion s1 s2)
-             (mUnion t1 t2)
-             (mUnion u1 u2)
+  mUnion m1 m2 = EM
+    { emHole = unionOn emHole m1 m2
+    , emVar = unionOn emVar m1 m2
+    , emIPVar = unionOn emIPVar m1 m2
+    , emOverLit = unionOn emOverLit m1 m2
+    , emLit = unionOn emLit m1 m2
+    , emLam = unionOn emLam m1 m2
+    , emApp = unionOn emApp m1 m2
+    , emOpApp = unionOn emOpApp m1 m2
+    , emNegApp = unionOn emNegApp m1 m2
+    , emPar = unionOn emPar m1 m2
+    , emExplicitTuple = unionOn emExplicitTuple m1 m2
+    , emCase = unionOn emCase m1 m2
+    , emSecL = unionOn emSecL m1 m2
+    , emSecR = unionOn emSecR m1 m2
+    , emIf = unionOn emIf m1 m2
+    , emLet = unionOn emLet m1 m2
+    , emDo = unionOn emDo m1 m2
+    , emExplicitList = unionOn emExplicitList m1 m2
+    , emRecordCon = unionOn emRecordCon m1 m2
+    , emRecordUpd = unionOn emRecordUpd m1 m2
+    , emExprWithTySig = unionOn emExprWithTySig m1 m2
+    }
 
   mAlter :: AlphaEnv -> Quantifiers -> Key EMap -> A a -> EMap a -> EMap a
   mAlter env vs e f EMEmpty = mAlter env vs e f emptyEMapWrapper
@@ -596,8 +608,11 @@ instance PatternMap SCMap where
   mUnion :: SCMap a -> SCMap a -> SCMap a
   mUnion SCEmpty m = m
   mUnion m SCEmpty = m
-  mUnion (SCM a1 b1 c1) (SCM a2 b2 c2) =
-    SCM (mUnion a1 a2) (mUnion b1 b2) (mUnion c1 c2)
+  mUnion m1 m2 = SCM
+    { scmListComp = unionOn scmListComp m1 m2
+    , scmMonadComp = unionOn scmMonadComp m1 m2
+    , scmDoExpr = unionOn scmDoExpr m1 m2
+    }
 
   mAlter :: AlphaEnv -> Quantifiers -> Key SCMap -> A a -> SCMap a -> SCMap a
   mAlter env vs sc f SCEmpty = mAlter env vs sc f emptySCMapWrapper
@@ -703,7 +718,10 @@ instance PatternMap CDMap where
   mUnion :: CDMap a -> CDMap a -> CDMap a
   mUnion CDEmpty m = m
   mUnion m CDEmpty = m
-  mUnion (CDMap a1 b1) (CDMap a2 b2) = CDMap (mUnion a1 a2) (mUnion b1 b2)
+  mUnion m1 m2 = CDMap
+    { cdPrefixCon = unionOn cdPrefixCon m1 m2
+    , cdInfixCon = unionOn cdInfixCon m1 m2
+    }
 
   mAlter :: AlphaEnv -> Quantifiers -> Key CDMap -> A a -> CDMap a -> CDMap a
   mAlter env vs d f CDEmpty   = mAlter env vs d f emptyCDMapWrapper
@@ -753,14 +771,14 @@ instance PatternMap PatMap where
   mUnion :: PatMap a -> PatMap a -> PatMap a
   mUnion PatEmpty m = m
   mUnion m PatEmpty = m
-  mUnion (PatMap a1 b1 c1 d1 e1 f1)
-         (PatMap a2 b2 c2 d2 e2 f2) =
-          PatMap (mUnion a1 a2)
-                 (mUnion b1 b2)
-                 (mUnion c1 c2)
-                 (mUnion d1 d2)
-                 (mUnion e1 e2)
-                 (mUnion f1 f2)
+  mUnion m1 m2 = PatMap
+    { pmHole = unionOn pmHole m1 m2
+    , pmWild = unionOn pmWild m1 m2
+    , pmVar = unionOn pmVar m1 m2
+    , pmParPat = unionOn pmParPat m1 m2
+    , pmTuplePat = unionOn pmTuplePat m1 m2
+    , pmConPatIn = unionOn pmConPatIn m1 m2
+    }
 
   mAlter :: AlphaEnv -> Quantifiers -> Key PatMap -> A a -> PatMap a -> PatMap a
   mAlter env vs pat f PatEmpty   = mAlter env vs pat f emptyPatMapWrapper
@@ -916,7 +934,10 @@ instance PatternMap SLMap where
   mUnion :: SLMap a -> SLMap a -> SLMap a
   mUnion SLEmpty m = m
   mUnion m SLEmpty = m
-  mUnion (SLM a1 b1) (SLM a2 b2) = SLM (mUnion a1 a2) (mUnion b1 b2)
+  mUnion m1 m2 = SLM
+    { slmNil = unionOn slmNil m1 m2
+    , slmCons = unionOn slmCons m1 m2
+    }
 
   mAlter :: AlphaEnv -> Quantifiers -> Key SLMap -> A a -> SLMap a -> SLMap a
   mAlter env vs ss f SLEmpty = mAlter env vs ss f emptySLMapWrapper
@@ -967,8 +988,10 @@ instance PatternMap LBMap where
   mUnion :: LBMap a -> LBMap a -> LBMap a
   mUnion LBEmpty m = m
   mUnion m LBEmpty = m
-  mUnion (LB a1 b1) (LB a2 b2) =
-    LB (mUnion a1 a2) (mUnion b1 b2)
+  mUnion m1 m2 = LB
+    { lbValBinds = unionOn lbValBinds m1 m2
+    , lbEmpty = unionOn lbEmpty m1 m2
+    }
 
   mAlter :: AlphaEnv -> Quantifiers -> Key LBMap -> A a -> LBMap a -> LBMap a
   mAlter env vs lbs f LBEmpty = mAlter env vs lbs f emptyLBMapWrapper
@@ -1041,8 +1064,11 @@ instance PatternMap BMap where
   mUnion :: BMap a -> BMap a -> BMap a
   mUnion BMEmpty m = m
   mUnion m BMEmpty = m
-  mUnion (BM a1 b1 c1) (BM a2 b2 c2)
-    = BM (mUnion a1 a2) (mUnion b1 b2) (mUnion c1 c2)
+  mUnion m1 m2 = BM
+    { bmFunBind = unionOn bmFunBind m1 m2
+    , bmVarBind = unionOn bmVarBind m1 m2
+    , bmPatBind = unionOn bmPatBind m1 m2
+    }
 
   mAlter :: AlphaEnv -> Quantifiers -> Key BMap -> A a -> BMap a -> BMap a
   mAlter env vs b f BMEmpty = mAlter env vs b f emptyBMapWrapper
@@ -1102,8 +1128,11 @@ instance PatternMap SMap where
   mUnion :: SMap a -> SMap a -> SMap a
   mUnion SMEmpty m = m
   mUnion m SMEmpty = m
-  mUnion (SM a1 b1 c1) (SM a2 b2 c2) =
-    SM (mUnion a1 a2) (mUnion b1 b2) (mUnion c1 c2)
+  mUnion m1 m2 = SM
+    { smLastStmt = unionOn smLastStmt m1 m2
+    , smBindStmt = unionOn smBindStmt m1 m2
+    , smBodyStmt = unionOn smBodyStmt m1 m2
+    }
 
   mAlter :: AlphaEnv -> Quantifiers -> Key SMap -> A a -> SMap a -> SMap a
   mAlter env vs s f SMEmpty = mAlter env vs s f emptySMapWrapper
@@ -1180,15 +1209,16 @@ instance PatternMap TyMap where
   mUnion :: TyMap a -> TyMap a -> TyMap a
   mUnion TyEmpty m = m
   mUnion m TyEmpty = m
+  mUnion m1 m2 = TM
+    { tyHole = unionOn tyHole m1 m2
+    , tyHsTyVar = unionOn tyHsTyVar m1 m2
+    , tyHsFunTy = unionOn tyHsFunTy m1 m2
+    , tyHsAppTy = unionOn tyHsAppTy m1 m2
 #if __GLASGOW_HASKELL__ < 806
-  mUnion (TM a1 b1 c1 d1 e1 f1) (TM a2 b2 c2 d2 e2 f2) =
-    TM (mUnion a1 a2) (mUnion b1 b2) (mUnion c1 c2) (mUnion d1 d2)
-       (mUnion e1 e2) (mUnion f1 f2)
-#else
-  mUnion (TM a1 b1 c1 d1 e1) (TM a2 b2 c2 d2 e2) =
-    TM (mUnion a1 a2) (mUnion b1 b2) (mUnion c1 c2) (mUnion d1 d2)
-       (mUnion e1 e2)
+    , tyHsAppsTy = unionOn tyHsAppsTy m1 m2
 #endif
+    , tyHsParTy = unionOn tyHsParTy m1 m2
+    }
 
   mAlter :: AlphaEnv -> Quantifiers -> Key TyMap -> A a -> TyMap a -> TyMap a
   mAlter env vs ty f TyEmpty = mAlter env vs ty f emptyTyMapWrapper
@@ -1303,8 +1333,10 @@ instance PatternMap AppTyMap where
   mUnion :: AppTyMap a -> AppTyMap a -> AppTyMap a
   mUnion AppTyEmpty m = m
   mUnion m AppTyEmpty = m
-  mUnion (ATM a1 b1) (ATM a2 b2) =
-    ATM (mUnion a1 a2) (mUnion b1 b2)
+  mUnion m1 m2 = ATM
+    { atmAppInfix = unionOn atmAppInfix m1 m2
+    , atmAppPrefix = unionOn atmAppPrefix m1 m2
+    }
 
   mAlter :: AlphaEnv -> Quantifiers -> Key AppTyMap -> A a -> AppTyMap a -> AppTyMap a
   mAlter env vs aty f AppTyEmpty = mAlter env vs aty f emptyAppTyMapWrapper

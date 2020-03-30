@@ -35,8 +35,10 @@ instance PatternMap BoolMap where
   mUnion :: BoolMap a -> BoolMap a -> BoolMap a
   mUnion EmptyBoolMap m = m
   mUnion m EmptyBoolMap = m
-  mUnion (BoolMap tm1 fm1) (BoolMap tm2 fm2) =
-    BoolMap (mUnion tm1 tm2) (mUnion fm1 fm2)
+  mUnion m1 m2 = BoolMap
+    { bmTrue = unionOn bmTrue m1 m2
+    , bmFalse = unionOn bmFalse m1 m2
+    }
 
   mAlter
     :: AlphaEnv -> Quantifiers -> Key BoolMap -> A a -> BoolMap a -> BoolMap a

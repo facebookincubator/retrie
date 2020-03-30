@@ -45,6 +45,9 @@ toAList :: A a -> A [a]
 toAList f Nothing = (:[]) <$> f Nothing
 toAList f (Just xs) = Just $ mapMaybe (f . Just) xs
 
+unionOn :: PatternMap m => (a -> m b) -> a -> a -> m b
+unionOn f m1 m2 = mUnion (f m1) (f m2)
+
 ------------------------------------------------------------------------
 
 class PatternMap m where
@@ -94,9 +97,10 @@ instance PatternMap MaybeMap where
 
 ------------------------------------------------------------------------
 
-data ListMap m a
-  = ListMap { lmNil  :: MaybeMap a
-            , lmCons :: m (ListMap m a) }
+data ListMap m a = ListMap
+  { lmNil  :: MaybeMap a
+  , lmCons :: m (ListMap m a)
+  }
   deriving (Functor)
 
 instance PatternMap m => PatternMap (ListMap m) where
@@ -106,7 +110,10 @@ instance PatternMap m => PatternMap (ListMap m) where
   mEmpty = ListMap mEmpty mEmpty
 
   mUnion :: ListMap m a -> ListMap m a -> ListMap m a
-  mUnion (ListMap n1 c1) (ListMap n2 c2) = ListMap (mUnion n1 n2) (mUnion c1 c2)
+  mUnion m1 m2 = ListMap
+    { lmNil = unionOn lmNil m1 m2
+    , lmCons = unionOn lmCons m1 m2
+    }
 
   mAlter :: AlphaEnv -> Quantifiers -> Key (ListMap m) -> A a -> ListMap m a -> ListMap m a
   mAlter env vs []     f m = m { lmNil  = mAlter env vs () f (lmNil m) }
