@@ -5,9 +5,12 @@
 #
 --type-backward Types4.Foo
 --type-backward Types4.Foo2
+--type-backward Types4.Foo3
+--type-backward Types4.Foo4
 ===
  {-# LANGUAGE ScopedTypeVariables #-}
  {-# LANGUAGE TypeOperators #-}
+ {-# LANGUAGE UnboxedSums #-}
  module Types4 where
  
  type Foo = [String]
@@ -21,3 +24,15 @@
 -foo2 :: ([String], Int)
 +foo2 :: Foo2
  foo2 = (foo, 2)
+
+ type Foo3 = (Functor f, Traversable t) => t (f a) -> f (t a)
+
+-foo3 :: (Functor f, Traversable t) => t (f a) -> f (t a)
++foo3 :: Foo3
+ foo3 = sequence
+
+ type Foo4 a = (# (# Int, String #) | a #)
+
+-foo4 :: (# (# Int, String #) | Bool #)
++foo4 :: Foo4 Bool
+ foo4 = (# | True #)

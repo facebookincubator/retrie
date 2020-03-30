@@ -1183,13 +1183,15 @@ data TyMap a
   = TyEmpty
   | TM { tyHole    :: Map RdrName a -- See Note [Holes]
        , tyHsTyVar :: VMap a
-       , tyHsFunTy :: TyMap (TyMap a)
        , tyHsAppTy :: TyMap (TyMap a)
 #if __GLASGOW_HASKELL__ < 806
        , tyHsAppsTy :: ListMap AppTyMap a
 #endif
-       , tyHsParTy :: TyMap a
+       , tyHsFunTy :: TyMap (TyMap a)
        , tyHsListTy :: TyMap a
+       , tyHsParTy :: TyMap a
+       , tyHsQualTy :: TyMap (ListMap TyMap a)
+       , tyHsSumTy :: ListMap TyMap a
        , tyHsTupleTy :: TupleSortMap (ListMap TyMap a)
          -- TODO: the rest
        }
@@ -1197,11 +1199,11 @@ data TyMap a
 
 emptyTyMapWrapper :: TyMap a
 emptyTyMapWrapper = TM
-  mEmpty mEmpty mEmpty mEmpty
+  mEmpty mEmpty mEmpty
 #if __GLASGOW_HASKELL__ < 806
   mEmpty
 #endif
-  mEmpty mEmpty mEmpty
+  mEmpty mEmpty mEmpty mEmpty mEmpty mEmpty
 
 instance PatternMap TyMap where
   type Key TyMap = LHsType GhcPs
@@ -1215,13 +1217,15 @@ instance PatternMap TyMap where
   mUnion m1 m2 = TM
     { tyHole = unionOn tyHole m1 m2
     , tyHsTyVar = unionOn tyHsTyVar m1 m2
-    , tyHsFunTy = unionOn tyHsFunTy m1 m2
     , tyHsAppTy = unionOn tyHsAppTy m1 m2
 #if __GLASGOW_HASKELL__ < 806
     , tyHsAppsTy = unionOn tyHsAppsTy m1 m2
 #endif
-    , tyHsParTy = unionOn tyHsParTy m1 m2
+    , tyHsFunTy = unionOn tyHsFunTy m1 m2
     , tyHsListTy = unionOn tyHsListTy m1 m2
+    , tyHsParTy = unionOn tyHsParTy m1 m2
+    , tyHsQualTy = unionOn tyHsQualTy m1 m2
+    , tyHsSumTy = unionOn tyHsSumTy m1 m2
     , tyHsTupleTy = unionOn tyHsTupleTy m1 m2
     }
 
@@ -1242,7 +1246,6 @@ instance PatternMap TyMap where
         | v `isQ` vs = m { tyHole    = mAlter env vs v f (tyHole m) }
         | otherwise  = m { tyHsTyVar = mAlter env vs v f (tyHsTyVar m) }
       go HsForAllTy{} = error "HsForAllTy"
-      go HsQualTy{} = error "HsQualTy"
       go HsOpTy{} = error "HsOpTy"
       go HsIParamTy{} = error "HsIParamTy"
       go HsKindSig{} = error "HsKindSig"
@@ -1259,6 +1262,9 @@ instance PatternMap TyMap where
       go (HsListTy ty') = m { tyHsListTy = mAlter env vs ty' f (tyHsListTy m) }
       go (HsParTy ty') = m { tyHsParTy = mAlter env vs ty' f (tyHsParTy m) }
       go (HsPArrTy _) = error "HsPArrTy"
+      go (HsQualTy (L _ cons) ty') =
+        m { tyHsQualTy = mAlter env vs ty' (toA (mAlter env vs cons f)) (tyHsQualTy m) }
+      go (HsSumTy tys) = m { tyHsSumTy = mAlter env vs tys f (tyHsSumTy m) }
       go (HsTupleTy ts tys) =
         m { tyHsTupleTy = mAlter env vs ts (toA (mAlter env vs tys f)) (tyHsTupleTy m) }
 #else
@@ -1266,7 +1272,10 @@ instance PatternMap TyMap where
       go (HsFunTy _ ty1 ty2) = m { tyHsFunTy = mAlter env vs ty1 (toA (mAlter env vs ty2 f)) (tyHsFunTy m) }
       go (HsListTy _ ty') = m { tyHsListTy = mAlter env vs ty' f (tyHsListTy m) }
       go (HsParTy _ ty') = m { tyHsParTy = mAlter env vs ty' f (tyHsParTy m) }
+      go (HsQualTy _ (L _ cons) ty') =
+        m { tyHsQualTy = mAlter env vs ty' (toA (mAlter env vs cons f)) (tyHsQualTy m) }
       go HsStarTy{} = error "HsStarTy"
+      go (HsSumTy _ tys) = m { tyHsSumTy = mAlter env vs tys f (tyHsSumTy m) }
       go (HsTupleTy _ ts tys) =
         m { tyHsTupleTy = mAlter env vs ts (toA (mAlter env vs tys f)) (tyHsTupleTy m) }
       go XHsType{} = error "XHsType"
@@ -1275,7 +1284,6 @@ instance PatternMap TyMap where
       go HsExplicitTupleTy{} = error "HsExplicitTupleTy"
       go HsTyLit{} = error "HsTyLit"
       go HsWildCardTy{} = error "HsWildCardTy"
-      go HsSumTy{} = error "HsSumTy"
 #if __GLASGOW_HASKELL__ < 808
 #else
       go HsAppKindTy{} = error "HsAppKindTy"
@@ -1298,6 +1306,8 @@ instance PatternMap TyMap where
       go (HsFunTy ty1 ty2) = mapFor tyHsFunTy >=> mMatch env ty1 >=> mMatch env ty2
       go (HsListTy ty') = mapFor tyHsListTy >=> mMatch env ty'
       go (HsParTy ty') = mapFor tyHsParTy >=> mMatch env ty'
+      go (HsQualTy (L _ cons) ty') = mapFor tyHsQualTy >=> mMatch env ty' >=> mMatch env cons
+      go (HsSumTy tys) = mapFor tyHsSumTy >=> mMatch env tys
       go (HsTupleTy ts tys) = mapFor tyHsTupleTy >=> mMatch env ts >=> mMatch env tys
       go (HsTyVar _ v) = mapFor tyHsTyVar >=> mMatch env (unLoc v)
 #else
@@ -1305,6 +1315,8 @@ instance PatternMap TyMap where
       go (HsFunTy _ ty1 ty2) = mapFor tyHsFunTy >=> mMatch env ty1 >=> mMatch env ty2
       go (HsListTy _ ty') = mapFor tyHsListTy >=> mMatch env ty'
       go (HsParTy _ ty') = mapFor tyHsParTy >=> mMatch env ty'
+      go (HsQualTy _ (L _ cons) ty') = mapFor tyHsQualTy >=> mMatch env ty' >=> mMatch env cons
+      go (HsSumTy _ tys) = mapFor tyHsSumTy >=> mMatch env tys
       go (HsTupleTy _ ts tys) = mapFor tyHsTupleTy >=> mMatch env ts >=> mMatch env tys
       go (HsTyVar _ _ v) = mapFor tyHsTyVar >=> mMatch env (unLoc v)
 #endif
