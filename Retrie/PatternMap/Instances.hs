@@ -1189,16 +1189,19 @@ data TyMap a
        , tyHsAppsTy :: ListMap AppTyMap a
 #endif
        , tyHsParTy :: TyMap a
+       , tyHsListTy :: TyMap a
+       , tyHsTupleTy :: TupleSortMap (ListMap TyMap a)
          -- TODO: the rest
        }
   deriving (Functor)
 
 emptyTyMapWrapper :: TyMap a
-emptyTyMapWrapper =
-  TM mEmpty mEmpty mEmpty mEmpty mEmpty
+emptyTyMapWrapper = TM
+  mEmpty mEmpty mEmpty mEmpty
 #if __GLASGOW_HASKELL__ < 806
-     mEmpty
+  mEmpty
 #endif
+  mEmpty mEmpty mEmpty
 
 instance PatternMap TyMap where
   type Key TyMap = LHsType GhcPs
@@ -1218,6 +1221,8 @@ instance PatternMap TyMap where
     , tyHsAppsTy = unionOn tyHsAppsTy m1 m2
 #endif
     , tyHsParTy = unionOn tyHsParTy m1 m2
+    , tyHsListTy = unionOn tyHsListTy m1 m2
+    , tyHsTupleTy = unionOn tyHsTupleTy m1 m2
     }
 
   mAlter :: AlphaEnv -> Quantifiers -> Key TyMap -> A a -> TyMap a -> TyMap a
@@ -1238,8 +1243,6 @@ instance PatternMap TyMap where
         | otherwise  = m { tyHsTyVar = mAlter env vs v f (tyHsTyVar m) }
       go HsForAllTy{} = error "HsForAllTy"
       go HsQualTy{} = error "HsQualTy"
-      go HsListTy{} = error "HsListTy"
-      go HsTupleTy{} = error "HsTupleTy"
       go HsOpTy{} = error "HsOpTy"
       go HsIParamTy{} = error "HsIParamTy"
       go HsKindSig{} = error "HsKindSig"
@@ -1250,16 +1253,22 @@ instance PatternMap TyMap where
 #if __GLASGOW_HASKELL__ < 806
       go (HsAppsTy atys) = m { tyHsAppsTy = mAlter env vs atys f (tyHsAppsTy m) }
       go (HsAppTy ty1 ty2) = m { tyHsAppTy = mAlter env vs ty1 (toA (mAlter env vs ty2 f)) (tyHsAppTy m) }
-      go (HsFunTy ty1 ty2) = m { tyHsFunTy = mAlter env vs ty1 (toA (mAlter env vs ty2 f)) (tyHsFunTy m) }
       go (HsCoreTy _) = error "HsCoreTy"
       go (HsEqTy _ _) = error "HsEqTy"
+      go (HsFunTy ty1 ty2) = m { tyHsFunTy = mAlter env vs ty1 (toA (mAlter env vs ty2 f)) (tyHsFunTy m) }
+      go (HsListTy ty') = m { tyHsListTy = mAlter env vs ty' f (tyHsListTy m) }
       go (HsParTy ty') = m { tyHsParTy = mAlter env vs ty' f (tyHsParTy m) }
       go (HsPArrTy _) = error "HsPArrTy"
+      go (HsTupleTy ts tys) =
+        m { tyHsTupleTy = mAlter env vs ts (toA (mAlter env vs tys f)) (tyHsTupleTy m) }
 #else
       go (HsAppTy _ ty1 ty2) = m { tyHsAppTy = mAlter env vs ty1 (toA (mAlter env vs ty2 f)) (tyHsAppTy m) }
       go (HsFunTy _ ty1 ty2) = m { tyHsFunTy = mAlter env vs ty1 (toA (mAlter env vs ty2 f)) (tyHsFunTy m) }
+      go (HsListTy _ ty') = m { tyHsListTy = mAlter env vs ty' f (tyHsListTy m) }
       go (HsParTy _ ty') = m { tyHsParTy = mAlter env vs ty' f (tyHsParTy m) }
       go HsStarTy{} = error "HsStarTy"
+      go (HsTupleTy _ ts tys) =
+        m { tyHsTupleTy = mAlter env vs ts (toA (mAlter env vs tys f)) (tyHsTupleTy m) }
       go XHsType{} = error "XHsType"
 #endif
       go HsExplicitListTy{} = error "HsExplicitListTy"
@@ -1287,12 +1296,16 @@ instance PatternMap TyMap where
       go (HsAppTy ty1 ty2) = mapFor tyHsAppTy >=> mMatch env ty1 >=> mMatch env ty2
       go (HsAppsTy atys) = mapFor tyHsAppsTy >=> mMatch env atys
       go (HsFunTy ty1 ty2) = mapFor tyHsFunTy >=> mMatch env ty1 >=> mMatch env ty2
+      go (HsListTy ty') = mapFor tyHsListTy >=> mMatch env ty'
       go (HsParTy ty') = mapFor tyHsParTy >=> mMatch env ty'
+      go (HsTupleTy ts tys) = mapFor tyHsTupleTy >=> mMatch env ts >=> mMatch env tys
       go (HsTyVar _ v) = mapFor tyHsTyVar >=> mMatch env (unLoc v)
 #else
       go (HsAppTy _ ty1 ty2) = mapFor tyHsAppTy >=> mMatch env ty1 >=> mMatch env ty2
       go (HsFunTy _ ty1 ty2) = mapFor tyHsFunTy >=> mMatch env ty1 >=> mMatch env ty2
+      go (HsListTy _ ty') = mapFor tyHsListTy >=> mMatch env ty'
       go (HsParTy _ ty') = mapFor tyHsParTy >=> mMatch env ty'
+      go (HsTupleTy _ ts tys) = mapFor tyHsTupleTy >=> mMatch env ts >=> mMatch env tys
       go (HsTyVar _ _ v) = mapFor tyHsTyVar >=> mMatch env (unLoc v)
 #endif
       go _                  = const [] -- TODO
@@ -1403,3 +1416,43 @@ fieldsToRdrNames = map go
   where
     go (L l (HsRecField (L l2 f) arg pun)) =
       L l (HsRecField (L l2 (recordFieldToRdrName f)) arg pun)
+
+------------------------------------------------------------------------
+
+data TupleSortMap a = TupleSortMap
+  { tsUnboxed :: MaybeMap a
+  , tsBoxed :: MaybeMap a
+  , tsConstraint :: MaybeMap a
+  , tsBoxedOrConstraint :: MaybeMap a
+  }
+  deriving (Functor)
+
+instance PatternMap TupleSortMap where
+  type Key TupleSortMap = HsTupleSort
+
+  mEmpty :: TupleSortMap a
+  mEmpty = TupleSortMap mEmpty mEmpty mEmpty mEmpty
+
+  mUnion :: TupleSortMap a -> TupleSortMap a -> TupleSortMap a
+  mUnion m1 m2 = TupleSortMap
+    { tsUnboxed = unionOn tsUnboxed m1 m2
+    , tsBoxed = unionOn tsBoxed m1 m2
+    , tsConstraint = unionOn tsConstraint m1 m2
+    , tsBoxedOrConstraint = unionOn tsBoxedOrConstraint m1 m2
+    }
+
+  mAlter :: AlphaEnv -> Quantifiers -> Key TupleSortMap -> A a -> TupleSortMap a -> TupleSortMap a
+  mAlter env vs HsUnboxedTuple f m =
+    m { tsUnboxed = mAlter env vs () f (tsUnboxed m) }
+  mAlter env vs HsBoxedTuple f m =
+    m { tsBoxed = mAlter env vs () f (tsBoxed m) }
+  mAlter env vs HsConstraintTuple f m =
+    m { tsConstraint = mAlter env vs () f (tsConstraint m) }
+  mAlter env vs HsBoxedOrConstraintTuple f m =
+    m { tsBoxedOrConstraint = mAlter env vs () f (tsBoxedOrConstraint m) }
+
+  mMatch :: MatchEnv -> Key TupleSortMap -> (Substitution, TupleSortMap a) -> [(Substitution, a)]
+  mMatch env HsUnboxedTuple = mapFor tsUnboxed >=> mMatch env ()
+  mMatch env HsBoxedTuple = mapFor tsBoxed >=> mMatch env ()
+  mMatch env HsConstraintTuple = mapFor tsConstraint >=> mMatch env ()
+  mMatch env HsBoxedOrConstraintTuple = mapFor tsBoxedOrConstraint >=> mMatch env ()

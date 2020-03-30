@@ -1,0 +1,23 @@
+# Copyright (c) Facebook, Inc. and its affiliates.
+#
+# This source code is licensed under the MIT license found in the
+# LICENSE file in the root directory of this source tree.
+#
+--type-backward Types4.Foo
+--type-backward Types4.Foo2
+===
+ {-# LANGUAGE ScopedTypeVariables #-}
+ {-# LANGUAGE TypeOperators #-}
+ module Types4 where
+ 
+ type Foo = [String]
+-type Foo2 = ([String], Int)
++type Foo2 = (Foo, Int)
+
+-foo :: [String]
++foo :: Foo
+ foo = ["foo", "bar"]
+
+-foo2 :: ([String], Int)
++foo2 :: Foo2
+ foo2 = (foo, 2)
