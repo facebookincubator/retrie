@@ -7,6 +7,7 @@
 --type-backward Types4.Foo2
 --type-backward Types4.Foo3
 --type-backward Types4.Foo4
+--type-backward Types4.Foo5
 ===
  {-# LANGUAGE ScopedTypeVariables #-}
  {-# LANGUAGE TypeOperators #-}
@@ -36,3 +37,9 @@
 -foo4 :: (# (# Int, String #) | Bool #)
 +foo4 :: Foo4 Bool
  foo4 = (# | True #)
+
+ type Foo5 = forall r (a :: Type) (b :: TYPE r). (a -> b) -> a -> b
+
+-foo5 :: forall s (c :: Type) (d :: TYPE s). (c -> d) -> c -> d
++foo5 :: Foo5
+ foo5 = ($)

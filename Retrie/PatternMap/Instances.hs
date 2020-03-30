@@ -1187,6 +1187,7 @@ data TyMap a
 #if __GLASGOW_HASKELL__ < 806
        , tyHsAppsTy :: ListMap AppTyMap a
 #endif
+       , tyHsForAllTy :: ForAllTyMap a -- See Note [Telescope]
        , tyHsFunTy :: TyMap (TyMap a)
        , tyHsListTy :: TyMap a
        , tyHsParTy :: TyMap a
@@ -1203,7 +1204,7 @@ emptyTyMapWrapper = TM
 #if __GLASGOW_HASKELL__ < 806
   mEmpty
 #endif
-  mEmpty mEmpty mEmpty mEmpty mEmpty mEmpty
+  mEmpty mEmpty mEmpty mEmpty mEmpty mEmpty mEmpty
 
 instance PatternMap TyMap where
   type Key TyMap = LHsType GhcPs
@@ -1221,6 +1222,7 @@ instance PatternMap TyMap where
 #if __GLASGOW_HASKELL__ < 806
     , tyHsAppsTy = unionOn tyHsAppsTy m1 m2
 #endif
+    , tyHsForAllTy = unionOn tyHsForAllTy m1 m2
     , tyHsFunTy = unionOn tyHsFunTy m1 m2
     , tyHsListTy = unionOn tyHsListTy m1 m2
     , tyHsParTy = unionOn tyHsParTy m1 m2
@@ -1245,7 +1247,6 @@ instance PatternMap TyMap where
 #endif
         | v `isQ` vs = m { tyHole    = mAlter env vs v f (tyHole m) }
         | otherwise  = m { tyHsTyVar = mAlter env vs v f (tyHsTyVar m) }
-      go HsForAllTy{} = error "HsForAllTy"
       go HsOpTy{} = error "HsOpTy"
       go HsIParamTy{} = error "HsIParamTy"
       go HsKindSig{} = error "HsKindSig"
@@ -1258,6 +1259,7 @@ instance PatternMap TyMap where
       go (HsAppTy ty1 ty2) = m { tyHsAppTy = mAlter env vs ty1 (toA (mAlter env vs ty2 f)) (tyHsAppTy m) }
       go (HsCoreTy _) = error "HsCoreTy"
       go (HsEqTy _ _) = error "HsEqTy"
+      go (HsForAllTy bndrs ty') = m { tyHsForAllTy = mAlter env vs (bndrs, ty') f (tyHsForAllTy m) }
       go (HsFunTy ty1 ty2) = m { tyHsFunTy = mAlter env vs ty1 (toA (mAlter env vs ty2 f)) (tyHsFunTy m) }
       go (HsListTy ty') = m { tyHsListTy = mAlter env vs ty' f (tyHsListTy m) }
       go (HsParTy ty') = m { tyHsParTy = mAlter env vs ty' f (tyHsParTy m) }
@@ -1269,6 +1271,7 @@ instance PatternMap TyMap where
         m { tyHsTupleTy = mAlter env vs ts (toA (mAlter env vs tys f)) (tyHsTupleTy m) }
 #else
       go (HsAppTy _ ty1 ty2) = m { tyHsAppTy = mAlter env vs ty1 (toA (mAlter env vs ty2 f)) (tyHsAppTy m) }
+      go (HsForAllTy _ bndrs ty') = m { tyHsForAllTy = mAlter env vs (bndrs, ty') f (tyHsForAllTy m) }
       go (HsFunTy _ ty1 ty2) = m { tyHsFunTy = mAlter env vs ty1 (toA (mAlter env vs ty2 f)) (tyHsFunTy m) }
       go (HsListTy _ ty') = m { tyHsListTy = mAlter env vs ty' f (tyHsListTy m) }
       go (HsParTy _ ty') = m { tyHsParTy = mAlter env vs ty' f (tyHsParTy m) }
@@ -1303,6 +1306,7 @@ instance PatternMap TyMap where
 #if __GLASGOW_HASKELL__ < 806
       go (HsAppTy ty1 ty2) = mapFor tyHsAppTy >=> mMatch env ty1 >=> mMatch env ty2
       go (HsAppsTy atys) = mapFor tyHsAppsTy >=> mMatch env atys
+      go (HsForAllTy bndrs ty') = mapFor tyHsForAllTy >=> mMatch env (bndrs, ty')
       go (HsFunTy ty1 ty2) = mapFor tyHsFunTy >=> mMatch env ty1 >=> mMatch env ty2
       go (HsListTy ty') = mapFor tyHsListTy >=> mMatch env ty'
       go (HsParTy ty') = mapFor tyHsParTy >=> mMatch env ty'
@@ -1312,6 +1316,7 @@ instance PatternMap TyMap where
       go (HsTyVar _ v) = mapFor tyHsTyVar >=> mMatch env (unLoc v)
 #else
       go (HsAppTy _ ty1 ty2) = mapFor tyHsAppTy >=> mMatch env ty1 >=> mMatch env ty2
+      go (HsForAllTy _ bndrs ty') = mapFor tyHsForAllTy >=> mMatch env (bndrs, ty')
       go (HsFunTy _ ty1 ty2) = mapFor tyHsFunTy >=> mMatch env ty1 >=> mMatch env ty2
       go (HsListTy _ ty') = mapFor tyHsListTy >=> mMatch env ty'
       go (HsParTy _ ty') = mapFor tyHsParTy >=> mMatch env ty'
@@ -1468,3 +1473,71 @@ instance PatternMap TupleSortMap where
   mMatch env HsBoxedTuple = mapFor tsBoxed >=> mMatch env ()
   mMatch env HsConstraintTuple = mapFor tsConstraint >=> mMatch env ()
   mMatch env HsBoxedOrConstraintTuple = mapFor tsBoxedOrConstraint >=> mMatch env ()
+
+
+------------------------------------------------------------------------
+
+-- Note [Telescope]
+-- Haskell's forall quantification is a telescope (type binders are in-scope
+-- to binders to the right. Example: forall r (a :: TYPE r). ...
+--
+-- To support this, we peel off the binders one at a time, extending the
+-- environment at each layer.
+
+data ForAllTyMap a = ForAllTyMap
+  { fatNil :: TyMap a
+  , fatUser :: ForAllTyMap a
+  , fatKinded :: TyMap (ForAllTyMap a)
+  }
+  deriving (Functor)
+
+instance PatternMap ForAllTyMap where
+  type Key ForAllTyMap = ([LHsTyVarBndr GhcPs], LHsType GhcPs)
+
+  mEmpty :: ForAllTyMap a
+  mEmpty = ForAllTyMap mEmpty mEmpty mEmpty
+
+  mUnion :: ForAllTyMap a -> ForAllTyMap a -> ForAllTyMap a
+  mUnion m1 m2 = ForAllTyMap
+    { fatNil = unionOn fatNil m1 m2
+    , fatUser = unionOn fatUser m1 m2
+    , fatKinded = unionOn fatKinded m1 m2
+    }
+
+  mAlter :: AlphaEnv -> Quantifiers -> Key ForAllTyMap -> A a -> ForAllTyMap a -> ForAllTyMap a
+  mAlter env vs ([], ty) f m = m { fatNil = mAlter env vs ty f (fatNil m) }
+#if __GLASGOW_HASKELL__ < 806
+  mAlter env vs (L _ (UserTyVar (L _ v)):rest, ty) f m =
+#else
+  mAlter env vs (L _ (UserTyVar _ (L _ v)):rest, ty) f m =
+#endif
+    let
+      env' = extendAlphaEnvInternal v env
+      vs' = vs `exceptQ` [v]
+    in m { fatUser = mAlter env' vs' (rest, ty) f (fatUser m) }
+#if __GLASGOW_HASKELL__ < 806
+  mAlter env vs (L _ (KindedTyVar (L _ v) k):rest, ty) f m =
+#else
+  mAlter env vs (L _ (KindedTyVar _ (L _ v) k):rest, ty) f m =
+#endif
+    let
+      env' = extendAlphaEnvInternal v env
+      vs' = vs `exceptQ` [v]
+    in m { fatKinded  = mAlter env vs k (toA (mAlter env' vs' (rest, ty) f)) (fatKinded m) }
+
+  mMatch :: MatchEnv -> Key ForAllTyMap -> (Substitution, ForAllTyMap a) -> [(Substitution, a)]
+  mMatch env ([],ty) = mapFor fatNil >=> mMatch env ty
+#if __GLASGOW_HASKELL__ < 806
+  mMatch env (L _ (UserTyVar (L _ v)):rest, ty) =
+#else
+  mMatch env (L _ (UserTyVar _ (L _ v)):rest, ty) =
+#endif
+    let env' = extendMatchEnv env [v]
+    in mapFor fatUser >=> mMatch env' (rest, ty)
+#if __GLASGOW_HASKELL__ < 806
+  mMatch env (L _ (KindedTyVar (L _ v) k):rest, ty) =
+#else
+  mMatch env (L _ (KindedTyVar _ (L _ v) k):rest, ty) =
+#endif
+    let env' = extendMatchEnv env [v]
+    in mapFor fatKinded >=> mMatch env k >=> mMatch env' (rest, ty)
