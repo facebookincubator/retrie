@@ -1518,6 +1518,7 @@ instance PatternMap ForAllTyMap where
 #if __GLASGOW_HASKELL__ < 806
   mAlter env vs (L _ (KindedTyVar (L _ v) k):rest, ty) f m =
 #else
+  mAlter _ _ (L _ (XTyVarBndr _):_,_) _ _ = error "XTyVarBndr"
   mAlter env vs (L _ (KindedTyVar _ (L _ v) k):rest, ty) f m =
 #endif
     let
@@ -1537,6 +1538,7 @@ instance PatternMap ForAllTyMap where
 #if __GLASGOW_HASKELL__ < 806
   mMatch env (L _ (KindedTyVar (L _ v) k):rest, ty) =
 #else
+  mMatch _ (L _ (XTyVarBndr _):_,_) = const []
   mMatch env (L _ (KindedTyVar _ (L _ v) k):rest, ty) =
 #endif
     let env' = extendMatchEnv env [v]
