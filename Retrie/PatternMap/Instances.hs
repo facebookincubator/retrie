@@ -49,7 +49,7 @@ instance PatternMap TupArgMap where
       go (Present e) = m { tamPresent = mAlter env vs e  f (tamPresent m) }
 #else
       go (Present _ e) = m { tamPresent = mAlter env vs e  f (tamPresent m) }
-      go XTupArg{} = error "XTupArg"
+      go XTupArg{} = missingSyntax "XTupArg"
 #endif
       go (Missing _) = m { tamMissing = mAlter env vs () f (tamMissing m) }
 
@@ -178,13 +178,13 @@ instance PatternMap LMap where
       go (HsWordPrim _ i)   = m { lmWordPrim = mAlter env vs i f (lmWordPrim m) }
       go (HsInt64Prim _ i)  = m { lmInt64Prim = mAlter env vs i f (lmInt64Prim m) }
       go (HsWord64Prim _ i) = m { lmWord64Prim = mAlter env vs i f (lmWord64Prim m) }
-      go (HsInteger _ _ _) = error "HsInteger"
-      go HsRat{} = error "HsRat"
-      go HsFloatPrim{} = error "HsFloatPrim"
-      go HsDoublePrim{} = error "HsDoublePrim"
+      go (HsInteger _ _ _) = missingSyntax "HsInteger"
+      go HsRat{} = missingSyntax "HsRat"
+      go HsFloatPrim{} = missingSyntax "HsFloatPrim"
+      go HsDoublePrim{} = missingSyntax "HsDoublePrim"
 #if __GLASGOW_HASKELL__ < 806
 #else
-      go XLit{} = error "XLit"
+      go XLit{} = missingSyntax "XLit"
 #endif
 
   mMatch :: MatchEnv -> Key LMap -> (Substitution, LMap a) -> [(Substitution, a)]
@@ -425,7 +425,7 @@ instance PatternMap EMap where
         m { emSecL = mAlter env vs o (toA (mAlter env vs lhs f)) (emSecL m) }
       go (SectionR _ o rhs) =
         m { emSecR = mAlter env vs o (toA (mAlter env vs rhs f)) (emSecR m) }
-      go XExpr{} = error "XExpr"
+      go XExpr{} = missingSyntax "XExpr"
       go (HsLet _ lbs e') =
 #endif
         let
@@ -433,10 +433,10 @@ instance PatternMap EMap where
           env' = foldr extendAlphaEnvInternal env bs
           vs' = vs `exceptQ` bs
         in m { emLet = mAlter env vs (unLoc lbs) (toA (mAlter env' vs' e' f)) (emLet m) }
-      go HsLamCase{}      = error "HsLamCase"
-      go HsMultiIf{} = error "HsMultiIf"
+      go HsLamCase{} = missingSyntax "HsLamCase"
+      go HsMultiIf{} = missingSyntax "HsMultiIf"
       go (ExplicitList _ _ es) = m { emExplicitList = mAlter env vs es f (emExplicitList m) }
-      go ArithSeq{} = error "ArithSeq"
+      go ArithSeq{} = missingSyntax "ArithSeq"
 #if __GLASGOW_HASKELL__ < 806
       go (ExprWithTySig e' (HsWC _ (HsIB _ ty _))) =
         m { emExprWithTySig = mAlter env vs e' (toA (mAlter env vs ty f)) (emExprWithTySig m) }
@@ -447,37 +447,37 @@ instance PatternMap EMap where
       go (ExprWithTySig _ e' (HsWC _ (HsIB _ ty))) =
 #endif
         m { emExprWithTySig = mAlter env vs e' (toA (mAlter env vs ty f)) (emExprWithTySig m) }
-      go ExprWithTySig{} = error "ExprWithTySig"
+      go ExprWithTySig{} = missingSyntax "ExprWithTySig"
 #endif
-      go HsSCC{} = error "HsSCC"
-      go HsCoreAnn{} = error "HsCoreAnn"
-      go HsBracket{} = error "HsBracket"
-      go HsRnBracketOut{} = error "HsRnBracketOut"
-      go HsTcBracketOut{} = error "HsTcBracketOut"
-      go HsSpliceE{} = error "HsSpliceE"
-      go HsProc{} = error "HsProc"
-      go HsStatic{} = error "HsStatic"
-      go HsArrApp{} = error "HsArrApp"
-      go HsArrForm{} = error "HsArrForm"
-      go HsTick{} = error "HsTick"
-      go HsBinTick{} = error "HsBinTick"
-      go HsTickPragma{} = error "HsTickPragma"
-      go EWildPat{} = error "EWildPat"
-      go EAsPat{} = error "EAsPat"
-      go EViewPat{} = error "EViewPat"
-      go ELazyPat{} = error "ELazyPat"
-      go HsWrap{} = error "HsWrap"
-      go HsUnboundVar{} = error "HsUnboundVar"
-      go HsRecFld{} = error "HsRecFld"
-      go HsOverLabel{} = error "HsOverLabel"
-      go HsAppType{} = error "HsAppType"
-      go HsConLikeOut{} = error "HsConLikeOut"
-      go ExplicitSum{} = error "ExplicitSum"
+      go HsSCC{} = missingSyntax "HsSCC"
+      go HsCoreAnn{} = missingSyntax "HsCoreAnn"
+      go HsBracket{} = missingSyntax "HsBracket"
+      go HsRnBracketOut{} = missingSyntax "HsRnBracketOut"
+      go HsTcBracketOut{} = missingSyntax "HsTcBracketOut"
+      go HsSpliceE{} = missingSyntax "HsSpliceE"
+      go HsProc{} = missingSyntax "HsProc"
+      go HsStatic{} = missingSyntax "HsStatic"
+      go HsArrApp{} = missingSyntax "HsArrApp"
+      go HsArrForm{} = missingSyntax "HsArrForm"
+      go HsTick{} = missingSyntax "HsTick"
+      go HsBinTick{} = missingSyntax "HsBinTick"
+      go HsTickPragma{} = missingSyntax "HsTickPragma"
+      go EWildPat{} = missingSyntax "EWildPat"
+      go EAsPat{} = missingSyntax "EAsPat"
+      go EViewPat{} = missingSyntax "EViewPat"
+      go ELazyPat{} = missingSyntax "ELazyPat"
+      go HsWrap{} = missingSyntax "HsWrap"
+      go HsUnboundVar{} = missingSyntax "HsUnboundVar"
+      go HsRecFld{} = missingSyntax "HsRecFld"
+      go HsOverLabel{} = missingSyntax "HsOverLabel"
+      go HsAppType{} = missingSyntax "HsAppType"
+      go HsConLikeOut{} = missingSyntax "HsConLikeOut"
+      go ExplicitSum{} = missingSyntax "ExplicitSum"
 #if __GLASGOW_HASKELL__ < 806
-      go ExplicitPArr{} = error "ExplicitPArr"
-      go ExprWithTySigOut{} = error "ExprWithTySigOut"
-      go HsAppTypeOut{} = error "HsAppTypeOut"
-      go PArrSeq{} = error "PArrSeq"
+      go ExplicitPArr{} = missingSyntax "ExplicitPArr"
+      go ExprWithTySigOut{} = missingSyntax "ExprWithTySigOut"
+      go HsAppTypeOut{} = missingSyntax "HsAppTypeOut"
+      go PArrSeq{} = missingSyntax "PArrSeq"
 #endif
 
   mMatch :: MatchEnv -> Key EMap -> (Substitution, EMap a) -> [(Substitution, a)]
@@ -621,15 +621,15 @@ instance PatternMap SCMap where
       go ListComp = m { scmListComp = mAlter env vs () f (scmListComp m) }
       go MonadComp = m { scmMonadComp = mAlter env vs () f (scmMonadComp m) }
 #if __GLASGOW_HASKELL__ < 806
-      go PArrComp = error "PArrComp"
+      go PArrComp = missingSyntax "PArrComp"
 #endif
       go DoExpr = m { scmDoExpr = mAlter env vs () f (scmDoExpr m) }
-      go MDoExpr = error "MDoExpr"
-      go ArrowExpr = error "ArrowExpr"
-      go GhciStmtCtxt = error "GhciStmtCtxt"
-      go (PatGuard _) = error "PatGuard"
-      go (ParStmtCtxt _) = error "ParStmtCtxt"
-      go (TransStmtCtxt _) = error "TransStmtCtxt"
+      go MDoExpr = missingSyntax "MDoExpr"
+      go ArrowExpr = missingSyntax "ArrowExpr"
+      go GhciStmtCtxt = missingSyntax "GhciStmtCtxt"
+      go (PatGuard _) = missingSyntax "PatGuard"
+      go (ParStmtCtxt _) = missingSyntax "ParStmtCtxt"
+      go (TransStmtCtxt _) = missingSyntax "TransStmtCtxt"
 
   mMatch :: MatchEnv -> Key SCMap -> (Substitution, SCMap a) -> [(Substitution, a)]
   mMatch _   _  (_,SCEmpty)  = []
@@ -728,7 +728,7 @@ instance PatternMap CDMap where
   mAlter env vs d f m@CDMap{} = go d
     where
       go (PrefixCon ps) = m { cdPrefixCon = mAlter env vs ps f (cdPrefixCon m) }
-      go (RecCon _) = error "RecCon"
+      go (RecCon _) = missingSyntax "RecCon"
       go (InfixCon p1 p2) = m { cdInfixCon = mAlter env vs p1
                                               (toA (mAlter env vs p2 f))
                                               (cdInfixCon m) }
@@ -792,33 +792,33 @@ instance PatternMap PatMap where
 #endif
         | unLoc v `isQ` vs = m { pmHole  = mAlter env vs (unLoc v) f (pmHole m) }
         | otherwise        = m { pmVar   = mAlter env vs () f (pmVar m) } -- See Note [Variable Binders]
-      go LazyPat{} = error "LazyPat"
-      go AsPat{} = error "AsPat"
-      go BangPat{} = error "BangPat"
-      go ListPat{} = error "ListPat"
+      go LazyPat{} = missingSyntax "LazyPat"
+      go AsPat{} = missingSyntax "AsPat"
+      go BangPat{} = missingSyntax "BangPat"
+      go ListPat{} = missingSyntax "ListPat"
       go (ConPatIn c d) = m { pmConPatIn = mAlter env vs (rdrFS (unLoc c)) (toA (mAlter env vs d f)) (pmConPatIn m) }
-      go ConPatOut{} = error "ConPatOut"
-      go ViewPat{} = error "ViewPat"
-      go SplicePat{} = error "SplicePat"
-      go LitPat{} = error "LitPat"
-      go NPat{} = error "NPat"
-      go NPlusKPat{} = error "NPlusKPat"
+      go ConPatOut{} = missingSyntax "ConPatOut"
+      go ViewPat{} = missingSyntax "ViewPat"
+      go SplicePat{} = missingSyntax "SplicePat"
+      go LitPat{} = missingSyntax "LitPat"
+      go NPat{} = missingSyntax "NPat"
+      go NPlusKPat{} = missingSyntax "NPlusKPat"
 #if __GLASGOW_HASKELL__ < 806
-      go (PArrPat _ _) = error "PArrPat"
+      go (PArrPat _ _) = missingSyntax "PArrPat"
       go (ParPat p) = m { pmParPat = mAlter env vs p f (pmParPat m) }
-      go (SigPatIn _ _) = error "SigPatIn"
-      go (SigPatOut _ _) = error "SigPatOut"
+      go (SigPatIn _ _) = missingSyntax "SigPatIn"
+      go (SigPatOut _ _) = missingSyntax "SigPatOut"
       go (TuplePat ps b _tys) =
         m { pmTuplePat = mAlter env vs b (toA (mAlter env vs ps f)) (pmTuplePat m) }
 #else
       go (ParPat _ p) = m { pmParPat = mAlter env vs p f (pmParPat m) }
       go (TuplePat _ ps b) =
         m { pmTuplePat = mAlter env vs b (toA (mAlter env vs ps f)) (pmTuplePat m) }
-      go SigPat{} = error "SigPat"
-      go XPat{} = error "XPat"
+      go SigPat{} = missingSyntax "SigPat"
+      go XPat{} = missingSyntax "XPat"
 #endif
-      go CoPat{} = error "CoPat"
-      go SumPat{} = error "SumPat"
+      go CoPat{} = missingSyntax "CoPat"
+      go SumPat{} = missingSyntax "SumPat"
 
   mMatch :: MatchEnv -> Key PatMap -> (Substitution, PatMap a) -> [(Substitution, a)]
   mMatch _   _   (_ ,PatEmpty)   = []
@@ -893,7 +893,7 @@ instance PatternMap GRHSMap where
 #if __GLASGOW_HASKELL__ < 806
   mAlter env vs (GRHS gs b) f (GRHSMap m) =
 #else
-  mAlter _ _ XGRHS{} _ _ = error "XGRHS"
+  mAlter _ _ XGRHS{} _ _ = missingSyntax "XGRHS"
   mAlter env vs (GRHS _ gs b) f (GRHSMap m) =
 #endif
     let bs = collectLStmtsBinders gs
@@ -1002,7 +1002,7 @@ instance PatternMap LBMap where
       go (HsValBinds vbs) =
 #else
       go (EmptyLocalBinds _) = m { lbEmpty = mAlter env vs () f (lbEmpty m) }
-      go XHsLocalBindsLR{} = error "XHsLocalBindsLR"
+      go XHsLocalBindsLR{} = missingSyntax "XHsLocalBindsLR"
       go (HsValBinds _ vbs) =
 #endif
         let
@@ -1010,7 +1010,7 @@ instance PatternMap LBMap where
           env' = foldr extendAlphaEnvInternal env bs
           vs' = vs `exceptQ` bs
         in m { lbValBinds = mAlter env' vs' (deValBinds vbs) f (lbValBinds m) }
-      go HsIPBinds{} = error "HsIPBinds"
+      go HsIPBinds{} = missingSyntax "HsIPBinds"
 
   mMatch :: MatchEnv -> Key LBMap -> (Substitution, LBMap a) -> [(Substitution, a)]
   mMatch _   _   (_,LBEmpty) = []
@@ -1081,13 +1081,13 @@ instance PatternMap BMap where
 #else
       go (FunBind _ _ mg _ _) = m { bmFunBind = mAlter env vs mg f (bmFunBind m) }
       go (VarBind _ _ e _) = m { bmVarBind = mAlter env vs e f (bmVarBind m) }
-      go XHsBindsLR{} = error "XHsBindsLR"
+      go XHsBindsLR{} = missingSyntax "XHsBindsLR"
       go (PatBind _ lhs rhs _) =
 #endif
         m { bmPatBind = mAlter env vs lhs
               (toA $ mAlter env vs rhs f) (bmPatBind m) }
-      go AbsBinds{} = error "AbsBinds"
-      go PatSynBind{} = error "PatSynBind"
+      go AbsBinds{} = missingSyntax "AbsBinds"
+      go PatSynBind{} = missingSyntax "PatSynBind"
 
   mMatch :: MatchEnv -> Key BMap -> (Substitution, BMap a) -> [(Substitution, a)]
   mMatch _   _ (_,BMEmpty) = []
@@ -1145,7 +1145,7 @@ instance PatternMap SMap where
 #else
       go (BodyStmt _ e _ _) = m { smBodyStmt = mAlter env vs e f (smBodyStmt m) }
       go (LastStmt _ e _ _)   = m { smLastStmt = mAlter env vs e f (smLastStmt m) }
-      go XStmtLR{} = error "XStmtLR"
+      go XStmtLR{} = missingSyntax "XStmtLR"
       go (BindStmt _ p e _ _) =
 #endif
         let bs = collectPatBinders p
@@ -1153,11 +1153,11 @@ instance PatternMap SMap where
             vs' = vs `exceptQ` bs
         in m { smBindStmt = mAlter env vs p
                               (toA (mAlter env' vs' e f)) (smBindStmt m) }
-      go LetStmt{} = error "LetStmt"
-      go ParStmt{} = error "ParStmt"
-      go TransStmt{} = error "TransStmt"
-      go RecStmt{} = error "RecStmt"
-      go ApplicativeStmt{} = error "ApplicativeStmt"
+      go LetStmt{} = missingSyntax "LetStmt"
+      go ParStmt{} = missingSyntax "ParStmt"
+      go TransStmt{} = missingSyntax "TransStmt"
+      go RecStmt{} = missingSyntax "RecStmt"
+      go ApplicativeStmt{} = missingSyntax "ApplicativeStmt"
 
   mMatch :: MatchEnv -> Key SMap -> (Substitution, SMap a) -> [(Substitution, a)]
   mMatch _   _   (_,SMEmpty) = []
@@ -1247,23 +1247,23 @@ instance PatternMap TyMap where
 #endif
         | v `isQ` vs = m { tyHole    = mAlter env vs v f (tyHole m) }
         | otherwise  = m { tyHsTyVar = mAlter env vs v f (tyHsTyVar m) }
-      go HsOpTy{} = error "HsOpTy"
-      go HsIParamTy{} = error "HsIParamTy"
-      go HsKindSig{} = error "HsKindSig"
-      go HsSpliceTy{} = error "HsSpliceTy"
-      go HsDocTy{} = error "HsDocTy"
-      go HsBangTy{} = error "HsBangTy"
-      go HsRecTy{} = error "HsRecTy"
+      go HsOpTy{} = missingSyntax "HsOpTy"
+      go HsIParamTy{} = missingSyntax "HsIParamTy"
+      go HsKindSig{} = missingSyntax "HsKindSig"
+      go HsSpliceTy{} = missingSyntax "HsSpliceTy"
+      go HsDocTy{} = missingSyntax "HsDocTy"
+      go HsBangTy{} = missingSyntax "HsBangTy"
+      go HsRecTy{} = missingSyntax "HsRecTy"
 #if __GLASGOW_HASKELL__ < 806
       go (HsAppsTy atys) = m { tyHsAppsTy = mAlter env vs atys f (tyHsAppsTy m) }
       go (HsAppTy ty1 ty2) = m { tyHsAppTy = mAlter env vs ty1 (toA (mAlter env vs ty2 f)) (tyHsAppTy m) }
-      go (HsCoreTy _) = error "HsCoreTy"
-      go (HsEqTy _ _) = error "HsEqTy"
+      go (HsCoreTy _) = missingSyntax "HsCoreTy"
+      go (HsEqTy _ _) = missingSyntax "HsEqTy"
       go (HsForAllTy bndrs ty') = m { tyHsForAllTy = mAlter env vs (bndrs, ty') f (tyHsForAllTy m) }
       go (HsFunTy ty1 ty2) = m { tyHsFunTy = mAlter env vs ty1 (toA (mAlter env vs ty2 f)) (tyHsFunTy m) }
       go (HsListTy ty') = m { tyHsListTy = mAlter env vs ty' f (tyHsListTy m) }
       go (HsParTy ty') = m { tyHsParTy = mAlter env vs ty' f (tyHsParTy m) }
-      go (HsPArrTy _) = error "HsPArrTy"
+      go (HsPArrTy _) = missingSyntax "HsPArrTy"
       go (HsQualTy (L _ cons) ty') =
         m { tyHsQualTy = mAlter env vs ty' (toA (mAlter env vs cons f)) (tyHsQualTy m) }
       go (HsSumTy tys) = m { tyHsSumTy = mAlter env vs tys f (tyHsSumTy m) }
@@ -1277,19 +1277,19 @@ instance PatternMap TyMap where
       go (HsParTy _ ty') = m { tyHsParTy = mAlter env vs ty' f (tyHsParTy m) }
       go (HsQualTy _ (L _ cons) ty') =
         m { tyHsQualTy = mAlter env vs ty' (toA (mAlter env vs cons f)) (tyHsQualTy m) }
-      go HsStarTy{} = error "HsStarTy"
+      go HsStarTy{} = missingSyntax "HsStarTy"
       go (HsSumTy _ tys) = m { tyHsSumTy = mAlter env vs tys f (tyHsSumTy m) }
       go (HsTupleTy _ ts tys) =
         m { tyHsTupleTy = mAlter env vs ts (toA (mAlter env vs tys f)) (tyHsTupleTy m) }
-      go XHsType{} = error "XHsType"
+      go XHsType{} = missingSyntax "XHsType"
 #endif
-      go HsExplicitListTy{} = error "HsExplicitListTy"
-      go HsExplicitTupleTy{} = error "HsExplicitTupleTy"
-      go HsTyLit{} = error "HsTyLit"
-      go HsWildCardTy{} = error "HsWildCardTy"
+      go HsExplicitListTy{} = missingSyntax "HsExplicitListTy"
+      go HsExplicitTupleTy{} = missingSyntax "HsExplicitTupleTy"
+      go HsTyLit{} = missingSyntax "HsTyLit"
+      go HsWildCardTy{} = missingSyntax "HsWildCardTy"
 #if __GLASGOW_HASKELL__ < 808
 #else
-      go HsAppKindTy{} = error "HsAppKindTy"
+      go HsAppKindTy{} = missingSyntax "HsAppKindTy"
 #endif
 
   mMatch :: MatchEnv -> Key TyMap -> (Substitution, TyMap a) -> [(Substitution, a)]
@@ -1518,7 +1518,7 @@ instance PatternMap ForAllTyMap where
 #if __GLASGOW_HASKELL__ < 806
   mAlter env vs (L _ (KindedTyVar (L _ v) k):rest, ty) f m =
 #else
-  mAlter _ _ (L _ (XTyVarBndr _):_,_) _ _ = error "XTyVarBndr"
+  mAlter _ _ (L _ (XTyVarBndr _):_,_) _ _ = missingSyntax "XTyVarBndr"
   mAlter env vs (L _ (KindedTyVar _ (L _ v) k):rest, ty) f m =
 #endif
     let
