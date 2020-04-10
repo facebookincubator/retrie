@@ -356,7 +356,7 @@ instance PatternMap EMap where
 #if __GLASGOW_HASKELL__ < 806
           go (HsApp l (noLoc (HsPar r)))
 #else
-          go (HsApp noExt l (noLoc (HsPar noExt r)))
+          go (HsApp noExtField l (noLoc (HsPar noExtField r)))
 #endif
       dollarFork _ _ _ = m
 
@@ -457,15 +457,17 @@ instance PatternMap EMap where
       go HsSpliceE{} = missingSyntax "HsSpliceE"
       go HsProc{} = missingSyntax "HsProc"
       go HsStatic{} = missingSyntax "HsStatic"
+#if __GLASGOW_HASKELL__ < 810
       go HsArrApp{} = missingSyntax "HsArrApp"
       go HsArrForm{} = missingSyntax "HsArrForm"
-      go HsTick{} = missingSyntax "HsTick"
-      go HsBinTick{} = missingSyntax "HsBinTick"
-      go HsTickPragma{} = missingSyntax "HsTickPragma"
       go EWildPat{} = missingSyntax "EWildPat"
       go EAsPat{} = missingSyntax "EAsPat"
       go EViewPat{} = missingSyntax "EViewPat"
       go ELazyPat{} = missingSyntax "ELazyPat"
+#endif
+      go HsTick{} = missingSyntax "HsTick"
+      go HsBinTick{} = missingSyntax "HsBinTick"
+      go HsTickPragma{} = missingSyntax "HsTickPragma"
       go HsWrap{} = missingSyntax "HsWrap"
       go HsUnboundVar{} = missingSyntax "HsUnboundVar"
       go HsRecFld{} = missingSyntax "HsRecFld"
@@ -710,7 +712,12 @@ emptyCDMapWrapper :: CDMap a
 emptyCDMapWrapper = CDMap mEmpty mEmpty
 
 instance PatternMap CDMap where
+#if __GLASGOW_HASKELL__ < 810
   type Key CDMap = HsConDetails (LPat GhcPs) (HsRecFields GhcPs (LPat GhcPs))
+#else
+  -- We must manually expand 'LPat' to avoid UndecidableInstances in GHC 8.10+
+  type Key CDMap = HsConDetails (Located (Pat GhcPs)) (HsRecFields GhcPs (Located (Pat GhcPs)))
+#endif
 
   mEmpty :: CDMap a
   mEmpty = CDEmpty
@@ -763,7 +770,12 @@ emptyPatMapWrapper :: PatMap a
 emptyPatMapWrapper = PatMap mEmpty mEmpty mEmpty mEmpty mEmpty mEmpty
 
 instance PatternMap PatMap where
+#if __GLASGOW_HASKELL__ < 810
   type Key PatMap = LPat GhcPs
+#else
+  -- We must manually expand 'LPat' to avoid UndecidableInstances in GHC 8.10+
+  type Key PatMap = Located (Pat GhcPs)
+#endif
 
   mEmpty :: PatMap a
   mEmpty = PatEmpty
@@ -1187,7 +1199,11 @@ data TyMap a
 #if __GLASGOW_HASKELL__ < 806
        , tyHsAppsTy :: ListMap AppTyMap a
 #endif
+#if __GLASGOW_HASKELL__ < 810
        , tyHsForAllTy :: ForAllTyMap a -- See Note [Telescope]
+#else
+       , tyHsForAllTy :: ForallVisMap (ForAllTyMap a) -- See Note [Telescope]
+#endif
        , tyHsFunTy :: TyMap (TyMap a)
        , tyHsListTy :: TyMap a
        , tyHsParTy :: TyMap a
@@ -1271,7 +1287,12 @@ instance PatternMap TyMap where
         m { tyHsTupleTy = mAlter env vs ts (toA (mAlter env vs tys f)) (tyHsTupleTy m) }
 #else
       go (HsAppTy _ ty1 ty2) = m { tyHsAppTy = mAlter env vs ty1 (toA (mAlter env vs ty2 f)) (tyHsAppTy m) }
+#if __GLASGOW_HASKELL__ < 810
       go (HsForAllTy _ bndrs ty') = m { tyHsForAllTy = mAlter env vs (bndrs, ty') f (tyHsForAllTy m) }
+#else
+      go (HsForAllTy _ vis bndrs ty') =
+        m { tyHsForAllTy = mAlter env vs vis (toA (mAlter env vs (bndrs, ty') f)) (tyHsForAllTy m) }
+#endif
       go (HsFunTy _ ty1 ty2) = m { tyHsFunTy = mAlter env vs ty1 (toA (mAlter env vs ty2 f)) (tyHsFunTy m) }
       go (HsListTy _ ty') = m { tyHsListTy = mAlter env vs ty' f (tyHsListTy m) }
       go (HsParTy _ ty') = m { tyHsParTy = mAlter env vs ty' f (tyHsParTy m) }
@@ -1316,7 +1337,12 @@ instance PatternMap TyMap where
       go (HsTyVar _ v) = mapFor tyHsTyVar >=> mMatch env (unLoc v)
 #else
       go (HsAppTy _ ty1 ty2) = mapFor tyHsAppTy >=> mMatch env ty1 >=> mMatch env ty2
+#if __GLASGOW_HASKELL__ < 810
       go (HsForAllTy _ bndrs ty') = mapFor tyHsForAllTy >=> mMatch env (bndrs, ty')
+#else
+      go (HsForAllTy _ vis bndrs ty') =
+        mapFor tyHsForAllTy >=> mMatch env vis >=> mMatch env (bndrs, ty')
+#endif
       go (HsFunTy _ ty1 ty2) = mapFor tyHsFunTy >=> mMatch env ty1 >=> mMatch env ty2
       go (HsListTy _ ty') = mapFor tyHsListTy >=> mMatch env ty'
       go (HsParTy _ ty') = mapFor tyHsParTy >=> mMatch env ty'
@@ -1474,7 +1500,6 @@ instance PatternMap TupleSortMap where
   mMatch env HsConstraintTuple = mapFor tsConstraint >=> mMatch env ()
   mMatch env HsBoxedOrConstraintTuple = mapFor tsBoxedOrConstraint >=> mMatch env ()
 
-
 ------------------------------------------------------------------------
 
 -- Note [Telescope]
@@ -1543,3 +1568,34 @@ instance PatternMap ForAllTyMap where
 #endif
     let env' = extendMatchEnv env [v]
     in mapFor fatKinded >=> mMatch env k >=> mMatch env' (rest, ty)
+
+#if __GLASGOW_HASKELL__ < 810
+#else
+data ForallVisMap a = ForallVisMap
+  { favVis :: MaybeMap a
+  , favInvis :: MaybeMap a
+  }
+  deriving (Functor)
+
+instance PatternMap ForallVisMap where
+  type Key ForallVisMap = ForallVisFlag
+
+  mEmpty :: ForallVisMap a
+  mEmpty = ForallVisMap mEmpty mEmpty
+
+  mUnion :: ForallVisMap a -> ForallVisMap a -> ForallVisMap a
+  mUnion m1 m2 = ForallVisMap
+    { favVis = unionOn favVis m1 m2
+    , favInvis = unionOn favInvis m1 m2
+    }
+
+  mAlter :: AlphaEnv -> Quantifiers -> Key ForallVisMap -> A a -> ForallVisMap a -> ForallVisMap a
+  mAlter env vs ForallVis f m =
+    m { favVis = mAlter env vs () f (favVis m) }
+  mAlter env vs ForallInvis f m =
+    m { favInvis = mAlter env vs () f (favInvis m) }
+
+  mMatch :: MatchEnv -> Key ForallVisMap -> (Substitution, ForallVisMap a) -> [(Substitution, a)]
+  mMatch env ForallVis = mapFor favVis >=> mMatch env ()
+  mMatch env ForallInvis = mapFor favInvis >=> mMatch env ()
+#endif

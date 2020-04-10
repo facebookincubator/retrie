@@ -12,8 +12,14 @@ module Retrie.GHC
   , module BasicTypes
   , module FastString
   , module FastStringEnv
+#if __GLASGOW_HASKELL__ < 810
   , module HsExpr
   , module HsSyn
+#else
+  , module ErrUtils
+  , module GHC.Hs.Expr
+  , module GHC.Hs
+#endif
   , module Module
   , module Name
   , module OccName
@@ -29,11 +35,17 @@ import Bag
 import BasicTypes
 import FastString
 import FastStringEnv
+#if __GLASGOW_HASKELL__ < 810
 import HsExpr
 #if __GLASGOW_HASKELL__ < 806
 import HsSyn hiding (HasDefault(..))
 #else
 import HsSyn
+#endif
+#else
+import ErrUtils
+import GHC.Hs.Expr
+import GHC.Hs
 #endif
 import Module
 import Name
@@ -130,3 +142,9 @@ data RuleInfo = RuleInfo
   , riLHS :: LHsExpr GhcPs
   , riRHS :: LHsExpr GhcPs
   }
+
+#if __GLASGOW_HASKELL__ < 806
+#elif __GLASGOW_HASKELL__ < 810
+noExtField :: NoExt
+noExtField = noExt
+#endif

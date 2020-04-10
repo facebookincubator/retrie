@@ -123,13 +123,13 @@ backtickRules e imps dir@LeftToRight grhss ps@[p1, p2] = do
     right op [r] = mkLoc (SectionR op r)
     right _ _ = fail "backtickRules - right: impossible!"
 #else
-    both op [l, r] = mkLoc (OpApp noExt l op r)
+    both op [l, r] = mkLoc (OpApp noExtField l op r)
     both _ _ = fail "backtickRules - both: impossible!"
 
-    left op [l] = mkLoc (SectionL noExt l op)
+    left op [l] = mkLoc (SectionL noExtField l op)
     left _ _ = fail "backtickRules - left: impossible!"
 
-    right op [r] = mkLoc (SectionR noExt op r)
+    right op [r] = mkLoc (SectionR noExtField op r)
     right _ _ = fail "backtickRules - right: impossible!"
 #endif
   qs <- makeFunctionQuery e imps dir grhss both (ps, [])

@@ -52,7 +52,7 @@ mkLocatedHsVar v = do
 #if __GLASGOW_HASKELL__ < 806
   lv@(L _ v') <- cloneT (noLoc (HsVar r))
 #else
-  lv@(L _ v') <- cloneT (noLoc (HsVar noExt r))
+  lv@(L _ v') <- cloneT (noLoc (HsVar noExtField r))
 #endif
   case v' of
 #if __GLASGOW_HASKELL__ < 806
@@ -92,7 +92,7 @@ mkLams vs e = do
 #if __GLASGOW_HASKELL__ < 806
       mkMatchGroup Generated [mkMatch LambdaExpr vs e (noLoc EmptyLocalBinds)]
 #else
-      mkMatchGroup Generated [mkMatch LambdaExpr vs e (noLoc (EmptyLocalBinds noExt))]
+      mkMatchGroup Generated [mkMatch LambdaExpr vs e (noLoc (EmptyLocalBinds noExtField))]
 #endif
   m' <- case unLoc $ mg_alts mg of
     [m] -> setAnnsFor m [(G AnnLam, DP (0,0)),(G AnnRarrow, DP (0,1))]
@@ -100,7 +100,7 @@ mkLams vs e = do
 #if __GLASGOW_HASKELL__ < 806
   cloneT $ noLoc $ HsLam mg { mg_alts = noLoc [m'] }
 #else
-  cloneT $ noLoc $ HsLam noExt mg { mg_alts = noLoc [m'] }
+  cloneT $ noLoc $ HsLam noExtField mg { mg_alts = noLoc [m'] }
 #endif
 
 mkLet :: Monad m => HsLocalBinds GhcPs -> LHsExpr GhcPs -> TransformT m (LHsExpr GhcPs)
@@ -110,7 +110,7 @@ mkLet lbs e = do
 #if __GLASGOW_HASKELL__ < 806
   le <- mkLoc $ HsLet llbs e
 #else
-  le <- mkLoc $ HsLet noExt llbs e
+  le <- mkLoc $ HsLet noExtField llbs e
 #endif
   setAnnsFor le [(G AnnLet, DP (0,0)), (G AnnIn, DP (1,1))]
 
@@ -120,7 +120,7 @@ mkApps f (a:as) = do
 #if __GLASGOW_HASKELL__ < 806
   f' <- mkLoc (HsApp f a)
 #else
-  f' <- mkLoc (HsApp noExt f a)
+  f' <- mkLoc (HsApp noExtField f a)
 #endif
   mkApps f' as
 
@@ -133,7 +133,7 @@ mkHsAppsTy ts = do
   mkLoc (HsAppsTy ts')
 #else
 mkHsAppsTy [] = error "mkHsAppsTy: empty list"
-mkHsAppsTy (t:ts) = foldM (\t1 t2 -> mkLoc (HsAppTy noExt t1 t2)) t ts
+mkHsAppsTy (t:ts) = foldM (\t1 t2 -> mkLoc (HsAppTy noExtField t1 t2)) t ts
 #endif
 
 mkTyVar :: Monad m => Located RdrName -> TransformT m (LHsType GhcPs)
@@ -141,7 +141,7 @@ mkTyVar nm = do
 #if __GLASGOW_HASKELL__ < 806
   tv <- mkLoc (HsTyVar NotPromoted nm)
 #else
-  tv <- mkLoc (HsTyVar noExt NotPromoted nm)
+  tv <- mkLoc (HsTyVar noExtField NotPromoted nm)
 #endif
   _ <- setAnnsFor nm [(G AnnVal, DP (0,0))]
   swapEntryDPT tv nm
@@ -228,9 +228,9 @@ patToExpr (dL -> lp@(L _ p)) = do
     go (ListPat _ ps) = do
       ps' <- mapM patToExpr ps
       lift $ do
-        el <- mkLoc $ ExplicitList noExt Nothing ps'
+        el <- mkLoc $ ExplicitList noExtField Nothing ps'
         setAnnsFor el [(G AnnOpenS, DP (0,0)), (G AnnCloseS, DP (0,0))]
-    go (ParPat _ p') = lift . mkParen (HsPar noExt) =<< patToExpr p'
+    go (ParPat _ p') = lift . mkParen (HsPar noExtField) =<< patToExpr p'
     go (VarPat _ i) = lift $ mkLocatedHsVar i
     go SigPat{} = error "patToExpr SigPat"
     go XPat{} = error "patToExpr XPat"
@@ -249,7 +249,7 @@ conPatHelper con (InfixCon x y) =
                          <*> pure PlaceHolder
                          <*> patToExpr y
 #else
-  lift . mkLoc =<< OpApp <$> pure noExt
+  lift . mkLoc =<< OpApp <$> pure noExtField
                          <*> patToExpr x
                          <*> lift (mkLocatedHsVar con)
                          <*> patToExpr y
@@ -290,7 +290,7 @@ parenify Context{..} le@(L _ e)
 #if __GLASGOW_HASKELL__ < 806
     mkParen HsPar le
 #else
-    mkParen (HsPar noExt) le
+    mkParen (HsPar noExtField) le
 #endif
   | otherwise = return le
   where
@@ -334,7 +334,7 @@ parenifyT Context{..} lty@(L _ ty)
 #if __GLASGOW_HASKELL__ < 806
   | needed ty = mkParen HsParTy lty
 #else
-  | needed ty = mkParen (HsParTy noExt) lty
+  | needed ty = mkParen (HsParTy noExtField) lty
 #endif
   | otherwise = return lty
   where

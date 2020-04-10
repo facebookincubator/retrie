@@ -121,15 +121,7 @@ fixOneExpr env (L l2 (OpApp x2 ap1@(L l1 (OpApp x1 x op1 y)) op2 z))
 fixOneExpr _ e = return e
 
 fixOnePat :: Monad m => FixityEnv -> LPat GhcPs -> TransformT m (LPat GhcPs)
-#if __GLASGOW_HASKELL__ < 808
-fixOnePat env (L l2 (ConPatIn op2 (InfixCon ap1@(L l1 (ConPatIn op1 (InfixCon x y))) z)))
-  | associatesRight (lookupOpRdrName op1 env) (lookupOpRdrName op2 env) = do
-    let ap2' = L l2 (ConPatIn op2 (InfixCon y z))
-    swapEntryDPT ap1 ap2'
-    transferAnnsT isComma ap2' ap1
-    rhs <- fixOnePat env ap2'
-    return $ L l1 (ConPatIn op1 (InfixCon x rhs))
-#else
+#if __GLASGOW_HASKELL__ == 808
 fixOnePat env (dL -> L l2 (ConPatIn op2 (InfixCon (dL -> ap1@(L l1 (ConPatIn op1 (InfixCon x y)))) z)))
   | associatesRight (lookupOpRdrName op1 env) (lookupOpRdrName op2 env) = do
     let ap2' = L l2 (ConPatIn op2 (InfixCon y z))
@@ -137,6 +129,14 @@ fixOnePat env (dL -> L l2 (ConPatIn op2 (InfixCon (dL -> ap1@(L l1 (ConPatIn op1
     transferAnnsT isComma ap2' ap1
     rhs <- fixOnePat env (composeSrcSpan ap2')
     return $ cL l1 (ConPatIn op1 (InfixCon x rhs))
+#else
+fixOnePat env (L l2 (ConPatIn op2 (InfixCon ap1@(L l1 (ConPatIn op1 (InfixCon x y))) z)))
+  | associatesRight (lookupOpRdrName op1 env) (lookupOpRdrName op2 env) = do
+    let ap2' = L l2 (ConPatIn op2 (InfixCon y z))
+    swapEntryDPT ap1 ap2'
+    transferAnnsT isComma ap2' ap1
+    rhs <- fixOnePat env ap2'
+    return $ L l1 (ConPatIn op1 (InfixCon x rhs))
 #endif
 fixOnePat _ e = return e
 
@@ -173,11 +173,11 @@ fixOneEntryExpr e@(L _ (OpApp _ x _ _)) = fixOneEntry e x
 fixOneEntryExpr e = return e
 
 fixOneEntryPat :: Monad m => LPat GhcPs -> TransformT m (LPat GhcPs)
-#if __GLASGOW_HASKELL__ < 808
-fixOneEntryPat p@(L _ (ConPatIn _ (InfixCon x _))) = fixOneEntry p x
-#else
+#if __GLASGOW_HASKELL__ == 808
 fixOneEntryPat p@(ConPatIn _ (InfixCon x _)) =
   composeSrcSpan <$> fixOneEntry (dL p) (dL x)
+#else
+fixOneEntryPat p@(L _ (ConPatIn _ (InfixCon x _))) = fixOneEntry p x
 #endif
 fixOneEntryPat p = return p
 
@@ -206,7 +206,13 @@ parseContentNoFixity :: FilePath -> String -> IO AnnotatedModule
 parseContentNoFixity fp str = do
   r <- Parsers.parseModuleFromString fp str
   case r of
-    Left msg -> fail $ show msg
+    Left msg -> do
+#if __GLASGOW_HASKELL__ < 810
+      fail $ show msg
+#else
+      join $ Parsers.withDynFlags $ \dflags -> printBagOfErrors dflags msg
+      fail "parse failed"
+#endif
     Right (anns, m) -> return $ unsafeMkA m anns 0
 
 parseContent :: FixityEnv -> FilePath -> String -> IO AnnotatedModule
@@ -250,13 +256,16 @@ parseType :: String -> IO AnnotatedHsType
 parseType = parseHelper "parseType" Parsers.parseType
 
 parseHelper :: FilePath -> Parsers.Parser a -> String -> IO (Annotated a)
-parseHelper fp parser str = do
-  r <- Parsers.withDynFlags p
-  case r of
+parseHelper fp parser str = join $ Parsers.withDynFlags $ \dflags ->
+  case parser dflags fp str of
+#if __GLASGOW_HASKELL__ < 810
     Left (_, msg) -> throwIO $ ErrorCall msg
+#else
+    Left errBag -> do
+      printBagOfErrors dflags errBag
+      throwIO $ ErrorCall "parse failed"
+#endif
     Right (anns, x) -> return $ unsafeMkA x anns 0
-  where
-    p dflags = parser dflags fp str
 
 -------------------------------------------------------------------------------
 
