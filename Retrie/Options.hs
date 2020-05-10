@@ -355,11 +355,11 @@ getTargetFiles Options{..} gtss = do
     fps <-
       case buildGrepChain targetDir gts targetFiles of
         Left fs -> return fs
-        Right (stdin, cmd) -> doCmd targetDir verbosity stdin (unwords cmd)
+        Right (stdin, cmd) -> doCmd verbosity stdin (unwords cmd)
 
     let
       r = filter (not . ignore)
-        $ map (normalise . (targetDir </>)) fps
+        $ map normalise fps
     debugPrint verbosity "Files:" r
     return $ HashSet.fromList r
 
@@ -412,11 +412,11 @@ buildGrepChain targetDir gts =
 
     esc s = "'" ++ intercalate "[[:space:]]\\+" (words s) ++ "'"
 
-doCmd :: FilePath -> Verbosity -> String -> String -> IO [FilePath]
-doCmd targetDir verbosity inp shellCmd = do
+doCmd :: Verbosity -> String -> String -> IO [FilePath]
+doCmd verbosity inp shellCmd = do
   debugPrint verbosity "stdin:" [inp]
   debugPrint verbosity "shellCmd:" [shellCmd]
-  let cmd = (shell shellCmd) { cwd = Just targetDir }
+  let cmd = (shell shellCmd)
   (ec, fps, err) <- readCreateProcessWithExitCode cmd inp
   case ec of
     -- A grep exit code 1 means no lines matched, not an actual failure
