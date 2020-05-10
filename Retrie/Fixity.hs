@@ -11,7 +11,6 @@ module Retrie.Fixity
   , lookupOpRdrName
   , Fixity(..)
   , FixityDirection(..)
-  , defaultFixityEnv
   , extendFixityEnv
   , ppFixityEnv
   ) where
@@ -28,27 +27,21 @@ module Retrie.Fixity
 -- we need fixity info. Ideally (#2) we'd rename the module and then extract
 -- the info from the FixityEnv. That is a TODO. For now, lets just reuse the
 -- list of base package fixities in HSE.
-import qualified Language.Haskell.Exts as HSE
-
-import Data.Default
 
 import Retrie.GHC
 
 newtype FixityEnv = FixityEnv
   { unFixityEnv :: FastStringEnv (FastString, Fixity) }
 
-instance Default FixityEnv where
-  def = defaultFixityEnv
-
-defaultFixityEnv :: FixityEnv
-defaultFixityEnv = mkFixityEnv HSE.baseFixities
+mkFixityEnv :: [(FastString, (FastString, Fixity))] -> FixityEnv
+mkFixityEnv = FixityEnv . mkFsEnv
 
 instance Semigroup FixityEnv where
   -- | 'mappend' for 'FixityEnv' is right-biased
   (<>) = mappend
 
 instance Monoid FixityEnv where
-  mempty = mkFixityEnv []
+  mempty = FixityEnv (mkFsEnv [])
   -- | 'mappend' for 'FixityEnv' is right-biased
   mappend (FixityEnv e1) (FixityEnv e2) = FixityEnv (plusFsEnv e1 e2)
 
@@ -59,9 +52,6 @@ lookupOp _ = error "lookupOp: called with non-variable!"
 lookupOpRdrName :: Located RdrName -> FixityEnv -> Fixity
 lookupOpRdrName (L _ n) (FixityEnv env) =
   maybe defaultFixity snd $ lookupFsEnv env (occNameFS $ occName n)
-
-mkFixityEnv :: [HSE.Fixity] -> FixityEnv
-mkFixityEnv = FixityEnv . mkFsEnv . map hseToGHC
 
 extendFixityEnv :: [(FastString, Fixity)] -> FixityEnv -> FixityEnv
 extendFixityEnv l (FixityEnv env) =
@@ -78,20 +68,3 @@ ppFixityEnv = unlines . map ppFixity . eltsUFM . unFixityEnv
       , show p
       , unpackFS fs
       ]
-
-hseToGHC :: HSE.Fixity -> (FastString, (FastString, Fixity))
-hseToGHC (HSE.Fixity assoc p nm) = (fs, (fs, Fixity (SourceText nm') p (dir assoc)))
-  where
-    dir (HSE.AssocNone _)  = InfixN
-    dir (HSE.AssocLeft _)  = InfixL
-    dir (HSE.AssocRight _) = InfixR
-
-    nm' = case nm of
-      HSE.Qual _ _ n -> nameStr n
-      HSE.UnQual _ n -> nameStr n
-      _             -> "SpecialCon"
-
-    fs = mkFastString nm'
-
-    nameStr (HSE.Ident _ s)  = s
-    nameStr (HSE.Symbol _ s) = s

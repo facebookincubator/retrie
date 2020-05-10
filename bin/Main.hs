@@ -7,7 +7,7 @@
 module Main (main) where
 
 import Control.Monad
-import Data.Default
+import Fixity
 import Retrie
 import Retrie.Debug
 import Retrie.Options
@@ -15,7 +15,7 @@ import Retrie.Run
 
 main :: IO ()
 main = do
-  opts@Options{..} <- parseOptions def
+  opts@Options{..} <- parseOptions defaultFixityEnv
   doRoundtrips fixityEnv targetDir roundtrips
   unless (null rewrites) $ do
     when (verbosity > Silent) $ do

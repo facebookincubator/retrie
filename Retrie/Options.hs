@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleContexts #-}
 -- Copyright (c) Facebook, Inc. and its affiliates.
 --
 -- This source code is licensed under the MIT license found in the
@@ -121,13 +122,13 @@ data Options_ rewrites imports = Options
 -- | Construct default options for the given target directory.
 defaultOptions
   :: (Default rewrites, Default imports)
-  => FilePath -> Options_ rewrites imports
-defaultOptions fp = Options
+  => FixityEnv -> FilePath -> Options_ rewrites imports
+defaultOptions fixityEnv fp = Options
   { additionalImports = D.def
   , colorise = noColor
   , executionMode = ExecRewrite
   , extraIgnores = []
-  , fixityEnv = D.def
+  , fixityEnv = fixityEnv
   , iterateN = 1
   , randomOrder = False
   , rewrites = D.def
@@ -142,7 +143,7 @@ defaultOptions fp = Options
 -- to 'resolveOptions' to get final 'Options'.
 getOptionsParser :: FixityEnv -> IO (Parser ProtoOptions)
 getOptionsParser fEnv = do
-  dOpts <- defaultOptions <$> getCurrentDirectory
+  dOpts <- defaultOptions fEnv <$> getCurrentDirectory
   return $ buildParser dOpts { fixityEnv = fEnv }
 
 buildParser :: ProtoOptions -> Parser ProtoOptions

@@ -8,6 +8,7 @@
 module Main where
 
 import Retrie
+import Fixity
 
 -- | A script for rewriting calls to a function that takes a string to be
 -- calls to a new function that takes an enumeration. See the README for
@@ -24,7 +25,7 @@ import Retrie
 -- +quux = fooNew (error "invalid argument: quux")
 --
 main :: IO ()
-main = runScript $ \opts -> do
+main = runScript defaultFixityEnv $ \opts -> do
   [rewrite] <- parseRewrites opts [Adhoc "forall arg. fooOld arg = fooNew arg"]
   return $ apply [setRewriteTransformer stringToFooArg rewrite]
 

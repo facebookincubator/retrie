@@ -8,6 +8,7 @@
 module Exclude (excludeTest) where
 
 import Data.List (isPrefixOf, stripPrefix)
+import Fixity
 import Retrie
 import Retrie.Options
 import System.FilePath
@@ -43,7 +44,7 @@ excludeTest v = TestLabel "exclude path prefixes" $
         $ nonExcludedPathsAreIncluded relfilepaths
 
 optionsWithExtraIgnores :: FilePath -> Verbosity -> Options
-optionsWithExtraIgnores target v = (defaultOptions target)
+optionsWithExtraIgnores target v = (defaultOptions defaultFixityEnv target)
   { extraIgnores = excludedPaths
   , verbosity = v
   }

@@ -11,9 +11,9 @@ module GroundTerms
 
 import Control.Monad
 import Control.Monad.IO.Class
-import Data.Default
 import qualified Data.HashSet as HashSet
 import Data.Text (Text)
+import Fixity
 import Retrie.CPP
 import Retrie.ExactPrint
 import Retrie.GroundTerms
@@ -62,8 +62,8 @@ gtTest lbl contents specs expected expectedCmds =
 
     rrs <-
       parseRewriteSpecs
-        (\_ -> parseCPP (parseContent def "Test") contents)
-        def
+        (\_ -> parseCPP (parseContent defaultFixityEnv "Test") contents)
+        defaultFixityEnv
         specs
     let gtss = map groundTerms rrs
 
@@ -81,8 +81,8 @@ gtTest lbl contents specs expected expectedCmds =
 
 getFocusTests :: IO [Test]
 getFocusTests = do
-  rrs1 <- parseAdhocs def ["forall xs. or (map isSpace xs) = any isSpace xs"]
-  rrs2 <- parseAdhocs def ["forall f g xs. map f (map g xs) = map (f . g) xs"]
+  rrs1 <- parseAdhocs defaultFixityEnv ["forall xs. or (map isSpace xs) = any isSpace xs"]
+  rrs2 <- parseAdhocs defaultFixityEnv ["forall f g xs. map f (map g xs) = map (f . g) xs"]
   let
     -- compare hashsets to avoid ordering issues
     terms = HashSet.fromList $ map groundTerms rrs1

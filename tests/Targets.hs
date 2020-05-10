@@ -10,6 +10,7 @@ module Targets
 
 import qualified Data.HashSet as HashSet
 import Data.List
+import Fixity
 import Retrie.GroundTerms
 import Retrie.Options
 import System.FilePath
@@ -62,5 +63,5 @@ allFiles =
   ] ++ retrieTargetFiles
 
 optionsWithTargetFiles :: FilePath -> [FilePath] -> Options
-optionsWithTargetFiles dir targets = (defaultOptions dir)
+optionsWithTargetFiles dir targets = (defaultOptions defaultFixityEnv dir)
   { targetFiles = map (dir </>) targets }

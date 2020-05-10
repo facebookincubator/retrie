@@ -4,6 +4,7 @@
 -- LICENSE file in the root directory of this source tree.
 --
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -45,7 +46,6 @@ module Retrie.ExactPrint
 
 import Control.Exception
 import Control.Monad.State.Lazy hiding (fix)
-import Data.Default as D
 import Data.Function (on)
 import Data.List (transpose)
 import Data.Maybe
@@ -394,8 +394,8 @@ setEntryDP x dp anns = M.alter (Just . f . fromMaybe annNone) k anns
               (c,_):cs -> ann { annPriorComments = (c,dp):cs }
 
 -- Useful for figuring out what annotations should be on something.
-debugParse :: String -> IO ()
-debugParse s = do
+debugParse :: FixityEnv -> String -> IO ()
+debugParse fixityEnv s = do
   writeFile "debug.txt" s
   r <- parseModule "debug.txt"
   case r of
@@ -407,8 +407,8 @@ debugParse s = do
       void $ transformDebug m
   where
     transformDebug =
-      run "fixOneExpr D.def" (fixOneExpr D.def)
-        >=> run "fixOnePat D.def" (fixOnePat D.def)
+      run "fixOneExpr D.def" (fixOneExpr fixityEnv)
+        >=> run "fixOnePat D.def" (fixOnePat fixityEnv)
         >=> run "fixOneEntryExpr" fixOneEntryExpr
         >=> run "fixOneEntryPat" fixOneEntryPat
 
