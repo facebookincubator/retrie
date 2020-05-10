@@ -53,6 +53,7 @@ import Retrie.Rewrites
 import Retrie.Types
 import Retrie.Universe
 import Retrie.Util
+import System.Exit (ExitCode(ExitFailure))
 
 -- | Command-line options.
 type Options = Options_ [Rewrite Universe] AnnotatedImports
@@ -416,5 +417,11 @@ doCmd targetDir verbosity inp shellCmd = do
   debugPrint verbosity "stdin:" [inp]
   debugPrint verbosity "shellCmd:" [shellCmd]
   let cmd = (shell shellCmd) { cwd = Just targetDir }
-  (_ec, fps, _) <- readCreateProcessWithExitCode cmd inp
-  return $ lines fps
+  (ec, fps, err) <- readCreateProcessWithExitCode cmd inp
+  case ec of
+    -- A grep exit code 1 means no lines matched, not an actual failure
+    ExitFailure n | n > 1 ->
+      fail $ "grep failed with exit code " <> show n <> ": \n" <> err
+    _ -> do
+      debugPrint verbosity "stdout:" [fps]
+      return $ lines fps
