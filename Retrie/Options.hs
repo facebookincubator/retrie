@@ -299,7 +299,9 @@ type ProtoOptions = Options_ [RewriteSpec] [String]
 -- declared fixities in the target directory.
 resolveOptions :: ProtoOptions -> IO Options
 resolveOptions protoOpts = do
-  opts@Options{..} <- addLocalFixities protoOpts
+  absoluteTargetDir <- makeAbsolute (targetDir protoOpts)
+  opts@Options{..} <-
+    addLocalFixities protoOpts { targetDir = absoluteTargetDir }
   parsedImports <- parseImports additionalImports
   debugPrint verbosity "Imports:" $
     runIdentity $ fmap astA $ transformA parsedImports $ \ imps -> do
@@ -307,9 +309,9 @@ resolveOptions protoOpts = do
       return $ map (`exactPrint` anns) imps
   rrs <- parseRewritesInternal opts rewrites
   return Options
-    { rewrites          = rrs
-    , additionalImports = parsedImports
-    , singleThreaded    = singleThreaded || verbosity == Loud
+    { additionalImports = parsedImports
+    , rewrites = rrs
+    , singleThreaded = singleThreaded || verbosity == Loud
     , ..
     }
 
