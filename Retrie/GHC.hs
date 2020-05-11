@@ -59,7 +59,11 @@ import UniqSet
 import Data.Maybe
 
 rdrFS :: RdrName -> FastString
-rdrFS = occNameFS . occName
+rdrFS (Qual m n) = mconcat [moduleNameFS m, fsDot, occNameFS n]
+rdrFS rdr = occNameFS (occName rdr)
+
+fsDot :: FastString
+fsDot = mkFastString "."
 
 varRdrName :: HsExpr p -> Maybe (Located (IdP p))
 #if __GLASGOW_HASKELL__ < 806

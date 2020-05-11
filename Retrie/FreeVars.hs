@@ -5,9 +5,9 @@
 --
 module Retrie.FreeVars
   ( FreeVars
-  , substFVs
   , elemFVs
-  , capturesFVs
+  , freeVars
+  , substFVs
   ) where
 
 import Data.Generics hiding (Fixity)
@@ -19,20 +19,20 @@ import Retrie.Substitution
 
 --------------------------------------------------------------------------------
 
-newtype FreeVars = FreeVars (OccEnv FastString)
+newtype FreeVars = FreeVars (UniqSet FastString)
 
 emptyFVs :: FreeVars
-emptyFVs = FreeVars emptyOccEnv
+emptyFVs = FreeVars emptyUniqSet
 
 instance Semigroup FreeVars where
   (<>) = mappend
 
 instance Monoid FreeVars where
   mempty = emptyFVs
-  mappend (FreeVars m1) (FreeVars m2) = FreeVars $ plusOccEnv m2 m1
+  mappend (FreeVars s1) (FreeVars s2) = FreeVars $ s1 <> s2
 
 instance Show FreeVars where
-  show (FreeVars m) = show (occEnvElts m)
+  show (FreeVars m) = show (nonDetEltsUniqSet m)
 
 substFVs :: Substitution -> FreeVars
 substFVs = foldSubst (f . snd) emptyFVs
@@ -40,11 +40,6 @@ substFVs = foldSubst (f . snd) emptyFVs
     f (HoleExpr e) fvs = freeVars emptyQs (astA e) <> fvs
     f (HoleRdr rdr) fvs = rdrFV rdr <> fvs
     f _ fvs = fvs -- TODO(anfarmer) types?
-
-capturesFVs :: (Data a, Typeable a) => Quantifiers -> [RdrName] -> a -> Bool
-capturesFVs qs binders thing = any (`elemOccEnv` fvEnv) $ map occName binders
-  where
-    FreeVars fvEnv = freeVars qs thing
 
 -- | This is an over-approximation, but that is fine for our purposes.
 freeVars :: (Data a, Typeable a) => Quantifiers -> a -> FreeVars
@@ -63,7 +58,7 @@ freeVars qs = everything (<>) (mkQ emptyFVs fvsExpr `extQ` fvsType)
     fvsType _ = emptyFVs
 
 elemFVs :: RdrName -> FreeVars -> Bool
-elemFVs rdr (FreeVars m) = elemOccEnv (occName rdr) m
+elemFVs rdr (FreeVars m) = elementOfUniqSet (rdrFS rdr) m
 
 rdrFV :: RdrName -> FreeVars
-rdrFV rdr = FreeVars $ unitOccEnv (occName rdr) (rdrFS rdr)
+rdrFV = FreeVars . unitUniqSet . rdrFS

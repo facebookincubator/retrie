@@ -55,7 +55,8 @@ replaceImpl c e = do
     check origin quantifiers match
       | getLoc e `overlaps` origin = NoMatch
       | MatchResult _ Template{..} <- match
-      , capturesFVs quantifiers (ctxtBinders c) (astA tTemplate) = NoMatch
+      , fvs <- freeVars quantifiers (astA tTemplate)
+      , any (`elemFVs` fvs) (ctxtBinders c) = NoMatch
       | otherwise = match
 
   match <- runRewriter f c (ctxtRewriter c) (getUnparened e)
