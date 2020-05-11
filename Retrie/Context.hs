@@ -110,13 +110,6 @@ updateContext c i =
         bs = collectLStmtsBinders gs
 
     updStmt :: Stmt GhcPs (LHsExpr GhcPs) -> Context
-#if __GLASGOW_HASKELL__ < 806
-    updStmt (BindStmt p _body _ _ _)
-#else
-    updStmt (BindStmt _ p _body _ _)
-#endif
-      -- i > firstChild == 'for the body'
-      | i > firstChild = addBinders neverParen (collectPatBinders p)
     updStmt _ = neverParen
 
     updStmtList :: [LStmt GhcPs (LHsExpr GhcPs)] -> TransformT m Context

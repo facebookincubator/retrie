@@ -48,7 +48,9 @@
 -    dupa2 = blarg some otherargs
 +    dupa2 = dupa some otherargs
 
-   dupa <- blarg "notok" "ok"
+   -- this blarg should be rewritten, because do-binding is not recursive
+-  dupa <- blarg "notok" "ok"
++  dupa <- dupa "notok" "ok"
 -  dupa2 <- blarg "notok" "ok"
 +  dupa2 <- dupa "notok" "ok"
 
