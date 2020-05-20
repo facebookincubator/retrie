@@ -4,6 +4,10 @@
 # LICENSE file in the root directory of this source tree.
 #
 -u Foo.foo
+-u Foo.baz
+-u Foo.str
+-u Foo.tuple
+-u Foo.list
 ===
  module Foo where
  
@@ -13,3 +17,36 @@
  bar :: [Int]
 -bar = foo [4,5,6]
 +bar = [4,5,6] ++ [1,2, 3]
+
+ baz :: Int -> Int
+ baz (-1) = 0
+ baz 0 = 1
+ baz n = n
+
+ quux :: Int
+-quux = baz 54 + baz 0 + baz (-1)
++quux = 54 + 1 + 0
+
+ str :: String -> Int
+ str "foo" = 54
+ str bar = 42
+
+ str2 :: Int
+-str2 = str "foo" - str "bar"
++str2 = 54 - 42
+
+ tuple :: (String, Int) -> Int
+ tuple ("foo", x) = x + 1
+ tuple (s, y) = y
+
+ tuple2 :: Int
+-tuple2 = tuple ("foo", 54) + tuple ("bar", 42)
++tuple2 = 54 + 1 + 42
+
+ list :: [String] -> Int
+ list ["foo"] = 54
+ list _ = 42
+
+ list2 :: Int
+-list2 = list ["foo"] + list ["bar"]
++list2 = 54 + 42

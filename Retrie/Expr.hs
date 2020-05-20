@@ -202,41 +202,68 @@ patToExpr (dL -> lp@(L _ p)) = do
   return e
   where
     go WildPat{} = newWildVar >>= lift . mkLocatedHsVar . noLoc
-    go LazyPat{} = error "patToExpr LazyPat"
-    go AsPat{} = error "patToExpr AsPat"
-    go BangPat{} = error "patToExpr BangPat"
-    go TuplePat{} = error "patToExpr TuplePat"
     go (ConPatIn con ds) = conPatHelper con ds
-    go ConPatOut{} = error "patToExpr ConPatOut"
-    go ViewPat{} = error "patToExpr ViewPat"
-    go SplicePat{} = error "patToExpr SplicePat"
-    go LitPat{} = error "patToExpr LitPat"
-    go NPat{} = error "patToExpr NPat"
-    go NPlusKPat{} = error "patToExpr NPlusKPat"
 #if __GLASGOW_HASKELL__ < 806
+    go (LazyPat pat) = patToExpr pat
+    go (BangPat pat) = patToExpr pat
     go (ListPat ps ty mb) = do
       ps' <- mapM patToExpr ps
       lift $ do
         el <- mkLoc $ ExplicitList ty (snd <$> mb) ps'
         setAnnsFor el [(G AnnOpenS, DP (0,0)), (G AnnCloseS, DP (0,0))]
+    go (LitPat lit) = lift $ do
+      lit' <- cloneT lit
+      mkLoc $ HsLit lit'
+    go (NPat llit mbNeg _ _) = lift $ do
+      L _ lit <- cloneT llit
+      e <- mkLoc $ HsOverLit lit
+      negE <- maybe (return e) (mkLoc . NegApp e) mbNeg
+      addAllAnnsT llit negE
+      return negE
     go PArrPat{} = error "patToExpr PArrPat"
     go (ParPat p') = lift . mkParen HsPar =<< patToExpr p'
     go SigPatIn{} = error "patToExpr SigPatIn"
     go SigPatOut{} = error "patToExpr SigPatOut"
+    go (TuplePat ps boxity _) = do
+      es <- forM ps $ \pat -> do
+        e <- patToExpr pat
+        lift $ mkLoc $ Present e
+      lift $ mkLoc $ ExplicitTuple es boxity
     go (VarPat i) = lift $ mkLocatedHsVar i
 #else
+    go (LazyPat _ pat) = patToExpr pat
+    go (BangPat _ pat) = patToExpr pat
     go (ListPat _ ps) = do
       ps' <- mapM patToExpr ps
       lift $ do
         el <- mkLoc $ ExplicitList noExtField Nothing ps'
         setAnnsFor el [(G AnnOpenS, DP (0,0)), (G AnnCloseS, DP (0,0))]
+    go (LitPat _ lit) = lift $ do
+      lit' <- cloneT lit
+      mkLoc $ HsLit noExtField lit'
+    go (NPat _ llit mbNeg _) = lift $ do
+      L _ lit <- cloneT llit
+      e <- mkLoc $ HsOverLit noExtField lit
+      negE <- maybe (return e) (mkLoc . NegApp noExtField e) mbNeg
+      addAllAnnsT llit negE
+      return negE
     go (ParPat _ p') = lift . mkParen (HsPar noExtField) =<< patToExpr p'
-    go (VarPat _ i) = lift $ mkLocatedHsVar i
     go SigPat{} = error "patToExpr SigPat"
+    go (TuplePat _ ps boxity) = do
+      es <- forM ps $ \pat -> do
+        e <- patToExpr pat
+        lift $ mkLoc $ Present noExtField e
+      lift $ mkLoc $ ExplicitTuple noExtField es boxity
+    go (VarPat _ i) = lift $ mkLocatedHsVar i
     go XPat{} = error "patToExpr XPat"
 #endif
+    go AsPat{} = error "patToExpr AsPat"
+    go ConPatOut{} = error "patToExpr ConPatOut" -- only exists post-tc
     go CoPat{} = error "patToExpr CoPat"
+    go NPlusKPat{} = error "patToExpr NPlusKPat"
+    go SplicePat{} = error "patToExpr SplicePat"
     go SumPat{} = error "patToExpr SumPat"
+    go ViewPat{} = error "patToExpr ViewPat"
 
 conPatHelper :: Monad m
              => Located RdrName
