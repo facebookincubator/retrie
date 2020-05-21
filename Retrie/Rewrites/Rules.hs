@@ -13,7 +13,6 @@ import Retrie.ExactPrint
 import Retrie.GHC
 import Retrie.Quantifiers
 import Retrie.Types
-import Retrie.Util
 
 rulesToRewrites
   :: [(FastString, Direction)]

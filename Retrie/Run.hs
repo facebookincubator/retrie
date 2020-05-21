@@ -27,6 +27,7 @@ import System.Console.ANSI
 
 import Retrie.CPP
 import Retrie.ExactPrint
+import Retrie.GHC
 import Retrie.Monad
 import Retrie.Options
 import Retrie.Pretty

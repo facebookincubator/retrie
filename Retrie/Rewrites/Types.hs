@@ -17,7 +17,6 @@ import Retrie.Expr
 import Retrie.GHC
 import Retrie.Quantifiers
 import Retrie.Types
-import Retrie.Util
 
 typeSynonymsToRewrites
   :: [(FastString, Direction)]

@@ -10,36 +10,10 @@ import Control.Applicative
 import Control.Concurrent.Async
 import Control.Exception
 import Control.Monad
-import Data.Bifunctor (second)
 import Data.List
 import System.Exit
 import System.FilePath
 import System.Process
-
-import Retrie.GHC
-
-overlaps :: SrcSpan -> SrcSpan -> Bool
-overlaps (RealSrcSpan s1) (RealSrcSpan s2) =
-     srcSpanFile s1 == srcSpanFile s2 &&
-     ((srcSpanStartLine s1, srcSpanStartCol s1) `within` s2 ||
-      (srcSpanEndLine s1, srcSpanEndCol s1) `within` s2)
-overlaps _ _ = False
-
-within :: (Int, Int) -> RealSrcSpan -> Bool
-within (l,p) s =
-  srcSpanStartLine s <= l &&
-  srcSpanStartCol s <= p  &&
-  srcSpanEndLine s >= l   &&
-  srcSpanEndCol s >= p
-
-lineCount :: [SrcSpan] -> Int
-lineCount ss = sum
-  [ srcSpanEndLine s - srcSpanStartLine s + 1
-  | RealSrcSpan s <- ss
-  ]
-
-showRdrs :: [RdrName] -> String
-showRdrs = show . map (occNameString . occName)
 
 data Verbosity = Silent | Normal | Loud
   deriving (Eq, Ord, Show)
@@ -121,6 +95,3 @@ trySync io = catch (Right <$> io) $ \e ->
   case fromException e of
     Just (_ :: SomeAsyncException) -> throwIO e
     Nothing -> return (Left e)
-
-uniqBag :: Uniquable a => [(a,b)] -> UniqFM [b]
-uniqBag = listToUFM_C (++) . map (second pure)
