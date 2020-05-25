@@ -63,5 +63,5 @@ allFiles =
   ] ++ retrieTargetFiles
 
 optionsWithTargetFiles :: FilePath -> [FilePath] -> Options
-optionsWithTargetFiles dir targets = (defaultOptions defaultFixityEnv dir)
+optionsWithTargetFiles dir targets = (defaultOptions dir)
   { targetFiles = map (dir </>) targets }

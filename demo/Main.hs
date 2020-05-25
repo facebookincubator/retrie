@@ -25,8 +25,8 @@ import Fixity
 -- +quux = fooNew (error "invalid argument: quux")
 --
 main :: IO ()
-main = runScript defaultFixityEnv $ \opts -> do
-  [rewrite] <- parseRewrites opts [Adhoc "forall arg. fooOld arg = fooNew arg"]
+main = runScript $ \opts -> do
+  [rewrite] <- parseRewrites opts{fixityEnv=defaultFixityEnv} [Adhoc "forall arg. fooOld arg = fooNew arg"]
   return $ apply [setRewriteTransformer stringToFooArg rewrite]
 
 argMapping :: [(FastString, String)]

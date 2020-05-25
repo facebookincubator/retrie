@@ -31,7 +31,7 @@ excludeTest :: Verbosity -> Test
 excludeTest v = TestLabel "exclude path prefixes" $
   TestCase $ do
     withFakeHgRepo [] allFiles $ \dir -> do
-      let opts = optionsWithExtraIgnores dir v
+      let opts = optionsWithDefaultFixities $ optionsWithExtraIgnores dir v
       filepaths <- getTargetFiles opts []
       assertBool (unlines ["Expected ", show excludedPaths,
         "to be excluded, these were included : ", show filepaths])
@@ -44,10 +44,13 @@ excludeTest v = TestLabel "exclude path prefixes" $
         $ nonExcludedPathsAreIncluded relfilepaths
 
 optionsWithExtraIgnores :: FilePath -> Verbosity -> Options
-optionsWithExtraIgnores target v = (defaultOptions defaultFixityEnv target)
+optionsWithExtraIgnores target v = (defaultOptions target)
   { extraIgnores = excludedPaths
   , verbosity = v
   }
+
+optionsWithDefaultFixities :: Options -> Options
+optionsWithDefaultFixities opts = opts { fixityEnv = defaultFixityEnv }
 
 -- Check that filepaths with prefixes in the excluded list are excluded
 excludedPathsAreExcluded :: [FilePath] -> Bool

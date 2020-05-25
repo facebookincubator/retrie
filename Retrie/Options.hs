@@ -122,13 +122,13 @@ data Options_ rewrites imports = Options
 -- | Construct default options for the given target directory.
 defaultOptions
   :: (Default rewrites, Default imports)
-  => FixityEnv -> FilePath -> Options_ rewrites imports
-defaultOptions fixityEnv fp = Options
+  => FilePath -> Options_ rewrites imports
+defaultOptions fp = Options
   { additionalImports = D.def
   , colorise = noColor
   , executionMode = ExecRewrite
   , extraIgnores = []
-  , fixityEnv = fixityEnv
+  , fixityEnv = mempty
   , iterateN = 1
   , randomOrder = False
   , rewrites = D.def
@@ -143,8 +143,8 @@ defaultOptions fixityEnv fp = Options
 -- to 'resolveOptions' to get final 'Options'.
 getOptionsParser :: FixityEnv -> IO (Parser ProtoOptions)
 getOptionsParser fEnv = do
-  dOpts <- defaultOptions fEnv <$> getCurrentDirectory
-  return $ buildParser dOpts
+  dOpts <- defaultOptions <$> getCurrentDirectory
+  return $ buildParser dOpts{fixityEnv = fEnv}
 
 buildParser :: ProtoOptions -> Parser ProtoOptions
 buildParser dOpts = do

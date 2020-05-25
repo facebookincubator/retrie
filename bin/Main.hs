@@ -16,7 +16,7 @@ import Retrie.Run
 main :: IO ()
 main = do
   opts@Options{..} <- parseOptions defaultFixityEnv
-  doRoundtrips fixityEnv targetDir roundtrips
+  doRoundtrips defaultFixityEnv targetDir roundtrips
   unless (null rewrites) $ do
     when (verbosity > Silent) $ do
       putStrLn "Adding:"

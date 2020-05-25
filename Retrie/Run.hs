@@ -26,7 +26,6 @@ import System.Console.ANSI
 
 import Retrie.CPP
 import Retrie.ExactPrint
-import Retrie.Fixity
 import Retrie.GHC
 import Retrie.Monad
 import Retrie.Options
@@ -48,16 +47,15 @@ import Retrie.Util
 -- >   return $ apply rr
 --
 -- To run the script, compile the program and execute it.
-runScript :: FixityEnv -> (Options -> IO (Retrie ())) -> IO ()
-runScript fixityEnv f =
-  runScriptWithModifiedOptions fixityEnv (\opts -> (opts,) <$> f opts)
+runScript :: (Options -> IO (Retrie ())) -> IO ()
+runScript f = runScriptWithModifiedOptions (\opts -> (opts,) <$> f opts)
 
 -- | Define a custom refactoring script and run it with modified options.
 -- This is the same as 'runScript', but the returned 'Options' will be used
 -- during rewriting.
-runScriptWithModifiedOptions :: FixityEnv -> (Options -> IO (Options, Retrie ())) -> IO ()
-runScriptWithModifiedOptions fixityEnv f = do
-  opts <- parseOptions fixityEnv
+runScriptWithModifiedOptions :: (Options -> IO (Options, Retrie ())) -> IO ()
+runScriptWithModifiedOptions f = do
+  opts <- parseOptions mempty
   (opts', retrie) <- f opts
   execute opts' retrie
 
