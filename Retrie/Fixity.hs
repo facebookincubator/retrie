@@ -15,19 +15,6 @@ module Retrie.Fixity
   , ppFixityEnv
   ) where
 
--- Note [HSE]
--- GHC's parser parses all operator applications left-associatived,
--- then fixes up the associativity in the renamer, since fixity info isn't
--- known until after name resolution.
---
--- Ideally, we'd run the module through the renamer and let it do its thing,
--- but ghc-exactprint cannot roundtrip renamed modules.
---
--- The next best thing we can do is reassociate the operators ourselves, but
--- we need fixity info. Ideally (#2) we'd rename the module and then extract
--- the info from the FixityEnv. That is a TODO. For now, lets just reuse the
--- list of base package fixities in HSE.
-
 import Retrie.GHC
 
 newtype FixityEnv = FixityEnv
@@ -41,7 +28,7 @@ instance Semigroup FixityEnv where
   (<>) = mappend
 
 instance Monoid FixityEnv where
-  mempty = FixityEnv (mkFsEnv [])
+  mempty = mkFixityEnv []
   -- | 'mappend' for 'FixityEnv' is right-biased
   mappend (FixityEnv e1) (FixityEnv e2) = FixityEnv (plusFsEnv e1 e2)
 

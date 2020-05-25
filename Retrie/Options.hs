@@ -144,7 +144,7 @@ defaultOptions fixityEnv fp = Options
 getOptionsParser :: FixityEnv -> IO (Parser ProtoOptions)
 getOptionsParser fEnv = do
   dOpts <- defaultOptions fEnv <$> getCurrentDirectory
-  return $ buildParser dOpts { fixityEnv = fEnv }
+  return $ buildParser dOpts
 
 buildParser :: ProtoOptions -> Parser ProtoOptions
 buildParser dOpts = do
