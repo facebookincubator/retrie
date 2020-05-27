@@ -83,7 +83,6 @@ library
     filepath >= 1.4.2 && < 1.5,
     ghc >= 8.4 && < 8.12,
     ghc-exactprint >= 0.6.2 && < 0.7,
-    haskell-src-exts >= 1.23.0 && < 1.24,
     mtl >= 2.2.2 && < 2.3,
     optparse-applicative >= 0.15.1 && < 0.16,
     process >= 1.6.3 && < 1.7,
@@ -94,27 +93,40 @@ library
     unordered-containers >= 0.2.10 && < 0.3
   default-language: Haskell2010
 
+Flag BuildExecutable
+  Description: build the retrie executable
+  Default: True
+
 executable retrie
+  if flag(BuildExecutable)
+    Buildable: True
+  else
+    Buildable: False
   main-is:
     Main.hs
-  hs-source-dirs: bin
-  other-modules:
+  hs-source-dirs: bin hse
+  other-modules: Fixity
   GHC-Options: -Wall
   build-depends:
     retrie,
     base >= 4.11 && < 4.15,
-    data-default
+    haskell-src-exts >= 1.23.0 && < 1.24
   default-language: Haskell2010
 
 executable demo
+  if flag(BuildExecutable)
+    Buildable: True
+  else
+    Buildable: False
   main-is:
     Main.hs
-  hs-source-dirs: demo
-  other-modules:
+  hs-source-dirs: demo hse
+  other-modules: Fixity
   GHC-Options: -Wall
   build-depends:
     retrie,
-    base >= 4.11 && < 4.15
+    base >= 4.11 && < 4.15,
+    haskell-src-exts >= 1.23.0 && < 1.24
   default-language: Haskell2010
 
 test-suite test
@@ -127,13 +139,14 @@ test-suite test
     Demo,
     Dependent,
     Exclude,
+    Fixity,
     Golden,
     GroundTerms,
     Ignore,
     ParseQualified,
     Targets,
     Util
-  hs-source-dirs: tests
+  hs-source-dirs: tests hse
   default-language: Haskell2010
   GHC-Options: -Wall
   build-depends:
@@ -147,6 +160,7 @@ test-suite test
     filepath,
     ghc >= 8.4 && < 8.12,
     ghc-paths,
+    haskell-src-exts >= 1.23.0 && < 1.24,
     mtl,
     optparse-applicative,
     process,

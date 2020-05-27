@@ -11,37 +11,14 @@ module Retrie.Fixity
   , lookupOpRdrName
   , Fixity(..)
   , FixityDirection(..)
-  , defaultFixityEnv
   , extendFixityEnv
   , ppFixityEnv
   ) where
-
--- Note [HSE]
--- GHC's parser parses all operator applications left-associatived,
--- then fixes up the associativity in the renamer, since fixity info isn't
--- known until after name resolution.
---
--- Ideally, we'd run the module through the renamer and let it do its thing,
--- but ghc-exactprint cannot roundtrip renamed modules.
---
--- The next best thing we can do is reassociate the operators ourselves, but
--- we need fixity info. Ideally (#2) we'd rename the module and then extract
--- the info from the FixityEnv. That is a TODO. For now, lets just reuse the
--- list of base package fixities in HSE.
-import qualified Language.Haskell.Exts as HSE
-
-import Data.Default
 
 import Retrie.GHC
 
 newtype FixityEnv = FixityEnv
   { unFixityEnv :: FastStringEnv (FastString, Fixity) }
-
-instance Default FixityEnv where
-  def = defaultFixityEnv
-
-defaultFixityEnv :: FixityEnv
-defaultFixityEnv = mkFixityEnv HSE.baseFixities
 
 instance Semigroup FixityEnv where
   -- | 'mappend' for 'FixityEnv' is right-biased
@@ -60,8 +37,8 @@ lookupOpRdrName :: Located RdrName -> FixityEnv -> Fixity
 lookupOpRdrName (L _ n) (FixityEnv env) =
   maybe defaultFixity snd $ lookupFsEnv env (occNameFS $ occName n)
 
-mkFixityEnv :: [HSE.Fixity] -> FixityEnv
-mkFixityEnv = FixityEnv . mkFsEnv . map hseToGHC
+mkFixityEnv :: [(FastString, (FastString, Fixity))] -> FixityEnv
+mkFixityEnv = FixityEnv . mkFsEnv
 
 extendFixityEnv :: [(FastString, Fixity)] -> FixityEnv -> FixityEnv
 extendFixityEnv l (FixityEnv env) =
@@ -78,20 +55,3 @@ ppFixityEnv = unlines . map ppFixity . eltsUFM . unFixityEnv
       , show p
       , unpackFS fs
       ]
-
-hseToGHC :: HSE.Fixity -> (FastString, (FastString, Fixity))
-hseToGHC (HSE.Fixity assoc p nm) = (fs, (fs, Fixity (SourceText nm') p (dir assoc)))
-  where
-    dir (HSE.AssocNone _)  = InfixN
-    dir (HSE.AssocLeft _)  = InfixL
-    dir (HSE.AssocRight _) = InfixR
-
-    nm' = case nm of
-      HSE.Qual _ _ n -> nameStr n
-      HSE.UnQual _ n -> nameStr n
-      _             -> "SpecialCon"
-
-    fs = mkFastString nm'
-
-    nameStr (HSE.Ident _ s)  = s
-    nameStr (HSE.Symbol _ s) = s

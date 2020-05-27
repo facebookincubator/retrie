@@ -20,7 +20,6 @@ module Retrie.Run
 
 import Control.Monad.State.Strict
 import Data.Char
-import Data.Default
 import Data.List
 import Data.Monoid
 import System.Console.ANSI
@@ -56,7 +55,7 @@ runScript f = runScriptWithModifiedOptions (\opts -> (opts,) <$> f opts)
 -- during rewriting.
 runScriptWithModifiedOptions :: (Options -> IO (Options, Retrie ())) -> IO ()
 runScriptWithModifiedOptions f = do
-  opts <- parseOptions def
+  opts <- parseOptions mempty
   (opts', retrie) <- f opts
   execute opts' retrie
 

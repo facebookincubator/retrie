@@ -8,8 +8,8 @@
 {-# LANGUAGE RecordWildCards #-}
 module AllTests (allTests) where
 
-import Data.Default
 import Data.Maybe
+import Fixity
 import Retrie
 import Retrie.Options
 import System.Environment
@@ -29,7 +29,7 @@ import Targets
 
 allTests :: Verbosity -> IO Test
 allTests rtVerbosity = do
-  p <- getOptionsParser def
+  p <- getOptionsParser defaultFixityEnv
   rtDir <-
     fromMaybe (dropFileName __FILE__ </> "inputs")
       <$> lookupEnv "RETRIEINPUTSDIR"
