@@ -71,6 +71,24 @@ matchToRewrites e imps dir (L _ alt) = do
 type AppBuilder =
   LHsExpr GhcPs -> [LHsExpr GhcPs] -> TransformT IO (LHsExpr GhcPs)
 
+irrefutablePat :: LPat GhcPs -> Bool
+irrefutablePat = go . unLoc
+  where
+    go WildPat{} = True
+    go VarPat{} = True
+#if __GLASGOW_HASKELL__ < 806
+    go (LazyPat p) = irrefutablePat p
+    go (AsPat _ p) = irrefutablePat p
+    go (ParPat p) = irrefutablePat p
+    go (BangPat p) = irrefutablePat p
+#else
+    go (LazyPat _ p) = irrefutablePat p
+    go (AsPat _ _ p) = irrefutablePat p
+    go (ParPat _ p) = irrefutablePat p
+    go (BangPat _ p) = irrefutablePat p
+#endif
+    go _ = False
+
 makeFunctionQuery
   :: LHsExpr GhcPs
   -> AnnotatedImports
@@ -79,28 +97,30 @@ makeFunctionQuery
   -> AppBuilder
   -> ([LPat GhcPs], [LPat GhcPs])
   -> TransformT IO [Rewrite (LHsExpr GhcPs)]
-makeFunctionQuery e imps dir grhss mkAppFn (argpats, bndpats) = do
-  let
-#if __GLASGOW_HASKELL__ < 806
-    GRHSs rhss lbs = grhss
-#else
-    GRHSs _ rhss lbs = grhss
-#endif
-    bs = collectPatsBinders argpats
-  -- See Note [Wildcards]
-  (es,(_,bs')) <- runStateT (mapM patToExpr argpats) (wildSupply bs, bs)
-  lhs <- mkAppFn e es
-  for rhss $ \ grhs -> do
-    le <- mkLet (unLoc lbs) (grhsToExpr grhs)
-    rhs <- mkLams bndpats le
+makeFunctionQuery e imps dir grhss mkAppFn (argpats, bndpats)
+  | any (not . irrefutablePat) bndpats = return []
+  | otherwise = do
     let
-      (pat, temp) =
-        case dir of
-          LeftToRight -> (lhs,rhs)
-          RightToLeft -> (rhs,lhs)
-    p <- pruneA pat
-    t <- pruneA temp
-    return $ addRewriteImports imps $ mkRewrite (mkQs bs') p t
+#if __GLASGOW_HASKELL__ < 806
+      GRHSs rhss lbs = grhss
+#else
+      GRHSs _ rhss lbs = grhss
+#endif
+      bs = collectPatsBinders argpats
+    -- See Note [Wildcards]
+    (es,(_,bs')) <- runStateT (mapM patToExpr argpats) (wildSupply bs, bs)
+    lhs <- mkAppFn e es
+    for rhss $ \ grhs -> do
+      le <- mkLet (unLoc lbs) (grhsToExpr grhs)
+      rhs <- mkLams bndpats le
+      let
+        (pat, temp) =
+          case dir of
+            LeftToRight -> (lhs,rhs)
+            RightToLeft -> (rhs,lhs)
+      p <- pruneA pat
+      t <- pruneA temp
+      return $ addRewriteImports imps $ mkRewrite (mkQs bs') p t
 
 backtickRules
   :: LHsExpr GhcPs
