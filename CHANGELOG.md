@@ -1,3 +1,12 @@
+0.1.1.1 (June 1, 2020)
+
+* Remove dependency on haskell-src-exts from library (#9)
+* Support additional pattern syntax when generating fold/unfold rewrites (#8)
+* Limit partial-application rewrite variants to irrefutible patterns (#7)
+* Fix handling of qualified names during substitution (#5)
+* Fix self-recursion check for do-syntax binds (#5)
+* Fix bug in grep invocation for relative target paths (#5)
+
 0.1.1.0 (May 8, 2020)
 
 * Support GHC 8.10.1
