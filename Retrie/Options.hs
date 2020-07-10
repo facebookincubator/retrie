@@ -242,6 +242,11 @@ parseRewriteSpecOptions = concat <$> traverse many
       , metavar "EQUATION"
       , help "Apply an adhoc equation of the form: forall vs. lhs = rhs"
       ]
+  , fmap AdhocType $ option str $ mconcat
+      [ long "adhoc-type"
+      , metavar "EQUATION"
+      , help "Apply an adhoc type equation of the form: lhs = rhs"
+      ]
   ]
 
 parseMode :: Parser ExecutionMode

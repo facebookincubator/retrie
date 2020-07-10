@@ -1,3 +1,7 @@
+x.x.x.x (xxx)
+
+* Added --adhoc-type flag (#13)
+
 0.1.1.1 (June 1, 2020)
 
 * Remove dependency on haskell-src-exts from library (#9)

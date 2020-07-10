@@ -15,6 +15,7 @@ module Retrie.Rewrites
 import Control.Exception
 import Data.Either (partitionEithers)
 import qualified Data.Map as Map
+import Data.Maybe
 import qualified Data.Text as Text
 import Data.Traversable
 import System.FilePath
@@ -37,6 +38,8 @@ data RewriteSpec
   = Adhoc String
     -- ^ Equation in RULES-format. (e.g. @"forall x. succ (pred x) = x"@)
     -- Will be applied left-to-right.
+  | AdhocType String
+    -- ^ Equation in type-synonym format, _without_ the keyword 'type'.
   | Fold QualifiedName
     -- ^ Fold a function definition. The inverse of unfolding/inlining.
     -- Replaces instances of the function body with calls to the function.
@@ -59,7 +62,8 @@ parseRewriteSpecs
 parseRewriteSpecs parser fixityEnv specs = do
   (adhocs, fileBased) <- partitionEithers <$> sequence
     [ case spec of
-        Adhoc rule -> return $ Left rule
+        Adhoc rule -> return $ Left $ Left rule
+        AdhocType tySyn -> return $ Left $ Right tySyn
         Fold name -> mkFileBased FoldUnfold RightToLeft name
         RuleBackward name -> mkFileBased Rule RightToLeft name
         RuleForward name -> mkFileBased Rule LeftToRight name
@@ -68,9 +72,11 @@ parseRewriteSpecs parser fixityEnv specs = do
         Unfold name -> mkFileBased FoldUnfold LeftToRight name
     | spec <- specs
     ]
+  let (adhocRules, adhocTypes) = partitionEithers adhocs
   fbRewrites <- parseFileBased parser fileBased
-  adhocRewrites <- parseAdhocs fixityEnv adhocs
-  return $ fbRewrites ++ adhocRewrites
+  adhocExpressionRewrites <- parseAdhocs fixityEnv adhocRules
+  adhocTypeRewrites <- parseAdhocTypes fixityEnv adhocTypes
+  return $ fbRewrites ++ adhocExpressionRewrites ++ adhocTypeRewrites
   where
     mkFileBased ty dir name =
       case parseQualified name of
@@ -116,6 +122,20 @@ parseAdhocs fixities adhocs = do
         )
       | (i,s) <- zip [1..] $ map addRHS adhocs
       , let nm = "adhoc" ++ show (i::Int)
+      ]
+
+parseAdhocTypes :: FixityEnv -> [String] -> IO [Rewrite Universe]
+parseAdhocTypes _ [] = return []
+parseAdhocTypes fixities tySyns = do
+  print adhocTySyns
+  cpp <-
+    parseCPP (parseContent fixities "parseAdhocTypes") (Text.unlines adhocTySyns)
+  constructRewrites cpp Type adhocSpecs
+  where
+    (adhocSpecs, adhocTySyns) = unzip
+      [ ( (mkFastString nm, LeftToRight), "type " <> Text.pack s)
+      | s <- tySyns
+      , Just nm <- [listToMaybe $ words s]
       ]
 
 constructRewrites
