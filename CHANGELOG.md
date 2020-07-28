@@ -1,6 +1,7 @@
 x.x.x.x (xxx)
 
 * Added --adhoc-type flag (#13)
+* Added --adhoc-pattern, --pattern-forward, --pattern-backward (#15)
 
 0.1.1.1 (June 1, 2020)
 
@@ -19,7 +20,7 @@ x.x.x.x (xxx)
 
 * Don't fail if 'git' or 'hg' commands cannot be found.
 * Better error message when syntax support needs to be extended.
-* Add support for following type syntax: lists, tuples, constraints, 
+* Add support for following type syntax: lists, tuples, constraints,
   unboxed sums, and forall.
 
 0.1.0.0 (March 16, 2020)

@@ -23,6 +23,7 @@ import Retrie.PatternMap.Bag
 import Retrie.PatternMap.Class
 import Retrie.Quantifiers
 import Retrie.Substitution
+import Retrie.Util
 
 ------------------------------------------------------------------------
 

@@ -247,6 +247,21 @@ parseRewriteSpecOptions = concat <$> traverse many
       , metavar "EQUATION"
       , help "Apply an adhoc type equation of the form: lhs = rhs"
       ]
+  , fmap PatternForward $ option str $ mconcat
+      [ long "pattern-forward"
+      , metavar "NAME"
+      , help "Apply fully-qualified pattern synonym name left-to-right."
+      ]
+  , fmap PatternBackward $ option str $ mconcat
+      [ long "pattern-backward"
+      , metavar "NAME"
+      , help "Apply fully-qualified pattern synonym name right-to-left."
+      ]
+  , fmap AdhocPattern $ option str $ mconcat
+      [ long "adhoc-pattern"
+      , metavar "EQUATION"
+      , help "Apply an adhoc pattern equation of the form: lhs = rhs"
+      ]
   ]
 
 parseMode :: Parser ExecutionMode

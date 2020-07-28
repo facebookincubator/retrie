@@ -95,3 +95,10 @@ trySync io = catch (Right <$> io) $ \e ->
   case fromException e of
     Just (_ :: SomeAsyncException) -> throwIO e
     Nothing -> return (Left e)
+
+missingSyntax :: String -> a
+missingSyntax constructor = error $ unlines
+  [ "Missing syntax support: " ++ constructor
+  , "Please file an issue at https://github.com/facebookincubator/retrie/issues"
+  , "with an example of the rewrite you are attempting and we'll add it."
+  ]

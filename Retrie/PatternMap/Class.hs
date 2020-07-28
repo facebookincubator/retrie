@@ -38,13 +38,6 @@ pruneMatchEnv i me = me { meAlphaEnv = pruneAlphaEnv i (meAlphaEnv me) }
 -- TODO: Maybe a -> a ??? -- we never need to delete
 type A a = Maybe a -> Maybe a
 
-missingSyntax :: String -> a
-missingSyntax constructor = error $ unlines
-  [ "Missing syntax support: " ++ constructor
-  , "Please file an issue at https://github.com/facebookincubator/retrie/issues"
-  , "with an example of the rewrite you are attempting and we'll add it."
-  ]
-
 toA :: PatternMap m => (m a -> m a) -> A (m a)
 toA f = Just . f . fromMaybe mEmpty
 

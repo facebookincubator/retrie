@@ -9,19 +9,25 @@
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE ViewPatterns #-}
 module Retrie.Expr
-  ( grhsToExpr
+  ( bitraverseHsConDetails
+  , grhsToExpr
   , mkApps
+  , mkConPatIn
   , mkHsAppsTy
   , mkLams
   , mkLet
   , mkLoc
   , mkLocatedHsVar
+  , mkVarPat
   , mkTyVar
   , parenify
   , parenifyT
+  , parenifyP
   , patToExpr
   , patToExprA
+  , setAnnsFor
   , unparen
+  , unparenP
   , unparenT
   , wildSupply
   ) where
@@ -89,11 +95,7 @@ mkLams [] e = return e
 mkLams vs e = do
   let
     mg =
-#if __GLASGOW_HASKELL__ < 806
-      mkMatchGroup Generated [mkMatch LambdaExpr vs e (noLoc EmptyLocalBinds)]
-#else
-      mkMatchGroup Generated [mkMatch LambdaExpr vs e (noLoc (EmptyLocalBinds noExtField))]
-#endif
+      mkMatchGroup Generated [mkMatch LambdaExpr vs e (noLoc emptyLocalBinds)]
   m' <- case unLoc $ mg_alts mg of
     [m] -> setAnnsFor m [(G AnnLam, DP (0,0)),(G AnnRarrow, DP (0,1))]
     _   -> fail "mkLams: lambda expression can only have a single match!"
@@ -146,6 +148,23 @@ mkTyVar nm = do
   _ <- setAnnsFor nm [(G AnnVal, DP (0,0))]
   swapEntryDPT tv nm
   return tv
+
+mkVarPat :: Monad m => Located RdrName -> TransformT m (LPat GhcPs)
+#if __GLASGOW_HASKELL__ < 806
+mkVarPat nm = mkLoc (VarPat nm)
+#else
+mkVarPat nm = mkLoc (VarPat noExtField nm)
+#endif
+
+mkConPatIn
+  :: Monad m
+  => Located RdrName
+  -> HsConPatDetails GhcPs
+  -> TransformT m (LPat GhcPs)
+mkConPatIn patName params = do
+  p <- mkLoc $ ConPatIn patName params
+  setEntryDPT p (DP (0,0))
+  return p
 
 -------------------------------------------------------------------------------
 
@@ -355,6 +374,31 @@ mkParen k e = do
   swapEntryDPT e pe
   return pe
 
+parenifyP :: Monad m => Context -> LPat GhcPs -> TransformT m (LPat GhcPs)
+parenifyP Context{..} p@(L _ pat)
+  | IsLhs <- ctxtParentPrec
+  , needed pat
+  =
+#if __GLASGOW_HASKELL__ < 806
+    mkParen ParPat p
+#else
+    mkParen (ParPat noExtField) p
+#endif
+  | otherwise = return p
+  where
+    needed BangPat{}                          = False
+    needed LazyPat{}                          = False
+    needed ListPat{}                          = False
+    needed LitPat{}                           = False
+    needed ParPat{}                           = False
+    needed SumPat{}                           = False
+    needed TuplePat{}                         = False
+    needed VarPat{}                           = False
+    needed WildPat{}                          = False
+    needed (ConPatIn _ (PrefixCon []))        = False
+    needed ConPatOut{pat_args = PrefixCon []} = False
+    needed _                                  = True
+
 parenifyT
   :: Monad m => Context -> LHsType GhcPs -> TransformT m (LHsType GhcPs)
 parenifyT Context{..} lty@(L _ ty)
@@ -390,3 +434,26 @@ unparenT (L _ (HsParTy ty)) = ty
 unparenT (L _ (HsParTy _ ty)) = ty
 #endif
 unparenT ty = ty
+
+unparenP :: LPat GhcPs -> LPat GhcPs
+#if __GLASGOW_HASKELL__ < 806
+unparenP (L _ (ParPat p)) = p
+#else
+unparenP (L _ (ParPat _ p)) = p
+#endif
+unparenP p = p
+
+--------------------------------------------------------------------
+
+bitraverseHsConDetails
+  :: Applicative m
+  => (arg -> m arg')
+  -> (rec -> m rec')
+  -> HsConDetails arg rec
+  -> m (HsConDetails arg' rec')
+bitraverseHsConDetails argf _ (PrefixCon args) =
+  PrefixCon <$> (argf `traverse` args)
+bitraverseHsConDetails _ recf (RecCon r) =
+  RecCon <$> recf r
+bitraverseHsConDetails argf _ (InfixCon a1 a2) =
+  InfixCon <$> argf a1 <*> argf a2

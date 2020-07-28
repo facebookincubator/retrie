@@ -76,18 +76,20 @@ substPat
   -> LPat GhcPs
   -> TransformT m (LPat GhcPs)
 #if __GLASGOW_HASKELL__ < 806
-substPat ctxt p@(L l1 (VarPat (L l2 v))) =
-#elif __GLASGOW_HASKELL__ < 808
-substPat ctxt p@(L l1 (VarPat x (L l2 v))) =
+substPat ctxt p@(L l1 (VarPat vl@(L l2 v))) =
 #else
-substPat ctxt (dL -> p@(L l1 (VarPat x (dL -> L l2 v)))) =
-  fmap composeSrcSpan $
+substPat ctxt p@(L l1 (VarPat x vl@(L l2 v))) =
 #endif
   case lookupHoleVar v ctxt of
     Just (HolePat pA) -> do
-      p' <- graftA pA
+      p' <- graftA (unparenP <$> pA)
       transferEntryAnnsT isComma p p'
-      return p'
+      -- the relevant entry delta is sometimes attached to
+      -- the OccName and not to the VarPat.
+      -- This seems to be the case only when the pattern comes from a lhs,
+      -- whereas it has no annotations in patterns found in rhs's.
+      tryTransferEntryDPT vl p'
+      parenifyP ctxt p'
     Just (HoleRdr rdr) ->
 #if __GLASGOW_HASKELL__ < 806
       return $ L l1 $ VarPat $ L l2 rdr

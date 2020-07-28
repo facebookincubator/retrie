@@ -50,6 +50,7 @@ updateContext c i =
     `extQ` (return . updGRHSs)
     `extQ` (return . updGRHS)
     `extQ` (return . updStmt)
+    `extQ` (return . updPat)
     `extQ` updStmtList
     `extQ` (return . updHsBind)
     `extQ` (return . updTyClDecl)
@@ -91,7 +92,15 @@ updateContext c i =
 #endif
 
     updMatch :: Match GhcPs (LHsExpr GhcPs) -> Context
-    updMatch = addInScope neverParen . collectPatsBinders . m_pats
+    updMatch
+#if __GLASGOW_HASKELL__ < 806
+      | i == 1  -- m_pats field
+#else
+      | i == 2  -- m_pats field
+#endif
+      = addInScope c{ctxtParentPrec = IsLhs} . collectPatsBinders . m_pats
+      | otherwise = addInScope neverParen . collectPatsBinders . m_pats
+      where
 
     updGRHSs :: GRHSs GhcPs (LHsExpr GhcPs) -> Context
     updGRHSs = addInScope neverParen . collectLocalBinders . unLoc . grhssLocalBinds
@@ -139,6 +148,9 @@ updateContext c i =
     updTyClDecl DataDecl{..} = addInScope neverParen [unLoc tcdLName]
     updTyClDecl ClassDecl{..} = addInScope neverParen [unLoc tcdLName]
     updTyClDecl _ = neverParen
+
+    updPat :: Pat GhcPs -> Context
+    updPat _ = neverParen
 
 -- | Create an empty 'Context' with given 'FixityEnv', rewriter, and dependent
 -- rewrite generator.

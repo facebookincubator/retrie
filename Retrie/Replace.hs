@@ -36,6 +36,7 @@ replace c =
   mkM (replaceImpl @(HsExpr GhcPs) c)
     `extM` (replaceImpl @(Stmt GhcPs (LHsExpr GhcPs)) c)
     `extM` (replaceImpl @(HsType GhcPs) c)
+    `extM` (replaceImpl @(Pat GhcPs) c)
 
 -- | Generic replacement function. This is the thing that actually runs the
 -- 'Rewriter' carried by the context, instantiates templates, handles parens
@@ -70,7 +71,7 @@ replaceImpl c e = do
       -- copy appropriate annotations from old expression to template
       addAllAnnsT e r
       -- add parens to template if needed
-      res <- (mkM (parenify c) `extM` parenifyT c) r
+      res <- (mkM (parenify c) `extM` parenifyT c `extM` parenifyP c) r
       -- prune the resulting expression and log it with location
       orig <- printNoLeadingSpaces <$> pruneA e
       repl <- printNoLeadingSpaces <$> pruneA res
@@ -108,7 +109,7 @@ instance Monoid Change where
 -- of the parens, not the inner expression, so we have to
 -- keep both expressions around.
 getUnparened :: Data k => k -> k
-getUnparened = mkT e `extT` t
+getUnparened = mkT e `extT` t `extT` p
   where
     e :: LHsExpr GhcPs -> LHsExpr GhcPs
 #if __GLASGOW_HASKELL__ < 806
@@ -125,6 +126,14 @@ getUnparened = mkT e `extT` t
     t (L _ (HsParTy _ ty)) = ty
 #endif
     t other = other
+
+    p :: LPat GhcPs -> LPat GhcPs
+#if __GLASGOW_HASKELL__ < 806
+    p (L _ (ParPat pat)) = pat
+#else
+    p (L _ (ParPat _ pat)) = pat
+#endif
+    p other = other
 
 -- The location of 'e' accurately points to the first non-space character
 -- of 'e', but when we exactprint 'e', we might get some leading spaces (if

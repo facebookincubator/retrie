@@ -62,6 +62,7 @@ library
     Retrie.Replace,
     Retrie.Rewrites,
     Retrie.Rewrites.Function,
+    Retrie.Rewrites.Patterns,
     Retrie.Rewrites.Rules,
     Retrie.Rewrites.Types,
     Retrie.Run,

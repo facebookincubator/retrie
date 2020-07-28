@@ -1,3 +1,4 @@
+{-# LANGUAGE RecordWildCards #-}
 -- Copyright (c) Facebook, Inc. and its affiliates.
 --
 -- This source code is licensed under the MIT license found in the
@@ -13,7 +14,6 @@ module Retrie.Rewrites
   ) where
 
 import Control.Exception
-import Data.Either (partitionEithers)
 import qualified Data.Map as Map
 import Data.Maybe
 import qualified Data.Text as Text
@@ -25,6 +25,7 @@ import Retrie.ExactPrint
 import Retrie.Fixity
 import Retrie.GHC
 import Retrie.Rewrites.Function
+import Retrie.Rewrites.Patterns
 import Retrie.Rewrites.Rules
 import Retrie.Rewrites.Types
 import Retrie.Types
@@ -38,6 +39,8 @@ data RewriteSpec
   = Adhoc String
     -- ^ Equation in RULES-format. (e.g. @"forall x. succ (pred x) = x"@)
     -- Will be applied left-to-right.
+  | AdhocPattern String
+    -- ^ Equation in pattern-synonym format, _without_ the keyword 'pattern'.
   | AdhocType String
     -- ^ Equation in type-synonym format, _without_ the keyword 'type'.
   | Fold QualifiedName
@@ -53,6 +56,25 @@ data RewriteSpec
     -- ^ Apply a type synonym left-to-right.
   | Unfold QualifiedName
     -- ^ Unfold, or inline, a function definition.
+  | PatternForward QualifiedName
+    -- ^ Unfold a pattern synonym
+  | PatternBackward QualifiedName
+    -- ^ Fold a pattern synonym, replacing instances of the rhs with the synonym
+
+
+data ClassifiedRewrites = ClassifiedRewrites
+  { adhocRules :: [String]
+  , adhocPatterns :: [String]
+  , adhocTypes :: [String]
+  , fileBased :: [(FilePath, [(FileBasedTy,[(FastString, Direction)])])]
+  }
+
+instance Monoid ClassifiedRewrites where
+  mempty = ClassifiedRewrites [] [] [] []
+
+instance Semigroup ClassifiedRewrites where
+  ClassifiedRewrites a b c d <> ClassifiedRewrites a' b' c' d' =
+    ClassifiedRewrites (a <> a') (b <> b') (c <> c') (d <> d')
 
 parseRewriteSpecs
   :: (FilePath -> IO (CPP AnnotatedModule))
@@ -60,30 +82,37 @@ parseRewriteSpecs
   -> [RewriteSpec]
   -> IO [Rewrite Universe]
 parseRewriteSpecs parser fixityEnv specs = do
-  (adhocs, fileBased) <- partitionEithers <$> sequence
+  ClassifiedRewrites{..} <- mconcat <$> sequence
     [ case spec of
-        Adhoc rule -> return $ Left $ Left rule
-        AdhocType tySyn -> return $ Left $ Right tySyn
+        Adhoc rule -> return mempty{adhocRules = [rule]}
+        AdhocPattern pSyn -> return mempty{adhocPatterns = [pSyn]}
+        AdhocType tySyn -> return mempty{adhocTypes = [tySyn]}
         Fold name -> mkFileBased FoldUnfold RightToLeft name
         RuleBackward name -> mkFileBased Rule RightToLeft name
         RuleForward name -> mkFileBased Rule LeftToRight name
         TypeBackward name -> mkFileBased Type RightToLeft name
         TypeForward name -> mkFileBased Type LeftToRight name
+        PatternBackward name -> mkFileBased Pattern RightToLeft name
+        PatternForward name -> mkFileBased Pattern LeftToRight name
         Unfold name -> mkFileBased FoldUnfold LeftToRight name
     | spec <- specs
     ]
-  let (adhocRules, adhocTypes) = partitionEithers adhocs
   fbRewrites <- parseFileBased parser fileBased
   adhocExpressionRewrites <- parseAdhocs fixityEnv adhocRules
   adhocTypeRewrites <- parseAdhocTypes fixityEnv adhocTypes
-  return $ fbRewrites ++ adhocExpressionRewrites ++ adhocTypeRewrites
+  adhocPatternRewrites <- parseAdhocPatterns fixityEnv adhocPatterns
+  return $
+    fbRewrites ++
+    adhocExpressionRewrites ++
+    adhocTypeRewrites ++
+    adhocPatternRewrites
   where
     mkFileBased ty dir name =
       case parseQualified name of
         Left err -> throwIO $ ErrorCall $ "parseRewriteSpecs: " ++ err
-        Right (fp, fs) -> return $ Right (fp, [(ty, [(fs, dir)])])
+        Right (fp, fs) -> return mempty{fileBased = [(fp, [(ty, [(fs, dir)])])]}
 
-data FileBasedTy = FoldUnfold | Rule | Type
+data FileBasedTy = FoldUnfold | Rule | Type | Pattern
   deriving (Eq, Ord)
 
 parseFileBased
@@ -138,6 +167,21 @@ parseAdhocTypes fixities tySyns = do
       , Just nm <- [listToMaybe $ words s]
       ]
 
+parseAdhocPatterns :: FixityEnv -> [String] -> IO [Rewrite Universe]
+parseAdhocPatterns _ [] = return []
+parseAdhocPatterns fixities patSyns = do
+  cpp <-
+    parseCPP (parseContent fixities "parseAdhocPatterns")
+             (Text.unlines $ pragma : adhocPatSyns)
+  constructRewrites cpp Pattern adhocSpecs
+  where
+    pragma = "{-# LANGUAGE PatternSynonyms #-}"
+    (adhocSpecs, adhocPatSyns) = unzip
+      [ ( (mkFastString nm, LeftToRight), "pattern " <> Text.pack s)
+      | s <- patSyns
+      , Just nm <- [listToMaybe $ words s]
+      ]
+
 constructRewrites
   :: CPP AnnotatedModule
   -> FileBasedTy
@@ -151,6 +195,7 @@ constructRewrites cpp ty specs = do
     nameOf FoldUnfold = "definition"
     nameOf Rule = "rule"
     nameOf Type = "type synonym"
+    nameOf Pattern = "pattern synonym"
 
     m = foldr (plusUFM_C (++)) emptyUFM cppM
 
@@ -168,6 +213,7 @@ tyBuilder
 tyBuilder FoldUnfold specs am = promote <$> dfnsToRewrites specs am
 tyBuilder Rule specs am = promote <$> rulesToRewrites specs am
 tyBuilder Type specs am = promote <$> typeSynonymsToRewrites specs am
+tyBuilder Pattern specs am = patternSynonymsToRewrites specs am
 
 promote :: Matchable a => UniqFM [Rewrite a] -> UniqFM [Rewrite Universe]
 promote = fmap (map toURewrite)

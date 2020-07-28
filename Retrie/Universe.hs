@@ -32,6 +32,7 @@ data Universe
   = ULHsExpr (LHsExpr GhcPs)
   | ULStmt (LStmt GhcPs (LHsExpr GhcPs))
   | ULType (LHsType GhcPs)
+  | ULPat (LPat GhcPs)
   deriving (Data)
 
 -- | Exactprint an annotated 'Universe'.
@@ -43,6 +44,7 @@ exactPrintU :: Universe -> Anns -> String
 exactPrintU (ULHsExpr e) anns = exactPrint e anns
 exactPrintU (ULStmt s) anns = exactPrint s anns
 exactPrintU (ULType t) anns = exactPrint t anns
+exactPrintU (ULPat p) anns = exactPrint p anns
 
 -------------------------------------------------------------------------------
 
@@ -64,6 +66,7 @@ instance Matchable Universe where
   getOrigin (ULHsExpr e) = getOrigin e
   getOrigin (ULStmt s) = getOrigin s
   getOrigin (ULType t) = getOrigin t
+  getOrigin (ULPat p) = getOrigin p
 
 instance Matchable (LHsExpr GhcPs) where
   inject = ULHsExpr
@@ -83,6 +86,12 @@ instance Matchable (LHsType GhcPs) where
   project _ = error "project ULType"
   getOrigin e = getLoc e
 
+instance Matchable (Located(Pat GhcPs)) where
+  inject = ULPat
+  project (ULPat p) = p
+  project _ = error "project ULPat"
+  getOrigin = getLoc
+
 -------------------------------------------------------------------------------
 
 -- | The pattern map for 'Universe'.
@@ -90,6 +99,7 @@ data UMap a = UMap
   { umExpr :: EMap a
   , umStmt :: SMap a
   , umType :: TyMap a
+  , umPat  :: PatMap a
   }
   deriving (Functor)
 
@@ -97,13 +107,14 @@ instance PatternMap UMap where
   type Key UMap = Universe
 
   mEmpty :: UMap a
-  mEmpty = UMap mEmpty mEmpty mEmpty
+  mEmpty = UMap mEmpty mEmpty mEmpty mEmpty
 
   mUnion :: UMap a -> UMap a -> UMap a
   mUnion m1 m2 = UMap
     (unionOn umExpr m1 m2)
     (unionOn umStmt m1 m2)
     (unionOn umType m1 m2)
+    (unionOn umPat m1 m2)
 
   mAlter :: AlphaEnv -> Quantifiers -> Universe -> A a -> UMap a -> UMap a
   mAlter env vs u f m = go u
@@ -111,6 +122,7 @@ instance PatternMap UMap where
       go (ULHsExpr e) = m { umExpr = mAlter env vs e f (umExpr m) }
       go (ULStmt s)   = m { umStmt = mAlter env vs s f (umStmt m) }
       go (ULType t)   = m { umType = mAlter env vs t f (umType m) }
+      go (ULPat p)    = m { umPat  = mAlter env vs p f (umPat  m) }
 
   mMatch :: MatchEnv -> Universe -> (Substitution, UMap a) -> [(Substitution, a)]
   mMatch env = go
@@ -118,4 +130,4 @@ instance PatternMap UMap where
       go (ULHsExpr e) = mapFor umExpr >=> mMatch env e
       go (ULStmt s)   = mapFor umStmt >=> mMatch env s
       go (ULType t)   = mapFor umType >=> mMatch env t
-
+      go (ULPat  p)   = mapFor umPat  >=> mMatch env p

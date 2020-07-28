@@ -1,0 +1,55 @@
+# Copyright (c) Facebook, Inc. and its affiliates.
+#
+# This source code is licensed under the MIT license found in the
+# LICENSE file in the root directory of this source tree.
+#
+--pattern-forward PatternSyn1.JustUnit
+--pattern-forward PatternSyn1.Some
+--pattern-forward PatternSyn1.SomeUni
+--pattern-forward PatternSyn1.LeftSomething
+--pattern-forward PatternSyn1.JustNot
+--adhoc-pattern "SomeAdhoc x = Just x"
+--adhoc-pattern "SomeAdhoc2 x <- Just x"
+===
+ {-# LANGUAGE PatternSynonyms #-}
+ {-# LANGUAGE ViewPatterns    #-}
+ module PatternSyn1 where
+
+ pattern JustUnit = Just ()
+ pattern Some x <- Just x where Some x = Just x
+ pattern SomeUni x <- Just x
+ pattern JustNot x <- Just (not -> x) where JustNot x = Just (not x)
+ pattern LeftSomething <- Left _
+ pattern SomeAdhoc x = Just x
+ pattern SomeAdhoc2 x = Just x
+
+ foo :: Maybe () -> Maybe ()
+
+-foo JustUnit = JustUnit
++foo (Just ()) = Just ()
+
+-foo (id -> JustUnit) = JustUnit
++foo (id -> Just ()) = Just ()
+
+-foo (Some ()) = Some ()
++foo (Just ()) = Just ()
+
+-foo (SomeUni ()) = Just ()
++foo (Just ()) = Just ()
+
+-foo (Some x) = let x = Some () in x
++foo (Just x) = let x = Just () in x
+
+-foo (SomeAdhoc ()) = SomeAdhoc ()
++foo (Just ()) = Just ()
+
+-foo (SomeAdhoc2 ()) = SomeAdhoc2 ()
++foo (Just ()) = SomeAdhoc2 ()
+
+ fooBool :: Maybe Bool -> MaybeBool
+-fooBool (JustNot x) = JustNot x
++fooBool (Just (not -> x)) = Just (not x)
+
+ bar :: Either () () -> Either () ()
+-bar LeftSomething = Left ()
++bar (Left _) = Left ()

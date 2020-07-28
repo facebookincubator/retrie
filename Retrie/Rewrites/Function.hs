@@ -5,7 +5,11 @@
 --
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE TupleSections #-}
-module Retrie.Rewrites.Function (dfnsToRewrites) where
+module Retrie.Rewrites.Function
+  ( dfnsToRewrites
+  , getImports
+  , matchToRewrites
+  ) where
 
 import Control.Monad
 import Control.Monad.State.Lazy

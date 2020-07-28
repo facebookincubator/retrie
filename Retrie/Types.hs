@@ -86,6 +86,7 @@ data Context = Context
 -- | Precedence of parent node in the AST.
 data ParentPrec
   = HasPrec Fixity -- ^ Parent has precedence info.
+  | IsLhs      -- ^ We are a pattern in a left-hand-side
   | IsHsAppsTy -- ^ Parent is HsAppsTy
   | NeverParen -- ^ Based on parent, we should never add parentheses.
 

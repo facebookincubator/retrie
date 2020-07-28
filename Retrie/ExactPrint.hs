@@ -7,7 +7,6 @@
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE ViewPatterns #-}
 -- | Provides consistent interface with ghc-exactprint.
 module Retrie.ExactPrint
   ( -- * Fixity re-association
@@ -29,6 +28,7 @@ module Retrie.ExactPrint
   , transferAnnsT
   , transferEntryAnnsT
   , transferEntryDPT
+  , tryTransferEntryDPT
     -- * Utils
   , debugDump
   , debugParse
@@ -305,6 +305,14 @@ transferEntryDPT
 transferEntryDPT a b =
   modifyAnnsT (transferEntryDP a b)
 
+tryTransferEntryDPT
+  :: (Data a, Data b, Monad m)
+  => Located a -> Located b -> TransformT m ()
+tryTransferEntryDPT a b = modifyAnnsT $ \anns ->
+  if M.member (mkAnnKey a) anns
+    then transferEntryDP a b anns
+    else anns
+
 -- This function fails if b is not in Anns, which seems dumb, since we are inserting it.
 transferEntryDP :: (Data a, Data b) => Located a -> Located b -> Anns -> Anns
 transferEntryDP a b anns = setEntryDP b dp anns'
@@ -375,16 +383,19 @@ transferAnnsT p a b = modifyAnnsT f
       let anB' = anB { annsDP = annsDP anB ++ filter (p . fst) (annsDP anA) }
       return $ M.insert bKey anB' anns
 
--- | 'Transform' monad version of 'getEntryDP'
+-- | 'Transform' monad version of 'setEntryDP',
+--   which sets the entry 'DeltaPos' for an annotation.
 setEntryDPT
   :: (Data a, Monad m)
   => Located a -> DeltaPos -> TransformT m ()
 setEntryDPT ast dp = do
   modifyAnnsT (setEntryDP ast dp)
 
--- | The setEntryDP that comes with exactprint does some really confusing
--- entry math around comments that I'm not convinced is either correct or useful.
+-- | Set the true entry 'DeltaPos' from the annotation of a
+--   given AST element.
 setEntryDP :: Data a => Located a -> DeltaPos -> Anns -> Anns
+--  The setEntryDP that comes with exactprint does some really confusing
+--  entry math around comments that I'm unconvinced is either correct or useful.
 setEntryDP x dp anns = M.alter (Just . f . fromMaybe annNone) k anns
   where
     k = mkAnnKey x

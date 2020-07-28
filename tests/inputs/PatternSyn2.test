@@ -1,0 +1,30 @@
+# Copyright (c) Facebook, Inc. and its affiliates.
+#
+# This source code is licensed under the MIT license found in the
+# LICENSE file in the root directory of this source tree.
+#
+--pattern-backward PatternSyn2.Some
+--pattern-backward PatternSyn2.JustUnit
+--pattern-backward PatternSyn2.SomeUnit
+===
+ {-# LANGUAGE PatternSynonyms #-}
+ {-# LANGUAGE ViewPatterns    #-}
+ module PatternSyn2 where
+
+ pattern Some x <- Just x where Some x = Just x
+ pattern JustUnit = Some ()
+ pattern SomeUnit <- JustUnit
+
+ foo :: Maybe () -> Maybe ()
+
+-foo (Just ()) = Just ()
++foo (Some ()) = Some ()
+
+-foo (id -> Just ()) = Just ()
++foo (id -> Some ()) = Some ()
+
+-foo (Some ()) = Some ()
++foo JustUnit = JustUnit
+
+-foo JustUnit = JustUnit
++foo SomeUnit = JustUnit
