@@ -32,9 +32,9 @@ patternSynonymsToRewrites specs am = fmap astA $ transformA am $ \(L _ m) -> do
   imports <- getImports RightToLeft (hsmodName m)
   rrs <- sequence
       [ do
-          patRewrites <- mkPatRewrite dir imports nm params rhs patdir
+          patRewrite <- mkPatRewrite dir imports nm params lrhs
           expRewrites <- mkExpRewrite dir imports nm params rhs patdir
-          return (rdr, map toURewrite patRewrites ++ map toURewrite expRewrites)
+          return (rdr, toURewrite patRewrite : map toURewrite expRewrites)
 #if __GLASGOW_HASKELL__ < 806
       | L _ (ValD (PatSynBind (PSB nm _ params rhs patdir))) <- hsmodDecls m
 #else
@@ -42,6 +42,7 @@ patternSynonymsToRewrites specs am = fmap astA $ transformA am $ \(L _ m) -> do
 #endif
       , let rdr = rdrFS (unLoc nm)
       , dir <- fromMaybe [] (lookupUFM fsMap rdr)
+      , Just lrhs <- [dLPat rhs]
       ]
 
   return $ listToUFM_C (++) rrs
@@ -51,31 +52,28 @@ mkPatRewrite
   -> AnnotatedImports
   -> LRdrName
   -> HsConDetails LRdrName [RecordPatSynField LRdrName]
-  -> LPat GhcPs
-  -> HsPatSynDir GhcPs
-  -> TransformT IO [Rewrite (LPat GhcPs)]
-mkPatRewrite dir imports patName params rhs _patDir = do
+  -> Located (Pat GhcPs)
+  -> TransformT IO (Rewrite (Located (Pat GhcPs)))
+mkPatRewrite dir imports patName params rhs = do
   lhs <- asPat patName params
 
-  rewrites <- case dir of
-    LeftToRight ->
-      return [(lhs, rhs)]
+  (pat, temp) <- case dir of
+    LeftToRight -> return (lhs, rhs)
     RightToLeft -> do
       setEntryDPT lhs (DP (0,0))
       -- Patterns from lhs have wonky annotations,
       -- the space will be attached to the name, not to the ConPatIn ast node
       setEntryDPTunderConPatIn lhs (DP (0,0))
-      return [(rhs,lhs)]
+      return (rhs, lhs)
 
-  forM rewrites $ \(pat,temp) -> do
-    p <- pruneA pat
-    t <- pruneA temp
-    let bs = collectPatsBinders [temp]
-    return $ addRewriteImports imports $ mkRewrite (mkQs bs) p t
+  p <- pruneA pat
+  t <- pruneA temp
+  let bs = collectPatBinders (cLPat temp)
+  return $ addRewriteImports imports $ mkRewrite (mkQs bs) p t
 
   where
     setEntryDPTunderConPatIn
-      :: Monad m => LPat GhcPs -> DeltaPos -> TransformT m ()
+      :: Monad m => Located (Pat GhcPs) -> DeltaPos -> TransformT m ()
     setEntryDPTunderConPatIn (L _ (ConPatIn nm _)) = setEntryDPT nm
     setEntryDPTunderConPatIn _ = const $ return ()
 
@@ -83,7 +81,7 @@ asPat
   :: Monad m
   => LRdrName
   -> HsConDetails LRdrName [RecordPatSynField LRdrName]
-  -> TransformT m (LPat GhcPs)
+  -> TransformT m (Located (Pat GhcPs))
 asPat patName params = do
   params' <- bitraverseHsConDetails mkVarPat convertFields params
   mkConPatIn patName params'

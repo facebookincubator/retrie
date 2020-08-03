@@ -3,7 +3,6 @@
 -- This source code is licensed under the MIT license found in the
 -- LICENSE file in the root directory of this source tree.
 --
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -36,7 +35,14 @@ replace c =
   mkM (replaceImpl @(HsExpr GhcPs) c)
     `extM` (replaceImpl @(Stmt GhcPs (LHsExpr GhcPs)) c)
     `extM` (replaceImpl @(HsType GhcPs) c)
-    `extM` (replaceImpl @(Pat GhcPs) c)
+    `extM` replacePat c
+
+replacePat :: MonadIO m => Context -> LPat GhcPs -> TransformT (WriterT Change m) (LPat GhcPs)
+-- We need to ensure we have a location available at the top level so we can
+-- transfer annotations. This ensures we don't try to rewrite a naked Pat.
+replacePat c p
+  | Just lp <- dLPat p = cLPat <$> replaceImpl c lp
+  | otherwise = return p
 
 -- | Generic replacement function. This is the thing that actually runs the
 -- 'Rewriter' carried by the context, instantiates templates, handles parens
@@ -109,31 +115,7 @@ instance Monoid Change where
 -- of the parens, not the inner expression, so we have to
 -- keep both expressions around.
 getUnparened :: Data k => k -> k
-getUnparened = mkT e `extT` t `extT` p
-  where
-    e :: LHsExpr GhcPs -> LHsExpr GhcPs
-#if __GLASGOW_HASKELL__ < 806
-    e (L _ (HsPar expr)) = expr
-#else
-    e (L _ (HsPar _ expr)) = expr
-#endif
-    e other = other
-
-    t :: LHsType GhcPs -> LHsType GhcPs
-#if __GLASGOW_HASKELL__ < 806
-    t (L _ (HsParTy ty)) = ty
-#else
-    t (L _ (HsParTy _ ty)) = ty
-#endif
-    t other = other
-
-    p :: LPat GhcPs -> LPat GhcPs
-#if __GLASGOW_HASKELL__ < 806
-    p (L _ (ParPat pat)) = pat
-#else
-    p (L _ (ParPat _ pat)) = pat
-#endif
-    p other = other
+getUnparened = mkT unparen `extT` unparenT `extT` unparenP
 
 -- The location of 'e' accurately points to the first non-space character
 -- of 'e', but when we exactprint 'e', we might get some leading spaces (if

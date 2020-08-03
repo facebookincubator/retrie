@@ -59,6 +59,36 @@ import UniqSet
 import Data.Bifunctor (second)
 import Data.Maybe
 
+cLPat :: Located (Pat (GhcPass p)) -> LPat (GhcPass p)
+#if __GLASGOW_HASKELL__ == 808
+cLPat = composeSrcSpan
+#else
+cLPat = id
+#endif
+
+-- | Only returns located pat if there is a genuine location available.
+dLPat :: LPat (GhcPass p) -> Maybe (Located (Pat (GhcPass p)))
+#if __GLASGOW_HASKELL__ == 808
+dLPat (XPat (L s p)) = Just $ L s $ stripSrcSpanPat p
+dLPat _ = Nothing
+#else
+dLPat = Just
+#endif
+
+-- | Will always give a location, but it may be noSrcSpan.
+dLPatUnsafe :: LPat (GhcPass p) -> Located (Pat (GhcPass p))
+#if __GLASGOW_HASKELL__ == 808
+dLPatUnsafe = dL
+#else
+dLPatUnsafe = id
+#endif
+
+#if __GLASGOW_HASKELL__ == 808
+stripSrcSpanPat :: LPat (GhcPass p) -> Pat (GhcPass p)
+stripSrcSpanPat (XPat (L _  p)) = stripSrcSpanPat p
+stripSrcSpanPat p = p
+#endif
+
 rdrFS :: RdrName -> FastString
 rdrFS (Qual m n) = mconcat [moduleNameFS m, fsDot, occNameFS n]
 rdrFS rdr = occNameFS (occName rdr)

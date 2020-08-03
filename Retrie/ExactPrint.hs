@@ -7,6 +7,7 @@
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE ViewPatterns #-}
 -- | Provides consistent interface with ghc-exactprint.
 module Retrie.ExactPrint
   ( -- * Fixity re-association
@@ -76,6 +77,8 @@ import Retrie.Fixity
 import Retrie.GHC
 import Retrie.SYB
 
+import GHC.Stack
+
 -- Fixity traversal -----------------------------------------------------------
 
 -- | Re-associate AST using given 'FixityEnv'. (The GHC parser has no knowledge
@@ -120,23 +123,13 @@ fixOneExpr env (L l2 (OpApp x2 ap1@(L l1 (OpApp x1 x op1 y)) op2 z))
 fixOneExpr _ e = return e
 
 fixOnePat :: Monad m => FixityEnv -> LPat GhcPs -> TransformT m (LPat GhcPs)
-#if __GLASGOW_HASKELL__ == 808
-fixOnePat env (dL -> L l2 (ConPatIn op2 (InfixCon (dL -> ap1@(L l1 (ConPatIn op1 (InfixCon x y)))) z)))
+fixOnePat env (dLPat -> Just (L l2 (ConPatIn op2 (InfixCon (dLPat -> Just ap1@(L l1 (ConPatIn op1 (InfixCon x y)))) z))))
   | associatesRight (lookupOpRdrName op1 env) (lookupOpRdrName op2 env) = do
     let ap2' = L l2 (ConPatIn op2 (InfixCon y z))
     swapEntryDPT ap1 ap2'
     transferAnnsT isComma ap2' ap1
-    rhs <- fixOnePat env (composeSrcSpan ap2')
-    return $ cL l1 (ConPatIn op1 (InfixCon x rhs))
-#else
-fixOnePat env (L l2 (ConPatIn op2 (InfixCon ap1@(L l1 (ConPatIn op1 (InfixCon x y))) z)))
-  | associatesRight (lookupOpRdrName op1 env) (lookupOpRdrName op2 env) = do
-    let ap2' = L l2 (ConPatIn op2 (InfixCon y z))
-    swapEntryDPT ap1 ap2'
-    transferAnnsT isComma ap2' ap1
-    rhs <- fixOnePat env ap2'
-    return $ L l1 (ConPatIn op1 (InfixCon x rhs))
-#endif
+    rhs <- fixOnePat env (cLPat ap2')
+    return $ cLPat $ L l1 (ConPatIn op1 (InfixCon x rhs))
 fixOnePat _ e = return e
 
 -- Move leading whitespace from the left child of an operator application
@@ -172,13 +165,10 @@ fixOneEntryExpr e@(L _ (OpApp _ x _ _)) = fixOneEntry e x
 fixOneEntryExpr e = return e
 
 fixOneEntryPat :: Monad m => LPat GhcPs -> TransformT m (LPat GhcPs)
-#if __GLASGOW_HASKELL__ == 808
-fixOneEntryPat p@(ConPatIn _ (InfixCon x _)) =
-  composeSrcSpan <$> fixOneEntry (dL p) (dL x)
-#else
-fixOneEntryPat p@(L _ (ConPatIn _ (InfixCon x _))) = fixOneEntry p x
-#endif
-fixOneEntryPat p = return p
+fixOneEntryPat pat
+  | Just p@(L _ (ConPatIn _ (InfixCon x _))) <- dLPat pat =
+    cLPat <$> fixOneEntry p (dLPatUnsafe x)
+  | otherwise = return pat
 
 -------------------------------------------------------------------------------
 
@@ -240,11 +230,7 @@ parseExpr = parseHelper "parseExpr" Parsers.parseExpr
 parsePattern :: String -> IO AnnotatedPat
 parsePattern = parseHelper "parsePattern" p
   where
-#if __GLASGOW_HASKELL__ < 808
-    p = Parsers.parsePattern
-#else
-    p flags fp str = fmap dL <$> Parsers.parsePattern flags fp str
-#endif
+    p flags fp str = fmap dLPatUnsafe <$> Parsers.parsePattern flags fp str
 
 -- | Parse a 'Stmt'.
 parseStmt :: String -> IO AnnotatedStmt
@@ -289,7 +275,7 @@ cloneT e = getAnnsT >>= flip graftT e
 -- The following definitions are all the same as the ones from ghc-exactprint,
 -- but the types are liberalized from 'Transform a' to 'TransformT m a'.
 transferEntryAnnsT
-  :: (Data a, Data b, Monad m)
+  :: (HasCallStack, Data a, Data b, Monad m)
   => (KeywordId -> Bool)        -- transfer Anns matching predicate
   -> Located a                  -- from
   -> Located b                  -- to
@@ -300,10 +286,9 @@ transferEntryAnnsT p a b = do
 
 -- | 'Transform' monad version of 'transferEntryDP'
 transferEntryDPT
-  :: (Data a, Data b, Monad m)
+  :: (HasCallStack, Data a, Data b, Monad m)
   => Located a -> Located b -> TransformT m ()
-transferEntryDPT a b =
-  modifyAnnsT (transferEntryDP a b)
+transferEntryDPT a b = modifyAnnsT (transferEntryDP a b)
 
 tryTransferEntryDPT
   :: (Data a, Data b, Monad m)
@@ -314,7 +299,7 @@ tryTransferEntryDPT a b = modifyAnnsT $ \anns ->
     else anns
 
 -- This function fails if b is not in Anns, which seems dumb, since we are inserting it.
-transferEntryDP :: (Data a, Data b) => Located a -> Located b -> Anns -> Anns
+transferEntryDP :: (HasCallStack, Data a, Data b) => Located a -> Located b -> Anns -> Anns
 transferEntryDP a b anns = setEntryDP b dp anns'
   where
     maybeAnns = do -- Maybe monad
@@ -327,12 +312,11 @@ transferEntryDP a b anns = setEntryDP b dp anns'
                   maybeAnns
 
 addAllAnnsT
-  :: (Data a, Data b, Monad m)
+  :: (HasCallStack, Data a, Data b, Monad m)
   => Located a -> Located b -> TransformT m ()
-addAllAnnsT a b =
-  modifyAnnsT (addAllAnns a b)
+addAllAnnsT a b = modifyAnnsT (addAllAnns a b)
 
-addAllAnns :: (Data a, Data b) => Located a -> Located b -> Anns -> Anns
+addAllAnns :: (HasCallStack, Data a, Data b) => Located a -> Located b -> Anns -> Anns
 addAllAnns a b anns =
   fromMaybe
     (error $ "addAllAnns: lookup failed: " ++ show (mkAnnKey a)

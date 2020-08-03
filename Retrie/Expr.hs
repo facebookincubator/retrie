@@ -153,14 +153,14 @@ mkVarPat :: Monad m => Located RdrName -> TransformT m (LPat GhcPs)
 #if __GLASGOW_HASKELL__ < 806
 mkVarPat nm = mkLoc (VarPat nm)
 #else
-mkVarPat nm = mkLoc (VarPat noExtField nm)
+mkVarPat nm = cLPat <$> mkLoc (VarPat noExtField nm)
 #endif
 
 mkConPatIn
   :: Monad m
   => Located RdrName
   -> HsConPatDetails GhcPs
-  -> TransformT m (LPat GhcPs)
+  -> TransformT m (Located (Pat GhcPs))
 mkConPatIn patName params = do
   p <- mkLoc $ ConPatIn patName params
   setEntryDPT p (DP (0,0))
@@ -202,23 +202,15 @@ wildSupplyP p =
 
 patToExprA :: AlphaEnv -> AnnotatedPat -> AnnotatedHsExpr
 patToExprA env pat = runIdentity $ transformA pat $ \ p ->
-  fst <$> runStateT
-#if __GLASGOW_HASKELL__ < 808
-    (patToExpr p)
-#else
-    (patToExpr (composeSrcSpan p))
-#endif
-    (wildSupplyAlphaEnv env, [])
+  fst <$> runStateT (patToExpr $ cLPat p) (wildSupplyAlphaEnv env, [])
 
 patToExpr :: Monad m => LPat GhcPs -> PatQ m (LHsExpr GhcPs)
-#if __GLASGOW_HASKELL__ < 808
-patToExpr lp@(L _ p) = do
-#else
-patToExpr (dL -> lp@(L _ p)) = do
-#endif
-  e <- go p
-  lift $ transferEntryDPT lp e
-  return e
+patToExpr orig = case dLPat orig of
+  Nothing -> error "patToExpr: called on unlocated Pat!"
+  Just lp@(L _ p) -> do
+    e <- go p
+    lift $ transferEntryDPT lp e
+    return e
   where
     go WildPat{} = newWildVar >>= lift . mkLocatedHsVar . noLoc
     go (ConPatIn con ds) = conPatHelper con ds
@@ -374,15 +366,20 @@ mkParen k e = do
   swapEntryDPT e pe
   return pe
 
-parenifyP :: Monad m => Context -> LPat GhcPs -> TransformT m (LPat GhcPs)
+-- This explicitly operates on 'Located (Pat GhcPs)' instead of 'LPat GhcPs'
+-- because it is applied at that type by SYB.
+parenifyP
+  :: Monad m
+  => Context
+  -> Located (Pat GhcPs)
+  -> TransformT m (Located (Pat GhcPs))
 parenifyP Context{..} p@(L _ pat)
   | IsLhs <- ctxtParentPrec
-  , needed pat
-  =
+  , needed pat =
 #if __GLASGOW_HASKELL__ < 806
     mkParen ParPat p
 #else
-    mkParen (ParPat noExtField) p
+    mkParen (ParPat noExtField . cLPat) p
 #endif
   | otherwise = return p
   where
@@ -435,11 +432,13 @@ unparenT (L _ (HsParTy _ ty)) = ty
 #endif
 unparenT ty = ty
 
-unparenP :: LPat GhcPs -> LPat GhcPs
+-- This explicitly operates on 'Located (Pat GhcPs)' instead of 'LPat GhcPs'
+-- to ensure 'dLPat' was called on the input.
+unparenP :: Located (Pat GhcPs) -> Located (Pat GhcPs)
 #if __GLASGOW_HASKELL__ < 806
 unparenP (L _ (ParPat p)) = p
 #else
-unparenP (L _ (ParPat _ p)) = p
+unparenP (L _ (ParPat _ p)) | Just lp <- dLPat p = lp
 #endif
 unparenP p = p
 

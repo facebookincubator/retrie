@@ -78,7 +78,7 @@ substPat
 #if __GLASGOW_HASKELL__ < 806
 substPat ctxt p@(L l1 (VarPat vl@(L l2 v))) =
 #else
-substPat ctxt p@(L l1 (VarPat x vl@(L l2 v))) =
+substPat ctxt (dLPat -> Just p@(L l1 (VarPat x vl@(L l2 v)))) = fmap cLPat $
 #endif
   case lookupHoleVar v ctxt of
     Just (HolePat pA) -> do

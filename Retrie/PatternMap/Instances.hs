@@ -568,15 +568,7 @@ sameHoleValue :: HoleVal -> HoleVal -> Maybe ()
 sameHoleValue (HoleExpr e1)  (HoleExpr e2)  =
   alphaEquivalent (astA e1) (astA e2) EMEmpty
 sameHoleValue (HolePat p1)   (HolePat p2)   =
-  alphaEquivalent
-#if __GLASGOW_HASKELL__ < 808
-    (astA p1)
-    (astA p2)
-#else
-    (composeSrcSpan $ astA p1)
-    (composeSrcSpan $ astA p2)
-#endif
-    PatEmpty
+  alphaEquivalent (cLPat $ astA p1) (cLPat $ astA p2) PatEmpty
 sameHoleValue (HoleType ty1) (HoleType ty2) =
   alphaEquivalent (astA ty1) (astA ty2) TyEmpty
 sameHoleValue _              _              = Nothing
@@ -834,15 +826,12 @@ instance PatternMap PatMap where
       go SumPat{} = missingSyntax "SumPat"
 
   mMatch :: MatchEnv -> Key PatMap -> (Substitution, PatMap a) -> [(Substitution, a)]
-  mMatch _   _   (_ ,PatEmpty)   = []
-#if __GLASGOW_HASKELL__ < 808
-  mMatch env pat (hs,m@PatMap{}) =
-#else
-  mMatch env (dL -> pat) (hs,m@PatMap{}) =
-#endif
-    hss ++ go (unLoc pat) (hs,m)
+  mMatch _   _   (_, PatEmpty)   = []
+  mMatch env pat (hs,m@PatMap{})
+    | Just lp@(L _ p) <- dLPat pat = hss lp ++ go p (hs,m)
+    | otherwise = []
     where
-      hss = extendResult (pmHole m) (HolePat $ mePruneA env pat) hs
+      hss lp = extendResult (pmHole m) (HolePat $ mePruneA env lp) hs
 
       go (WildPat _) = mapFor pmWild >=> mMatch env ()
 #if __GLASGOW_HASKELL__ < 806

@@ -32,7 +32,7 @@ data Universe
   = ULHsExpr (LHsExpr GhcPs)
   | ULStmt (LStmt GhcPs (LHsExpr GhcPs))
   | ULType (LHsType GhcPs)
-  | ULPat (LPat GhcPs)
+  | ULPat (Located (Pat GhcPs))
   deriving (Data)
 
 -- | Exactprint an annotated 'Universe'.
@@ -86,7 +86,7 @@ instance Matchable (LHsType GhcPs) where
   project _ = error "project ULType"
   getOrigin e = getLoc e
 
-instance Matchable (Located(Pat GhcPs)) where
+instance Matchable (Located (Pat GhcPs)) where
   inject = ULPat
   project (ULPat p) = p
   project _ = error "project ULPat"
@@ -120,14 +120,14 @@ instance PatternMap UMap where
   mAlter env vs u f m = go u
     where
       go (ULHsExpr e) = m { umExpr = mAlter env vs e f (umExpr m) }
-      go (ULStmt s)   = m { umStmt = mAlter env vs s f (umStmt m) }
-      go (ULType t)   = m { umType = mAlter env vs t f (umType m) }
-      go (ULPat p)    = m { umPat  = mAlter env vs p f (umPat  m) }
+      go (ULStmt s) = m { umStmt = mAlter env vs s f (umStmt m) }
+      go (ULType t) = m { umType = mAlter env vs t f (umType m) }
+      go (ULPat p) = m { umPat  = mAlter env vs (cLPat p) f (umPat m) }
 
   mMatch :: MatchEnv -> Universe -> (Substitution, UMap a) -> [(Substitution, a)]
   mMatch env = go
     where
       go (ULHsExpr e) = mapFor umExpr >=> mMatch env e
-      go (ULStmt s)   = mapFor umStmt >=> mMatch env s
-      go (ULType t)   = mapFor umType >=> mMatch env t
-      go (ULPat  p)   = mapFor umPat  >=> mMatch env p
+      go (ULStmt s) = mapFor umStmt >=> mMatch env s
+      go (ULType t) = mapFor umType >=> mMatch env t
+      go (ULPat p) = mapFor umPat >=> mMatch env (cLPat p)
