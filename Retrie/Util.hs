@@ -14,6 +14,7 @@ import Data.List
 import System.Exit
 import System.FilePath
 import System.Process
+import System.IO (hPutStrLn, stderr)
 
 data Verbosity = Silent | Normal | Loud
   deriving (Eq, Ord, Show)
@@ -81,13 +82,16 @@ ignoreWorker prefix verbosity targetDir extraDirs cmd = handle (handler prefix v
         idirs = extraDirs dirs
       return $ Just $ \fp -> fp `elem` ifiles || any (`isPrefixOf` fp) idirs
     ExitFailure _ -> do
-      when (verbosity > Normal) $ putStrLn $ prefix ++ err
+      when (verbosity > Normal) $ putErrStrLn $ prefix ++ err
       return Nothing
 
 handler :: String -> Verbosity -> IOError -> IO (Maybe a)
 handler prefix verbosity err = do
-  when (verbosity > Normal) $ putStrLn $ prefix ++ show err
+  when (verbosity > Normal) $ putErrStrLn $ prefix ++ show err
   return Nothing
+
+putErrStrLn :: String -> IO ()
+putErrStrLn = hPutStrLn stderr
 
 -- | Like 'try', but rethrows async exceptions.
 trySync :: IO a -> IO (Either SomeException a)
