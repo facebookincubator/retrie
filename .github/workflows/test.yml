@@ -1,0 +1,41 @@
+name: Testing
+
+on: [push, pull_request]
+jobs:
+  test:
+    timeout-minutes: 360
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest]
+        ghc: ['8.10.2', '8.8.4', '8.6.5', '8.4.4']
+
+    steps:
+    - uses: actions/checkout@v2
+    - uses: actions/setup-haskell@v1
+      with:
+        ghc-version: ${{ matrix.ghc }}
+        cabal-version: '3.2'
+
+    - name: Cache Cabal
+      uses: actions/cache@v2
+      with:
+        path: |
+          ~/.cabal/packages
+          ~/.cabal/store
+        key: ${{ runner.os }}-${{ matrix.ghc }}-{{matrix.ghc-lib}}-cabal-test
+
+    - run: cabal update
+
+    - name: Build
+      shell: bash
+      run: cabal build
+
+    - name: Haddock
+      shell: bash
+      run: cabal haddock
+
+    - name: Test
+      shell: bash
+      run: cabal test
