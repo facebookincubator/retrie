@@ -3,7 +3,6 @@
 -- This source code is licensed under the MIT license found in the
 -- LICENSE file in the root directory of this source tree.
 --
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE ViewPatterns #-}
 module Retrie.Subst (subst) where
 
@@ -49,11 +48,7 @@ substExpr
   => Context
   -> LHsExpr GhcPs
   -> TransformT m (LHsExpr GhcPs)
-#if __GLASGOW_HASKELL__ < 806
-substExpr ctxt e@(L l1 (HsVar (L l2 v))) =
-#else
 substExpr ctxt e@(L l1 (HsVar x (L l2 v))) =
-#endif
   case lookupHoleVar v ctxt of
     Just (HoleExpr eA) -> do
       e' <- graftA (unparen <$> eA)
@@ -62,11 +57,7 @@ substExpr ctxt e@(L l1 (HsVar x (L l2 v))) =
       transferAnnsT isComma e e'
       parenify ctxt e'
     Just (HoleRdr rdr) ->
-#if __GLASGOW_HASKELL__ < 806
-      return $ L l1 $ HsVar $ L l2 rdr
-#else
       return $ L l1 $ HsVar x $ L l2 rdr
-#endif
     _ -> return e
 substExpr _ e = return e
 
@@ -75,11 +66,7 @@ substPat
   => Context
   -> LPat GhcPs
   -> TransformT m (LPat GhcPs)
-#if __GLASGOW_HASKELL__ < 806
-substPat ctxt p@(L l1 (VarPat vl@(L l2 v))) =
-#else
 substPat ctxt (dLPat -> Just p@(L l1 (VarPat x vl@(L l2 v)))) = fmap cLPat $
-#endif
   case lookupHoleVar v ctxt of
     Just (HolePat pA) -> do
       p' <- graftA (unparenP <$> pA)
@@ -91,11 +78,7 @@ substPat ctxt (dLPat -> Just p@(L l1 (VarPat x vl@(L l2 v)))) = fmap cLPat $
       tryTransferEntryDPT vl p'
       parenifyP ctxt p'
     Just (HoleRdr rdr) ->
-#if __GLASGOW_HASKELL__ < 806
-      return $ L l1 $ VarPat $ L l2 rdr
-#else
       return $ L l1 $ VarPat x $ L l2 rdr
-#endif
     _ -> return p
 substPat _ p = return p
 

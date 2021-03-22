@@ -103,15 +103,6 @@ fixOneExpr
   => FixityEnv
   -> LHsExpr GhcPs
   -> TransformT m (LHsExpr GhcPs)
-#if __GLASGOW_HASKELL__ < 806
-fixOneExpr env (L l2 (OpApp ap1@(L l1 (OpApp x op1 f1 y)) op2 f2 z))
-  | associatesRight (lookupOp op1 env) (lookupOp op2 env) = do
-    let ap2' = L l2 $ OpApp y op2 f2 z
-    swapEntryDPT ap1 ap2'
-    transferAnnsT isComma ap2' ap1
-    rhs <- fixOneExpr env ap2'
-    return $ L l1 $ OpApp x op1 f1 rhs
-#else
 fixOneExpr env (L l2 (OpApp x2 ap1@(L l1 (OpApp x1 x op1 y)) op2 z))
   | associatesRight (lookupOp op1 env) (lookupOp op2 env) = do
     let ap2' = L l2 $ OpApp x2 y op2 z
@@ -119,7 +110,6 @@ fixOneExpr env (L l2 (OpApp x2 ap1@(L l1 (OpApp x1 x op1 y)) op2 z))
     transferAnnsT isComma ap2' ap1
     rhs <- fixOneExpr env ap2'
     return $ L l1 $ OpApp x1 x op1 rhs
-#endif
 fixOneExpr _ e = return e
 
 fixOnePat :: Monad m => FixityEnv -> LPat GhcPs -> TransformT m (LPat GhcPs)
@@ -157,11 +147,7 @@ fixOneEntry e x = do
   return e
 
 fixOneEntryExpr :: Monad m => LHsExpr GhcPs -> TransformT m (LHsExpr GhcPs)
-#if __GLASGOW_HASKELL__ < 806
-fixOneEntryExpr e@(L _ (OpApp x _ _ _)) = fixOneEntry e x
-#else
 fixOneEntryExpr e@(L _ (OpApp _ x _ _)) = fixOneEntry e x
-#endif
 fixOneEntryExpr e = return e
 
 fixOneEntryPat :: Monad m => LPat GhcPs -> TransformT m (LPat GhcPs)

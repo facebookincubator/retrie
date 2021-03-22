@@ -3,7 +3,6 @@
 -- This source code is licensed under the MIT license found in the
 -- LICENSE file in the root directory of this source tree.
 --
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeFamilies #-}
@@ -28,11 +27,7 @@ typeSynonymsToRewrites specs am = fmap astA $ transformA am $ \ m -> do
     tySyns =
       [ (rdr, (dir, (nm, hsq_explicit vars, rhs)))
         -- only hsq_explicit is available pre-renaming
-#if __GLASGOW_HASKELL__ < 806
-      | L _ (TyClD (SynDecl nm vars _ rhs _)) <- hsmodDecls $ unLoc m
-#else
       | L _ (TyClD _ (SynDecl _ nm vars _ rhs)) <- hsmodDecls $ unLoc m
-#endif
       , let rdr = rdrFS (unLoc nm)
       , dir <- fromMaybe [] (lookupUFM fsMap rdr)
       ]

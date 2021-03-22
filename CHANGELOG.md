@@ -2,6 +2,7 @@ x.x.x.x (xxx)
 
 * Added --adhoc-type flag (#13)
 * Added --adhoc-pattern, --pattern-forward, --pattern-backward (#15)
+* Removed support for GHC 8.4 and 8.8
 
 0.1.1.1 (June 1, 2020)
 

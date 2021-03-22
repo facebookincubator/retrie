@@ -3,7 +3,6 @@
 -- This source code is licensed under the MIT license found in the
 -- LICENSE file in the root directory of this source tree.
 --
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE TupleSections #-}
 module Retrie.Rewrites.Function
   ( dfnsToRewrites
@@ -37,11 +36,7 @@ dfnsToRewrites specs am = fmap astA $ transformA am $ \ (L _ m) -> do
         imps <- getImports dir (hsmodName m)
         (fName,) . concat <$>
           forM (unLoc $ mg_alts $ fun_matches f) (matchToRewrites fe imps dir)
-#if __GLASGOW_HASKELL__ < 806
-    | L _ (ValD f@FunBind{}) <- hsmodDecls m
-#else
     | L _ (ValD _ f@FunBind{}) <- hsmodDecls m
-#endif
     , let fRdrName = fun_id f
     , let fName = occNameFS (occName (unLoc fRdrName))
     , dir <- fromMaybe [] (lookupUFM fsMap fName)
@@ -80,17 +75,10 @@ irrefutablePat = go . unLoc
   where
     go WildPat{} = True
     go VarPat{} = True
-#if __GLASGOW_HASKELL__ < 806
-    go (LazyPat p) = irrefutablePat p
-    go (AsPat _ p) = irrefutablePat p
-    go (ParPat p) = irrefutablePat p
-    go (BangPat p) = irrefutablePat p
-#else
     go (LazyPat _ p) = irrefutablePat p
     go (AsPat _ _ p) = irrefutablePat p
     go (ParPat _ p) = irrefutablePat p
     go (BangPat _ p) = irrefutablePat p
-#endif
     go _ = False
 
 makeFunctionQuery
@@ -105,11 +93,7 @@ makeFunctionQuery e imps dir grhss mkAppFn (argpats, bndpats)
   | any (not . irrefutablePat) bndpats = return []
   | otherwise = do
     let
-#if __GLASGOW_HASKELL__ < 806
-      GRHSs rhss lbs = grhss
-#else
       GRHSs _ rhss lbs = grhss
-#endif
       bs = collectPatsBinders argpats
     -- See Note [Wildcards]
     (es,(_,bs')) <- runStateT (mapM patToExpr argpats) (wildSupply bs, bs)
@@ -136,16 +120,6 @@ backtickRules
 backtickRules e imps dir@LeftToRight grhss ps@[p1, p2] = do
   let
     both, left, right :: AppBuilder
-#if __GLASGOW_HASKELL__ < 806
-    both op [l, r] = mkLoc (OpApp l op PlaceHolder r)
-    both _ _ = fail "backtickRules - both: impossible!"
-
-    left op [l] = mkLoc (SectionL l op)
-    left _ _ = fail "backtickRules - left: impossible!"
-
-    right op [r] = mkLoc (SectionR op r)
-    right _ _ = fail "backtickRules - right: impossible!"
-#else
     both op [l, r] = mkLoc (OpApp noExtField l op r)
     both _ _ = fail "backtickRules - both: impossible!"
 
@@ -154,7 +128,6 @@ backtickRules e imps dir@LeftToRight grhss ps@[p1, p2] = do
 
     right op [r] = mkLoc (SectionR noExtField op r)
     right _ _ = fail "backtickRules - right: impossible!"
-#endif
   qs <- makeFunctionQuery e imps dir grhss both (ps, [])
   qsl <- makeFunctionQuery e imps dir grhss left ([p1], [p2])
   qsr <- makeFunctionQuery e imps dir grhss right ([p2], [p1])

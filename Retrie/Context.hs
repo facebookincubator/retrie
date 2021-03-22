@@ -3,7 +3,6 @@
 -- This source code is licensed under the MIT license found in the
 -- LICENSE file in the root directory of this source tree.
 --
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -43,9 +42,6 @@ updateContext c i =
   const (return c)
     `extQ` (return . updExp)
     `extQ` (return . updType)
-#if __GLASGOW_HASKELL__ < 806
-    `extQ` (return . updTypeList)
-#endif
     `extQ` (return . updMatch)
     `extQ` (return . updGRHSs)
     `extQ` (return . updGRHS)
@@ -63,41 +59,18 @@ updateContext c i =
     -- Reason for 10 + i: (i is index of child, 0 = left, 1 = right)
     -- In left child, prec is 10, so HsApp child will NOT get paren'd
     -- In right child, prec is 11, so every child gets paren'd (unless atomic)
-#if __GLASGOW_HASKELL__ < 806
-    updExp (OpApp _ op _ _) = c { ctxtParentPrec = HasPrec $ lookupOp op (ctxtFixityEnv c) }
-    updExp (HsLet lbs _) = addInScope neverParen $ collectLocalBinders $ unLoc lbs
-#else
     updExp (OpApp _ _ op _) = c { ctxtParentPrec = HasPrec $ lookupOp op (ctxtFixityEnv c) }
     updExp (HsLet _ lbs _) = addInScope neverParen $ collectLocalBinders $ unLoc lbs
-#endif
     updExp _ = neverParen
 
     updType :: HsType GhcPs -> Context
-#if __GLASGOW_HASKELL__ < 806
-    updType (HsAppsTy _) = c { ctxtParentPrec = IsHsAppsTy }
-#else
     updType HsAppTy{}
       | i > firstChild = c { ctxtParentPrec = IsHsAppsTy }
-#endif
     updType _ = neverParen
-
-#if __GLASGOW_HASKELL__ < 806
-    updTypeList :: [LHsAppType GhcPs] -> Context
-    updTypeList _ =
-      case ctxtParentPrec c of
-        IsHsAppsTy
-          | i > 0 -> c { ctxtParentPrec = HasPrec $ Fixity (SourceText "HsAppsTy") 11 InfixL }
-          | otherwise -> neverParen
-        _ -> c -- leave prec as is
-#endif
 
     updMatch :: Match GhcPs (LHsExpr GhcPs) -> Context
     updMatch
-#if __GLASGOW_HASKELL__ < 806
-      | i == 1  -- m_pats field
-#else
       | i == 2  -- m_pats field
-#endif
       = addInScope c{ctxtParentPrec = IsLhs} . collectPatsBinders . m_pats
       | otherwise = addInScope neverParen . collectPatsBinders . m_pats
       where
@@ -106,12 +79,8 @@ updateContext c i =
     updGRHSs = addInScope neverParen . collectLocalBinders . unLoc . grhssLocalBinds
 
     updGRHS :: GRHS GhcPs (LHsExpr GhcPs) -> Context
-#if __GLASGOW_HASKELL__ < 806
-    updGRHS (GRHS gs _)
-#else
     updGRHS XGRHS{} = neverParen
     updGRHS (GRHS _ gs _)
-#endif
         -- binders are in scope over the body (right child) only
       | i > firstChild = addInScope neverParen bs
       | otherwise = fst $ updateSubstitution neverParen bs
@@ -127,11 +96,7 @@ updateContext c i =
         -- binders are in scope over tail of list (right child)
       | i > 0 = insertDependentRewrites neverParen bs ls
         -- lets are recursive in do-blocks
-#if __GLASGOW_HASKELL__ < 806
-      | L _ (LetStmt (L _ bnds)) <- ls =
-#else
       | L _ (LetStmt _ (L _ bnds)) <- ls =
-#endif
           return $ addInScope neverParen $ collectLocalBinders bnds
       | otherwise = return $ fst $ updateSubstitution neverParen bs
       where
@@ -165,11 +130,7 @@ emptyContext ctxtFixityEnv ctxtRewriter ctxtDependents = Context{..}
 -- Deal with Trees-That-Grow adding extension points
 -- as the first child everywhere.
 firstChild :: Int
-#if __GLASGOW_HASKELL__ < 806
-firstChild = 0
-#else
 firstChild = 1
-#endif
 
 -- | Add dependent rewrites to 'ctxtRewriter' if necessary.
 insertDependentRewrites

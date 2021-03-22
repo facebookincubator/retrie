@@ -3,7 +3,6 @@
 -- This source code is licensed under the MIT license found in the
 -- LICENSE file in the root directory of this source tree.
 --
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE RecordWildCards #-}
@@ -35,11 +34,7 @@ patternSynonymsToRewrites specs am = fmap astA $ transformA am $ \(L _ m) -> do
           patRewrite <- mkPatRewrite dir imports nm params lrhs
           expRewrites <- mkExpRewrite dir imports nm params rhs patdir
           return (rdr, toURewrite patRewrite : map toURewrite expRewrites)
-#if __GLASGOW_HASKELL__ < 806
-      | L _ (ValD (PatSynBind (PSB nm _ params rhs patdir))) <- hsmodDecls m
-#else
       | L _ (ValD _ (PatSynBind _ (PSB _ nm params rhs patdir))) <- hsmodDecls m
-#endif
       , let rdr = rdrFS (unLoc nm)
       , dir <- fromMaybe [] (lookupUFM fsMap rdr)
       , Just lrhs <- [dLPat rhs]

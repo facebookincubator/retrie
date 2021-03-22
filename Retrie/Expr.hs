@@ -3,7 +3,6 @@
 -- This source code is licensed under the MIT license found in the
 -- LICENSE file in the root directory of this source tree.
 --
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TupleSections #-}
@@ -55,17 +54,9 @@ mkLocatedHsVar v = do
           "[]" -> [(G AnnOpenS, DP (0,0)), (G AnnCloseS, DP (0,0))]
           _    -> [(G AnnVal, DP (0,0))]
   r <- setAnnsFor v anns
-#if __GLASGOW_HASKELL__ < 806
-  lv@(L _ v') <- cloneT (noLoc (HsVar r))
-#else
   lv@(L _ v') <- cloneT (noLoc (HsVar noExtField r))
-#endif
   case v' of
-#if __GLASGOW_HASKELL__ < 806
-    HsVar x ->
-#else
     HsVar _ x ->
-#endif
       swapEntryDPT x lv
     _ -> return ()
   return lv
@@ -99,62 +90,36 @@ mkLams vs e = do
   m' <- case unLoc $ mg_alts mg of
     [m] -> setAnnsFor m [(G AnnLam, DP (0,0)),(G AnnRarrow, DP (0,1))]
     _   -> fail "mkLams: lambda expression can only have a single match!"
-#if __GLASGOW_HASKELL__ < 806
-  cloneT $ noLoc $ HsLam mg { mg_alts = noLoc [m'] }
-#else
   cloneT $ noLoc $ HsLam noExtField mg { mg_alts = noLoc [m'] }
-#endif
 
 mkLet :: Monad m => HsLocalBinds GhcPs -> LHsExpr GhcPs -> TransformT m (LHsExpr GhcPs)
 mkLet EmptyLocalBinds{} e = return e
 mkLet lbs e = do
   llbs <- mkLoc lbs
-#if __GLASGOW_HASKELL__ < 806
-  le <- mkLoc $ HsLet llbs e
-#else
   le <- mkLoc $ HsLet noExtField llbs e
-#endif
   setAnnsFor le [(G AnnLet, DP (0,0)), (G AnnIn, DP (1,1))]
 
 mkApps :: Monad m => LHsExpr GhcPs -> [LHsExpr GhcPs] -> TransformT m (LHsExpr GhcPs)
 mkApps e []     = return e
 mkApps f (a:as) = do
-#if __GLASGOW_HASKELL__ < 806
-  f' <- mkLoc (HsApp f a)
-#else
   f' <- mkLoc (HsApp noExtField f a)
-#endif
   mkApps f' as
 
 -- GHC never generates HsAppTy in the parser, using HsAppsTy to keep a list
 -- of types.
 mkHsAppsTy :: Monad m => [LHsType GhcPs] -> TransformT m (LHsType GhcPs)
-#if __GLASGOW_HASKELL__ < 806
-mkHsAppsTy ts = do
-  ts' <- mapM (mkLoc . HsAppPrefix) ts
-  mkLoc (HsAppsTy ts')
-#else
 mkHsAppsTy [] = error "mkHsAppsTy: empty list"
 mkHsAppsTy (t:ts) = foldM (\t1 t2 -> mkLoc (HsAppTy noExtField t1 t2)) t ts
-#endif
 
 mkTyVar :: Monad m => Located RdrName -> TransformT m (LHsType GhcPs)
 mkTyVar nm = do
-#if __GLASGOW_HASKELL__ < 806
-  tv <- mkLoc (HsTyVar NotPromoted nm)
-#else
   tv <- mkLoc (HsTyVar noExtField NotPromoted nm)
-#endif
   _ <- setAnnsFor nm [(G AnnVal, DP (0,0))]
   swapEntryDPT tv nm
   return tv
 
 mkVarPat :: Monad m => Located RdrName -> TransformT m (LPat GhcPs)
-#if __GLASGOW_HASKELL__ < 806
-mkVarPat nm = mkLoc (VarPat nm)
-#else
 mkVarPat nm = cLPat <$> mkLoc (VarPat noExtField nm)
-#endif
 
 mkConPatIn
   :: Monad m
@@ -214,34 +179,6 @@ patToExpr orig = case dLPat orig of
   where
     go WildPat{} = newWildVar >>= lift . mkLocatedHsVar . noLoc
     go (ConPatIn con ds) = conPatHelper con ds
-#if __GLASGOW_HASKELL__ < 806
-    go (LazyPat pat) = patToExpr pat
-    go (BangPat pat) = patToExpr pat
-    go (ListPat ps ty mb) = do
-      ps' <- mapM patToExpr ps
-      lift $ do
-        el <- mkLoc $ ExplicitList ty (snd <$> mb) ps'
-        setAnnsFor el [(G AnnOpenS, DP (0,0)), (G AnnCloseS, DP (0,0))]
-    go (LitPat lit) = lift $ do
-      lit' <- cloneT lit
-      mkLoc $ HsLit lit'
-    go (NPat llit mbNeg _ _) = lift $ do
-      L _ lit <- cloneT llit
-      e <- mkLoc $ HsOverLit lit
-      negE <- maybe (return e) (mkLoc . NegApp e) mbNeg
-      addAllAnnsT llit negE
-      return negE
-    go PArrPat{} = error "patToExpr PArrPat"
-    go (ParPat p') = lift . mkParen HsPar =<< patToExpr p'
-    go SigPatIn{} = error "patToExpr SigPatIn"
-    go SigPatOut{} = error "patToExpr SigPatOut"
-    go (TuplePat ps boxity _) = do
-      es <- forM ps $ \pat -> do
-        e <- patToExpr pat
-        lift $ mkLoc $ Present e
-      lift $ mkLoc $ ExplicitTuple es boxity
-    go (VarPat i) = lift $ mkLocatedHsVar i
-#else
     go (LazyPat _ pat) = patToExpr pat
     go (BangPat _ pat) = patToExpr pat
     go (ListPat _ ps) = do
@@ -267,7 +204,6 @@ patToExpr orig = case dLPat orig of
       lift $ mkLoc $ ExplicitTuple noExtField es boxity
     go (VarPat _ i) = lift $ mkLocatedHsVar i
     go XPat{} = error "patToExpr XPat"
-#endif
     go AsPat{} = error "patToExpr AsPat"
     go ConPatOut{} = error "patToExpr ConPatOut" -- only exists post-tc
     go CoPat{} = error "patToExpr CoPat"
@@ -281,17 +217,10 @@ conPatHelper :: Monad m
              -> HsConPatDetails GhcPs
              -> PatQ m (LHsExpr GhcPs)
 conPatHelper con (InfixCon x y) =
-#if __GLASGOW_HASKELL__ < 806
-  lift . mkLoc =<< OpApp <$> patToExpr x
-                         <*> lift (mkLocatedHsVar con)
-                         <*> pure PlaceHolder
-                         <*> patToExpr y
-#else
   lift . mkLoc =<< OpApp <$> pure noExtField
                          <*> patToExpr x
                          <*> lift (mkLocatedHsVar con)
                          <*> patToExpr y
-#endif
 conPatHelper con (PrefixCon xs) = do
   f <- lift $ mkLocatedHsVar con
   as <- mapM patToExpr xs
@@ -301,35 +230,22 @@ conPatHelper _ _ = error "conPatHelper RecCon"
 -------------------------------------------------------------------------------
 
 grhsToExpr :: LGRHS p (LHsExpr p) -> LHsExpr p
-#if __GLASGOW_HASKELL__ < 806
-grhsToExpr (L _ (GRHS [] e)) = e
-grhsToExpr (L _ (GRHS (_:_) e)) = e -- not sure about this
-#else
 grhsToExpr (L _ (GRHS _ [] e)) = e
 grhsToExpr (L _ (GRHS _ (_:_) e)) = e -- not sure about this
 grhsToExpr _ = error "grhsToExpr"
-#endif
 
 -------------------------------------------------------------------------------
 
 precedence :: FixityEnv -> HsExpr GhcPs -> Maybe Fixity
 precedence _        (HsApp {})       = Just $ Fixity (SourceText "HsApp") 10 InfixL
-#if __GLASGOW_HASKELL__ < 806
-precedence fixities (OpApp _ op _ _) = Just $ lookupOp op fixities
-#else
 precedence fixities (OpApp _ _ op _) = Just $ lookupOp op fixities
-#endif
 precedence _        _                = Nothing
 
 parenify
   :: Monad m => Context -> LHsExpr GhcPs -> TransformT m (LHsExpr GhcPs)
 parenify Context{..} le@(L _ e)
   | needed ctxtParentPrec (precedence ctxtFixityEnv e) && needsParens e =
-#if __GLASGOW_HASKELL__ < 806
-    mkParen HsPar le
-#else
     mkParen (HsPar noExtField) le
-#endif
   | otherwise = return le
   where
            {- parent -}               {- child -}
@@ -340,24 +256,12 @@ parenify Context{..} le@(L _ e)
     needed _ _ = False
 
 unparen :: LHsExpr GhcPs -> LHsExpr GhcPs
-#if __GLASGOW_HASKELL__ < 806
-unparen (L _ (HsPar e)) = e
-#else
 unparen (L _ (HsPar _ e)) = e
-#endif
 unparen e = e
 
 -- | hsExprNeedsParens is not always up-to-date, so this allows us to override
 needsParens :: HsExpr GhcPs -> Bool
-#if __GLASGOW_HASKELL__ < 806
-needsParens RecordCon{} = False
-needsParens RecordUpd{} = False
-needsParens HsSpliceE{} = False
-needsParens (HsWrap _ e) = hsExprNeedsParens e
-needsParens e = hsExprNeedsParens e
-#else
 needsParens = hsExprNeedsParens (PprPrec 10)
-#endif
 
 mkParen :: (Data x, Monad m) => (Located x -> x) -> Located x -> TransformT m (Located x)
 mkParen k e = do
@@ -376,11 +280,7 @@ parenifyP
 parenifyP Context{..} p@(L _ pat)
   | IsLhs <- ctxtParentPrec
   , needed pat =
-#if __GLASGOW_HASKELL__ < 806
-    mkParen ParPat p
-#else
     mkParen (ParPat noExtField . cLPat) p
-#endif
   | otherwise = return p
   where
     needed BangPat{}                          = False
@@ -399,47 +299,22 @@ parenifyP Context{..} p@(L _ pat)
 parenifyT
   :: Monad m => Context -> LHsType GhcPs -> TransformT m (LHsType GhcPs)
 parenifyT Context{..} lty@(L _ ty)
-#if __GLASGOW_HASKELL__ < 806
-  | needed ty = mkParen HsParTy lty
-#else
   | needed ty = mkParen (HsParTy noExtField) lty
-#endif
   | otherwise = return lty
   where
-#if __GLASGOW_HASKELL__ < 806
-    needed HsTyVar{}   = False
-    needed HsListTy{}  = False
-    needed HsPArrTy{}  = False
-    needed HsTupleTy{} = False
-    needed HsParTy{}   = False
-    needed HsTyLit{}   = False
-    needed (HsAppsTy tys)
-      | HasPrec _ <- ctxtParentPrec = length tys > 1
-      | otherwise = False
-    needed _           = True
-#else
     needed HsAppTy{}
       | IsHsAppsTy <- ctxtParentPrec = True
       | otherwise = False
     needed t = hsTypeNeedsParens (PprPrec 10) t
-#endif
 
 unparenT :: LHsType GhcPs -> LHsType GhcPs
-#if __GLASGOW_HASKELL__ < 806
-unparenT (L _ (HsParTy ty)) = ty
-#else
 unparenT (L _ (HsParTy _ ty)) = ty
-#endif
 unparenT ty = ty
 
 -- This explicitly operates on 'Located (Pat GhcPs)' instead of 'LPat GhcPs'
 -- to ensure 'dLPat' was called on the input.
 unparenP :: Located (Pat GhcPs) -> Located (Pat GhcPs)
-#if __GLASGOW_HASKELL__ < 806
-unparenP (L _ (ParPat p)) = p
-#else
 unparenP (L _ (ParPat _ p)) | Just lp <- dLPat p = lp
-#endif
 unparenP p = p
 
 --------------------------------------------------------------------

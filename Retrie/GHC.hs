@@ -37,11 +37,7 @@ import FastString
 import FastStringEnv
 #if __GLASGOW_HASKELL__ < 810
 import HsExpr
-#if __GLASGOW_HASKELL__ < 806
-import HsSyn hiding (HasDefault(..))
-#else
 import HsSyn
-#endif
 #else
 import ErrUtils
 import GHC.Hs.Expr
@@ -97,44 +93,21 @@ fsDot :: FastString
 fsDot = mkFastString "."
 
 varRdrName :: HsExpr p -> Maybe (Located (IdP p))
-#if __GLASGOW_HASKELL__ < 806
-varRdrName (HsVar n) = Just n
-#else
 varRdrName (HsVar _ n) = Just n
-#endif
 varRdrName _ = Nothing
 
 tyvarRdrName :: HsType p -> Maybe (Located (IdP p))
-#if __GLASGOW_HASKELL__ < 806
-tyvarRdrName (HsTyVar _ n) = Just n
-#else
 tyvarRdrName (HsTyVar _ _ n) = Just n
-#endif
 tyvarRdrName _ = Nothing
 
 fixityDecls :: HsModule p -> [(Located (IdP p), Fixity)]
 fixityDecls m =
   [ (nm, fixity)
-#if __GLASGOW_HASKELL__ < 806
-  | L _ (SigD (FixSig (FixitySig nms fixity))) <- hsmodDecls m
-#else
   | L _ (SigD _ (FixSig _ (FixitySig _ nms fixity))) <- hsmodDecls m
-#endif
   , nm <- nms
   ]
 
 ruleInfo :: RuleDecl GhcPs -> [RuleInfo]
-#if __GLASGOW_HASKELL__ < 808
-
-#if __GLASGOW_HASKELL__ < 806
-ruleInfo (HsRule (L _ (_, riName)) _ bs riLHS _ riRHS _) =
-#else
-ruleInfo XRuleDecl{} = []
-ruleInfo (HsRule _ (L _ (_, riName)) _ bs riLHS riRHS) =
-#endif
-  [ RuleInfo { riQuantifiers = ruleBindersToQs bs, .. } ]
-
-#else
 ruleInfo (HsRule _ (L _ (_, riName)) _ tyBs valBs riLHS riRHS) =
   let
     riQuantifiers =
@@ -142,33 +115,22 @@ ruleInfo (HsRule _ (L _ (_, riName)) _ tyBs valBs riLHS riRHS) =
       ruleBindersToQs valBs
   in [ RuleInfo{..} ]
 ruleInfo XRuleDecl{} = []
-#endif
 
 ruleBindersToQs :: [LRuleBndr GhcPs] -> [RdrName]
 ruleBindersToQs bs = catMaybes
   [ case b of
-#if __GLASGOW_HASKELL__ < 806
-      RuleBndr (L _ v) -> Just v
-      RuleBndrSig (L _ v) _ -> Just v
-#else
       RuleBndr _ (L _ v) -> Just v
       RuleBndrSig _ (L _ v) _ -> Just v
       XRuleBndr{} -> Nothing
-#endif
   | L _ b <- bs
   ]
 
 tyBindersToLocatedRdrNames :: [LHsTyVarBndr GhcPs] -> [Located RdrName]
 tyBindersToLocatedRdrNames vars = catMaybes
   [ case var of
-#if __GLASGOW_HASKELL__ < 806
-      UserTyVar v -> Just v
-      KindedTyVar v _ -> Just v
-#else
       UserTyVar _ v -> Just v
       KindedTyVar _ v _ -> Just v
       XTyVarBndr{} -> Nothing
-#endif
   | L _ var <- vars ]
 
 data RuleInfo = RuleInfo
@@ -178,8 +140,7 @@ data RuleInfo = RuleInfo
   , riRHS :: LHsExpr GhcPs
   }
 
-#if __GLASGOW_HASKELL__ < 806
-#elif __GLASGOW_HASKELL__ < 810
+#if __GLASGOW_HASKELL__ < 810
 noExtField :: NoExt
 noExtField = noExt
 #endif
