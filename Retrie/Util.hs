@@ -6,11 +6,13 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 module Retrie.Util where
 
+import Control.Arrow (first)
 import Control.Applicative
 import Control.Concurrent.Async
 import Control.Exception
 import Control.Monad
 import Data.List
+import qualified Data.Set as Set
 import System.Exit
 import System.FilePath
 import System.Process
@@ -76,11 +78,12 @@ ignoreWorker prefix verbosity targetDir extraDirs cmd = handle (handler prefix v
   case ec of
     ExitSuccess -> do
       let
-        (ifiles, dirs) = partition hasExtension
+        (ifiles, dirs) = first Set.fromList $ partition hasExtension
           [ normalise $ targetDir </> dropTrailingPathSeparator f
           | f <- lines fps ]
         idirs = extraDirs dirs
-      return $ Just $ \fp -> fp `elem` ifiles || any (`isPrefixOf` fp) idirs
+      return $ Just
+        $ \fp -> fp `Set.member` ifiles || any (`isPrefixOf` fp) idirs
     ExitFailure _ -> do
       when (verbosity > Normal) $ putErrStrLn $ prefix ++ err
       return Nothing
