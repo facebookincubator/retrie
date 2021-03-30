@@ -1084,7 +1084,7 @@ instance PatternMap TyMap where
       go (HsForAllTy _ bndrs ty') = m { tyHsForAllTy = mAlter env vs (bndrs, ty') f (tyHsForAllTy m) }
 #else
       go (HsForAllTy _ vis bndrs ty') =
-        m { tyHsForAllTy = mAlter env vs vis (toA (mAlter env vs (bndrs, ty') f)) (tyHsForAllTy m) }
+        m { tyHsForAllTy = mAlter env vs (vis == ForallVis) (toA (mAlter env vs (bndrs, ty') f)) (tyHsForAllTy m) }
 #endif
       go (HsFunTy _ ty1 ty2) = m { tyHsFunTy = mAlter env vs ty1 (toA (mAlter env vs ty2 f)) (tyHsFunTy m) }
       go (HsListTy _ ty') = m { tyHsListTy = mAlter env vs ty' f (tyHsListTy m) }
@@ -1114,7 +1114,7 @@ instance PatternMap TyMap where
       go (HsForAllTy _ bndrs ty') = mapFor tyHsForAllTy >=> mMatch env (bndrs, ty')
 #else
       go (HsForAllTy _ vis bndrs ty') =
-        mapFor tyHsForAllTy >=> mMatch env vis >=> mMatch env (bndrs, ty')
+        mapFor tyHsForAllTy >=> mMatch env (vis == ForallVis) >=> mMatch env (bndrs, ty')
 #endif
       go (HsFunTy _ ty1 ty2) = mapFor tyHsFunTy >=> mMatch env ty1 >=> mMatch env ty2
       go (HsListTy _ ty') = mapFor tyHsListTy >=> mMatch env ty'
@@ -1267,31 +1267,21 @@ instance PatternMap ForAllTyMap where
 
 #if __GLASGOW_HASKELL__ < 810
 #else
-data ForallVisMap a = ForallVisMap
-  { favVis :: MaybeMap a
-  , favInvis :: MaybeMap a
-  }
+newtype ForallVisMap a = ForallVisMap { favBoolMap :: BoolMap a }
   deriving (Functor)
 
 instance PatternMap ForallVisMap where
-  type Key ForallVisMap = ForallVisFlag
+  type Key ForallVisMap = Bool
 
   mEmpty :: ForallVisMap a
-  mEmpty = ForallVisMap mEmpty mEmpty
+  mEmpty = ForallVisMap mEmpty
 
   mUnion :: ForallVisMap a -> ForallVisMap a -> ForallVisMap a
-  mUnion m1 m2 = ForallVisMap
-    { favVis = unionOn favVis m1 m2
-    , favInvis = unionOn favInvis m1 m2
-    }
+  mUnion m1 m2 = ForallVisMap (unionOn favBoolMap m1 m2)
 
   mAlter :: AlphaEnv -> Quantifiers -> Key ForallVisMap -> A a -> ForallVisMap a -> ForallVisMap a
-  mAlter env vs ForallVis f m =
-    m { favVis = mAlter env vs () f (favVis m) }
-  mAlter env vs ForallInvis f m =
-    m { favInvis = mAlter env vs () f (favInvis m) }
+  mAlter env vs k f (ForallVisMap m) = ForallVisMap $ mAlter env vs k f m
 
   mMatch :: MatchEnv -> Key ForallVisMap -> (Substitution, ForallVisMap a) -> [(Substitution, a)]
-  mMatch env ForallVis = mapFor favVis >=> mMatch env ()
-  mMatch env ForallInvis = mapFor favInvis >=> mMatch env ()
+  mMatch env b = mapFor favBoolMap >=> mMatch env b
 #endif
