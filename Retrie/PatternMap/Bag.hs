@@ -3,6 +3,7 @@
 -- This source code is licensed under the MIT license found in the
 -- LICENSE file in the root directory of this source tree.
 --
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeFamilies #-}
@@ -139,7 +140,11 @@ instance PatternMap FSEnv where
 
 ------------------------------------------------------------------------
 
+#if __GLASGOW_HASKELL__ < 900
 newtype UniqFM a = UniqFM { unUniqFM :: GHC.UniqFM [a] }
+#else
+newtype UniqFM a = UniqFM { unUniqFM :: GHC.UniqFM (Key UniqFM) [a] }
+#endif
   deriving (Functor)
 
 instance PatternMap UniqFM where

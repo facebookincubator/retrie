@@ -55,7 +55,7 @@ type AnnotatedHsExpr = Annotated (LHsExpr GhcPs)
 type AnnotatedHsType = Annotated (LHsType GhcPs)
 type AnnotatedImport = Annotated (LImportDecl GhcPs)
 type AnnotatedImports = Annotated [LImportDecl GhcPs]
-type AnnotatedModule = Annotated (Located (HsModule GhcPs))
+type AnnotatedModule = Annotated (Located HsModule)
 type AnnotatedPat = Annotated (Located (Pat GhcPs))
 type AnnotatedStmt = Annotated (LStmt GhcPs (LHsExpr GhcPs))
 

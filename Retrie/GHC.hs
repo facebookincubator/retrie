@@ -7,6 +7,7 @@
 {-# LANGUAGE RecordWildCards #-}
 module Retrie.GHC
   ( module Retrie.GHC
+#if __GLASGOW_HASKELL__ < 900
   , module ApiAnnotation
   , module Bag
   , module BasicTypes
@@ -28,8 +29,26 @@ module Retrie.GHC
   , module Unique
   , module UniqFM
   , module UniqSet
+#else
+  -- GHC >= 9.0
+  , module GHC.Data.Bag
+  , module GHC.Data.FastString
+  , module GHC.Data.FastString.Env
+  , module GHC.Utils.Error
+  , module GHC.Hs
+  , module GHC.Parser.Annotation
+  , module GHC.Types.Basic
+  , module GHC.Types.Name
+  , module GHC.Types.Name.Reader
+  , module GHC.Types.SrcLoc
+  , module GHC.Types.Unique
+  , module GHC.Types.Unique.FM
+  , module GHC.Types.Unique.Set
+  , module GHC.Unit
+#endif
   ) where
 
+#if __GLASGOW_HASKELL__ < 900
 import ApiAnnotation
 import Bag
 import BasicTypes
@@ -37,11 +56,13 @@ import FastString
 import FastStringEnv
 #if __GLASGOW_HASKELL__ < 810
 import HsExpr
-import HsSyn
+import HsSyn hiding (HsModule)
+import qualified HsSyn as HS
 #else
 import ErrUtils
 import GHC.Hs.Expr
-import GHC.Hs
+import GHC.Hs hiding (HsModule)
+import qualified GHC.Hs as HS
 #endif
 import Module
 import Name
@@ -51,9 +72,30 @@ import SrcLoc
 import Unique
 import UniqFM
 import UniqSet
+#else
+-- GHC >= 9.0
+import GHC.Data.Bag
+import GHC.Data.FastString
+import GHC.Data.FastString.Env
+import GHC.Utils.Error
+import GHC.Hs
+import GHC.Parser.Annotation
+import GHC.Types.Basic
+import GHC.Types.Name
+import GHC.Types.Name.Reader
+import GHC.Types.SrcLoc
+import GHC.Types.Unique
+import GHC.Types.Unique.FM
+import GHC.Types.Unique.Set
+import GHC.Unit
+#endif
 
 import Data.Bifunctor (second)
 import Data.Maybe
+
+#if __GLASGOW_HASKELL__ < 900
+type HsModule = HS.HsModule GhcPs
+#endif
 
 cLPat :: Located (Pat (GhcPass p)) -> LPat (GhcPass p)
 #if __GLASGOW_HASKELL__ == 808
@@ -100,7 +142,7 @@ tyvarRdrName :: HsType p -> Maybe (Located (IdP p))
 tyvarRdrName (HsTyVar _ _ n) = Just n
 tyvarRdrName _ = Nothing
 
-fixityDecls :: HsModule p -> [(Located (IdP p), Fixity)]
+fixityDecls :: HsModule -> [(Located RdrName, Fixity)]
 fixityDecls m =
   [ (nm, fixity)
   | L _ (SigD _ (FixSig _ (FixitySig _ nms fixity))) <- hsmodDecls m
@@ -114,23 +156,36 @@ ruleInfo (HsRule _ (L _ (_, riName)) _ tyBs valBs riLHS riRHS) =
       map unLoc (tyBindersToLocatedRdrNames (fromMaybe [] tyBs)) ++
       ruleBindersToQs valBs
   in [ RuleInfo{..} ]
+#if __GLASGOW_HASKELL__ < 900
 ruleInfo XRuleDecl{} = []
+#endif
 
 ruleBindersToQs :: [LRuleBndr GhcPs] -> [RdrName]
 ruleBindersToQs bs = catMaybes
   [ case b of
       RuleBndr _ (L _ v) -> Just v
       RuleBndrSig _ (L _ v) _ -> Just v
+#if __GLASGOW_HASKELL__ < 900
       XRuleBndr{} -> Nothing
+#endif
   | L _ b <- bs
   ]
 
+#if __GLASGOW_HASKELL__ < 900
 tyBindersToLocatedRdrNames :: [LHsTyVarBndr GhcPs] -> [Located RdrName]
+#else
+tyBindersToLocatedRdrNames :: [LHsTyVarBndr () GhcPs] -> [Located RdrName]
+#endif
 tyBindersToLocatedRdrNames vars = catMaybes
   [ case var of
+#if __GLASGOW_HASKELL__ < 900
       UserTyVar _ v -> Just v
       KindedTyVar _ v _ -> Just v
       XTyVarBndr{} -> Nothing
+#else
+      UserTyVar _ _ v -> Just v
+      KindedTyVar _ _ v _ -> Just v
+#endif
   | L _ var <- vars ]
 
 data RuleInfo = RuleInfo
@@ -146,10 +201,11 @@ noExtField = noExt
 #endif
 
 overlaps :: SrcSpan -> SrcSpan -> Bool
-overlaps (RealSrcSpan s1) (RealSrcSpan s2) =
-     srcSpanFile s1 == srcSpanFile s2 &&
-     ((srcSpanStartLine s1, srcSpanStartCol s1) `within` s2 ||
-      (srcSpanEndLine s1, srcSpanEndCol s1) `within` s2)
+overlaps ss1 ss2
+  | Just s1 <- getRealSpan ss1, Just s2 <- getRealSpan ss2 =
+    srcSpanFile s1 == srcSpanFile s2 &&
+    ((srcSpanStartLine s1, srcSpanStartCol s1) `within` s2 ||
+     (srcSpanEndLine s1, srcSpanEndCol s1) `within` s2)
 overlaps _ _ = False
 
 within :: (Int, Int) -> RealSrcSpan -> Bool
@@ -162,11 +218,31 @@ within (l,p) s =
 lineCount :: [SrcSpan] -> Int
 lineCount ss = sum
   [ srcSpanEndLine s - srcSpanStartLine s + 1
-  | RealSrcSpan s <- ss
+  | Just s <- map getRealSpan ss
   ]
 
 showRdrs :: [RdrName] -> String
 showRdrs = show . map (occNameString . occName)
 
+#if __GLASGOW_HASKELL__ < 900
 uniqBag :: Uniquable a => [(a,b)] -> UniqFM [b]
+#else
+uniqBag :: Uniquable a => [(a,b)] -> UniqFM a [b]
+#endif
 uniqBag = listToUFM_C (++) . map (second pure)
+
+getRealLoc :: SrcLoc -> Maybe RealSrcLoc
+#if __GLASGOW_HASKELL__ < 900
+getRealLoc (RealSrcLoc l) = Just l
+#else
+getRealLoc (RealSrcLoc l _) = Just l
+#endif
+getRealLoc _ = Nothing
+
+getRealSpan :: SrcSpan -> Maybe RealSrcSpan
+#if __GLASGOW_HASKELL__ < 900
+getRealSpan (RealSrcSpan s) = Just s
+#else
+getRealSpan (RealSrcSpan s _) = Just s
+#endif
+getRealSpan _ = Nothing

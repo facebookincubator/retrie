@@ -3,6 +3,7 @@
 -- This source code is licensed under the MIT license found in the
 -- LICENSE file in the root directory of this source tree.
 --
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeFamilies #-}
@@ -20,7 +21,11 @@ import Retrie.Types
 typeSynonymsToRewrites
   :: [(FastString, Direction)]
   -> AnnotatedModule
+#if __GLASGOW_HASKELL__ < 900
   -> IO (UniqFM [Rewrite (LHsType GhcPs)])
+#else
+  -> IO (UniqFM FastString [Rewrite (LHsType GhcPs)])
+#endif
 typeSynonymsToRewrites specs am = fmap astA $ transformA am $ \ m -> do
   let
     fsMap = uniqBag specs
@@ -39,7 +44,11 @@ typeSynonymsToRewrites specs am = fmap astA $ transformA am $ \ m -> do
 -- | Compile a list of RULES into a list of rewrites.
 mkTypeRewrite
   :: Direction
+#if __GLASGOW_HASKELL__ < 900
   -> (Located RdrName, [LHsTyVarBndr GhcPs], LHsType GhcPs)
+#else
+  -> (Located RdrName, [LHsTyVarBndr () GhcPs], LHsType GhcPs)
+#endif
   -> TransformT IO (Rewrite (LHsType GhcPs))
 mkTypeRewrite d (lhsName, vars, rhs) = do
   setEntryDPT lhsName $ DP (0,0)

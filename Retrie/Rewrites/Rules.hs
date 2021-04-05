@@ -3,6 +3,7 @@
 -- This source code is licensed under the MIT license found in the
 -- LICENSE file in the root directory of this source tree.
 --
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE RecordWildCards #-}
 module Retrie.Rewrites.Rules (rulesToRewrites) where
 
@@ -17,7 +18,11 @@ import Retrie.Types
 rulesToRewrites
   :: [(FastString, Direction)]
   -> AnnotatedModule
+#if __GLASGOW_HASKELL__ < 900
   -> IO (UniqFM [Rewrite (LHsExpr GhcPs)])
+#else
+  -> IO (UniqFM RuleName [Rewrite (LHsExpr GhcPs)])
+#endif
 rulesToRewrites specs am = fmap astA $ transformA am $ \ m -> do
   let
     fsMap = uniqBag specs

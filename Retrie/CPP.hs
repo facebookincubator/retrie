@@ -116,7 +116,7 @@ printCPP repls (CPP orig is ms) = Text.unpack $ Text.unlines $
     sorted = sortOn fst
       [ (r, replReplacement)
       | Replacement{..} <- repls
-      , RealSrcSpan r <- [replLocation]
+      , Just r <- [getRealSpan replLocation]
       ]
 
     origLines = Text.lines orig
@@ -319,8 +319,8 @@ isPragma = Text.isPrefixOf "{-#"
 insertImports
   :: Monad m
   => [AnnotatedImports]   -- ^ imports and their annotations
-  -> Located (HsModule GhcPs)    -- ^ target module
-  -> TransformT m (Located (HsModule GhcPs))
+  -> Located HsModule     -- ^ target module
+  -> TransformT m (Located HsModule)
 insertImports is (L l m) = do
   imps <- graftA $ filterAndFlatten (unLoc <$> hsmodName m) is
   let

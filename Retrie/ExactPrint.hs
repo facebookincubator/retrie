@@ -75,7 +75,7 @@ import Language.Haskell.GHC.ExactPrint.Utils (annLeadingCommentEntryDelta, showG
 import Retrie.ExactPrint.Annotated
 import Retrie.Fixity
 import Retrie.GHC
-import Retrie.SYB
+import Retrie.SYB hiding (ext1)
 
 import GHC.Stack
 
@@ -113,6 +113,7 @@ fixOneExpr env (L l2 (OpApp x2 ap1@(L l1 (OpApp x1 x op1 y)) op2 z))
 fixOneExpr _ e = return e
 
 fixOnePat :: Monad m => FixityEnv -> LPat GhcPs -> TransformT m (LPat GhcPs)
+#if __GLASGOW_HASKELL__ < 900
 fixOnePat env (dLPat -> Just (L l2 (ConPatIn op2 (InfixCon (dLPat -> Just ap1@(L l1 (ConPatIn op1 (InfixCon x y)))) z))))
   | associatesRight (lookupOpRdrName op1 env) (lookupOpRdrName op2 env) = do
     let ap2' = L l2 (ConPatIn op2 (InfixCon y z))
@@ -120,6 +121,15 @@ fixOnePat env (dLPat -> Just (L l2 (ConPatIn op2 (InfixCon (dLPat -> Just ap1@(L
     transferAnnsT isComma ap2' ap1
     rhs <- fixOnePat env (cLPat ap2')
     return $ cLPat $ L l1 (ConPatIn op1 (InfixCon x rhs))
+#else
+fixOnePat env (dLPat -> Just (L l2 (ConPat ext2 op2 (InfixCon (dLPat -> Just ap1@(L l1 (ConPat ext1 op1 (InfixCon x y)))) z))))
+  | associatesRight (lookupOpRdrName op1 env) (lookupOpRdrName op2 env) = do
+    let ap2' = L l2 (ConPat ext2 op2 (InfixCon y z))
+    swapEntryDPT ap1 ap2'
+    transferAnnsT isComma ap2' ap1
+    rhs <- fixOnePat env (cLPat ap2')
+    return $ cLPat $ L l1 (ConPat ext1 op1 (InfixCon x rhs))
+#endif
 fixOnePat _ e = return e
 
 -- Move leading whitespace from the left child of an operator application
@@ -152,7 +162,11 @@ fixOneEntryExpr e = return e
 
 fixOneEntryPat :: Monad m => LPat GhcPs -> TransformT m (LPat GhcPs)
 fixOneEntryPat pat
+#if __GLASGOW_HASKELL__ < 900
   | Just p@(L _ (ConPatIn _ (InfixCon x _))) <- dLPat pat =
+#else
+  | Just p@(L _ (ConPat _ _ (InfixCon x _))) <- dLPat pat =
+#endif
     cLPat <$> fixOneEntry p (dLPatUnsafe x)
   | otherwise = return pat
 

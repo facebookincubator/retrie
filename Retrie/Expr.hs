@@ -3,6 +3,7 @@
 -- This source code is licensed under the MIT license found in the
 -- LICENSE file in the root directory of this source tree.
 --
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TupleSections #-}
@@ -127,7 +128,11 @@ mkConPatIn
   -> HsConPatDetails GhcPs
   -> TransformT m (Located (Pat GhcPs))
 mkConPatIn patName params = do
+#if __GLASGOW_HASKELL__ < 900
   p <- mkLoc $ ConPatIn patName params
+#else
+  p <- mkLoc $ ConPat noExtField patName params
+#endif
   setEntryDPT p (DP (0,0))
   return p
 
@@ -178,7 +183,14 @@ patToExpr orig = case dLPat orig of
     return e
   where
     go WildPat{} = newWildVar >>= lift . mkLocatedHsVar . noLoc
+#if __GLASGOW_HASKELL__ < 900
+    go XPat{} = error "patToExpr XPat"
+    go CoPat{} = error "patToExpr CoPat"
     go (ConPatIn con ds) = conPatHelper con ds
+    go ConPatOut{} = error "patToExpr ConPatOut" -- only exists post-tc
+#else
+    go (ConPat _ con ds) = conPatHelper con ds
+#endif
     go (LazyPat _ pat) = patToExpr pat
     go (BangPat _ pat) = patToExpr pat
     go (ListPat _ ps) = do
@@ -203,10 +215,7 @@ patToExpr orig = case dLPat orig of
         lift $ mkLoc $ Present noExtField e
       lift $ mkLoc $ ExplicitTuple noExtField es boxity
     go (VarPat _ i) = lift $ mkLocatedHsVar i
-    go XPat{} = error "patToExpr XPat"
     go AsPat{} = error "patToExpr AsPat"
-    go ConPatOut{} = error "patToExpr ConPatOut" -- only exists post-tc
-    go CoPat{} = error "patToExpr CoPat"
     go NPlusKPat{} = error "patToExpr NPlusKPat"
     go SplicePat{} = error "patToExpr SplicePat"
     go SumPat{} = error "patToExpr SumPat"
@@ -292,8 +301,12 @@ parenifyP Context{..} p@(L _ pat)
     needed TuplePat{}                         = False
     needed VarPat{}                           = False
     needed WildPat{}                          = False
+#if __GLASGOW_HASKELL__ < 900
     needed (ConPatIn _ (PrefixCon []))        = False
     needed ConPatOut{pat_args = PrefixCon []} = False
+#else
+    needed (ConPat _ _ (PrefixCon []))        = False
+#endif
     needed _                                  = True
 
 parenifyT

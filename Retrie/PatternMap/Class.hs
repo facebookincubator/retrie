@@ -11,6 +11,7 @@
 module Retrie.PatternMap.Class where
 
 import Control.Monad
+import Data.Kind
 import Data.Maybe
 
 import Retrie.AlphaEnv
@@ -51,7 +52,7 @@ unionOn f m1 m2 = mUnion (f m1) (f m2)
 ------------------------------------------------------------------------
 
 class PatternMap m where
-  type Key m :: *
+  type Key m :: Type
 
   mEmpty :: m a
   mUnion :: m a -> m a -> m a

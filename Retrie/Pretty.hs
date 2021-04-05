@@ -3,6 +3,7 @@
 -- This source code is licensed under the MIT license found in the
 -- LICENSE file in the root directory of this source tree.
 --
+{-# LANGUAGE CPP #-}
 module Retrie.Pretty
   ( noColor
   , addColor
@@ -37,7 +38,11 @@ addColor intensity color x = mconcat
 ppSrcSpan :: ColoriseFun -> SrcSpan -> String
 ppSrcSpan colorise spn = case srcSpanStart spn of
   UnhelpfulLoc x -> unpackFS x
+#if __GLASGOW_HASKELL__ < 900
   RealSrcLoc loc -> intercalate (colorise Dull Cyan ":")
+#else
+  RealSrcLoc loc _ -> intercalate (colorise Dull Cyan ":")
+#endif
     [ colorise Dull Magenta $ unpackFS $ srcLocFile loc
     , colorise Dull Green $ show $ srcLocLine loc
     , colorise Dull Green $ show $ srcLocCol loc
@@ -62,10 +67,6 @@ ppRepl lMap spn replacement = fromMaybe [replacement] $ do
 -- | Return HashMap from line number to line of a file.
 linesMap :: String -> IO (HashMap.HashMap Int String)
 linesMap fp = HashMap.fromList . zip [1..] . lines <$> readFile fp
-
-getRealLoc :: SrcLoc -> Maybe RealSrcLoc
-getRealLoc (RealSrcLoc x) = Just x
-getRealLoc _ = Nothing
 
 strip :: String -> String
 strip = dropWhileEnd isSpace . dropWhile isSpace

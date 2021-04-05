@@ -3,6 +3,7 @@
 -- This source code is licensed under the MIT license found in the
 -- LICENSE file in the root directory of this source tree.
 --
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE RecordWildCards #-}
@@ -24,7 +25,11 @@ import Retrie.Util
 patternSynonymsToRewrites
   :: [(FastString, Direction)]
   -> AnnotatedModule
+#if __GLASGOW_HASKELL__ < 900
   -> IO (UniqFM [Rewrite Universe])
+#else
+  -> IO (UniqFM FastString [Rewrite Universe])
+#endif
 patternSynonymsToRewrites specs am = fmap astA $ transformA am $ \(L _ m) -> do
   let
     fsMap = uniqBag specs
@@ -69,7 +74,11 @@ mkPatRewrite dir imports patName params rhs = do
   where
     setEntryDPTunderConPatIn
       :: Monad m => Located (Pat GhcPs) -> DeltaPos -> TransformT m ()
+#if __GLASGOW_HASKELL__ < 900
     setEntryDPTunderConPatIn (L _ (ConPatIn nm _)) = setEntryDPT nm
+#else
+    setEntryDPTunderConPatIn (L _ (ConPat _ nm _)) = setEntryDPT nm
+#endif
     setEntryDPTunderConPatIn _ = const $ return ()
 
 asPat

@@ -3,6 +3,7 @@
 -- This source code is licensed under the MIT license found in the
 -- LICENSE file in the root directory of this source tree.
 --
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE ViewPatterns #-}
 module Retrie.Subst (subst) where
 
@@ -101,8 +102,13 @@ substType _ ty = return ty
 substHsMatchContext
   :: Monad m
   => Context
+#if __GLASGOW_HASKELL__ < 900
   -> HsMatchContext RdrName
   -> TransformT m (HsMatchContext RdrName)
+#else
+  -> HsMatchContext GhcPs
+  -> TransformT m (HsMatchContext GhcPs)
+#endif
 substHsMatchContext ctxt (FunRhs (L l v) f s)
   | Just (HoleRdr rdr) <- lookupHoleVar v ctxt =
     return $ FunRhs (L l rdr) f s

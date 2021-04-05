@@ -3,6 +3,7 @@
 -- This source code is licensed under the MIT license found in the
 -- LICENSE file in the root directory of this source tree.
 --
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -79,7 +80,9 @@ updateContext c i =
     updGRHSs = addInScope neverParen . collectLocalBinders . unLoc . grhssLocalBinds
 
     updGRHS :: GRHS GhcPs (LHsExpr GhcPs) -> Context
+#if __GLASGOW_HASKELL__ < 900
     updGRHS XGRHS{} = neverParen
+#endif
     updGRHS (GRHS _ gs _)
         -- binders are in scope over the body (right child) only
       | i > firstChild = addInScope neverParen bs

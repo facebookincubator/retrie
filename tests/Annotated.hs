@@ -3,6 +3,7 @@
 -- This source code is licensed under the MIT license found in the
 -- LICENSE file in the root directory of this source tree.
 --
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 module Annotated (annotatedTest) where
@@ -195,19 +196,27 @@ assertNoOverwrite annsPreGraft annsPostGraft =
 -- expected form.
 assertExactPrintAnns :: Anns -> Anns -> IO ()
 assertExactPrintAnns annsPreGraft annsPostGraft =
-  mapM_ (\(AnnKey ss _) -> assertGoodSrcSpan ss) newKeys
+  forM_ newKeys $ \(AnnKey ss _) ->
+#if __GLASGOW_HASKELL__ < 900
+    assertGoodSrcSpan ss
+#else
+    assertGoodRealSrcSpan ss
+#endif
   where
     newKeys :: S.Set AnnKey
     newKeys = M.keysSet annsPostGraft `S.difference` M.keysSet annsPreGraft
 
 assertGoodSrcSpan :: SrcSpan -> IO ()
 assertGoodSrcSpan srcSpan =
-  case srcSpan of
-    RealSrcSpan rss -> do
-      assertGoodSrcLoc (realSrcSpanStart rss)
-      assertGoodSrcLoc (realSrcSpanEnd rss)
-    UnhelpfulSpan _ ->
+  case getRealSpan srcSpan of
+    Just rss -> assertGoodRealSrcSpan rss
+    Nothing ->
       assertFailure "only real src spans should be generated"
+
+assertGoodRealSrcSpan :: RealSrcSpan -> IO ()
+assertGoodRealSrcSpan rss = do
+  assertGoodSrcLoc (realSrcSpanStart rss)
+  assertGoodSrcLoc (realSrcSpanEnd rss)
 
 assertGoodSrcLoc :: RealSrcLoc -> IO ()
 assertGoodSrcLoc srcLoc = do

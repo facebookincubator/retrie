@@ -4,6 +4,7 @@
 -- This source code is licensed under the MIT license found in the
 -- LICENSE file in the root directory of this source tree.
 --
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE OverloadedStrings #-}
 module Retrie.Rewrites
   ( RewriteSpec(..)
@@ -209,13 +210,21 @@ tyBuilder
   :: FileBasedTy
   -> [(FastString, Direction)]
   -> AnnotatedModule
+#if __GLASGOW_HASKELL__ < 900
   -> IO (UniqFM [Rewrite Universe])
+#else
+  -> IO (UniqFM FastString [Rewrite Universe])
+#endif
 tyBuilder FoldUnfold specs am = promote <$> dfnsToRewrites specs am
 tyBuilder Rule specs am = promote <$> rulesToRewrites specs am
 tyBuilder Type specs am = promote <$> typeSynonymsToRewrites specs am
 tyBuilder Pattern specs am = patternSynonymsToRewrites specs am
 
+#if __GLASGOW_HASKELL__ < 900
 promote :: Matchable a => UniqFM [Rewrite a] -> UniqFM [Rewrite Universe]
+#else
+promote :: Matchable a => UniqFM k [Rewrite a] -> UniqFM k [Rewrite Universe]
+#endif
 promote = fmap (map toURewrite)
 
 parseQualified :: String -> Either String (FilePath, FastString)
