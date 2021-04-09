@@ -1,7 +1,8 @@
-x.x.x.x (xxx)
+1.0.0.0 (April 9, 2021)
 
 * Added --adhoc-type flag (#13)
 * Added --adhoc-pattern, --pattern-forward, --pattern-backward (#15)
+* Speed up file search when large number of files match.
 * Removed support for GHC 8.4 and 8.8
 * Added support for GHC 9.0.1
 
