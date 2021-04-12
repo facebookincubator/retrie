@@ -114,7 +114,7 @@ executable retrie
     haskell-src-exts >= 1.23.0 && < 1.24
   default-language: Haskell2010
 
-executable demo
+executable demo-retrie
   if flag(BuildExecutable)
     Buildable: True
   else
