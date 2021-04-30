@@ -44,6 +44,7 @@ import System.Random.Shuffle
 
 import Retrie.CPP
 import Retrie.Debug
+import Retrie.Elaborate
 import Retrie.ExactPrint
 import Retrie.Fixity
 import Retrie.GroundTerms
@@ -87,6 +88,8 @@ data Options_ rewrites imports = Options
     -- ^ Imports specified by the command-line flag '--import'.
   , colorise :: ColoriseFun
     -- ^ Function used to colorize results of certain execution modes.
+  , elaborations :: rewrites
+    -- ^ Rewrites which are applied to the left-hand side of the actual rewrites.
   , executionMode :: ExecutionMode
     -- ^ Controls behavior of 'apply'. See 'ExecutionMode'.
   , extraIgnores :: [FilePath]
@@ -99,6 +102,8 @@ data Options_ rewrites imports = Options
     -- ^ Iterate the given rewrites or 'Retrie' computation up to this many
     -- times. Iteration may stop before the limit if no changes are made during
     -- a given iteration.
+  , noDefaultElaborations :: Bool
+    -- ^ Do not apply any of the built in elaborations in 'defaultElaborations'.
   , randomOrder :: Bool
     -- ^ Whether to randomize the order of target modules before rewriting them.
   , rewrites :: rewrites
@@ -125,10 +130,12 @@ defaultOptions
 defaultOptions fp = Options
   { additionalImports = D.def
   , colorise = noColor
+  , elaborations = D.def
   , executionMode = ExecRewrite
   , extraIgnores = []
   , fixityEnv = mempty
   , iterateN = 1
+  , noDefaultElaborations = False
   , randomOrder = False
   , rewrites = D.def
   , roundtrips = []
@@ -184,6 +191,11 @@ buildParser dOpts = do
     [ long "color"
     , help "Highlight matches with color."
     ]
+  noDefaultElaborations <- switch $ mconcat
+    [ long "no-default-elaborations"
+    , showDefault
+    , help "Don't apply any of the default elaborations to rewrites."
+    ]
   randomOrder <- switch $ mconcat
     [ long "random-order"
     , help "Randomize the order of targeted modules."
@@ -198,8 +210,28 @@ buildParser dOpts = do
 
   executionMode <- parseMode
   rewrites <- parseRewriteSpecOptions
+  elaborations <- parseElaborations
   roundtrips <- parseRoundtrips
   return Options{ fixityEnv = fixityEnv dOpts, ..}
+
+parseElaborations :: Parser [RewriteSpec]
+parseElaborations = concat <$> traverse many
+  [ fmap Adhoc $ option str $ mconcat
+    [ long "elaborate"
+    , metavar "EQUATION"
+    , help "Elaborate the left-hand side of rewrites using the given equation."
+    ]
+  , fmap AdhocType $ option str $ mconcat
+    [ long "elaborate-type"
+    , metavar "EQUATION"
+    , help "Elaborate the left-hand side of rewrites using the given equation."
+    ]
+  , fmap AdhocPattern $ option str $ mconcat
+    [ long "elaborate-pattern"
+    , metavar "EQUATION"
+    , help "Elaborate the left-hand side of rewrites using the given equation."
+    ]
+  ]
 
 parseRewriteSpecOptions :: Parser [RewriteSpec]
 parseRewriteSpecOptions = concat <$> traverse many
@@ -328,9 +360,14 @@ resolveOptions protoOpts = do
       anns <- getAnnsT
       return $ map (`exactPrint` anns) imps
   rrs <- parseRewritesInternal opts rewrites
+  es <- parseRewritesInternal opts $
+    (if noDefaultElaborations then [] else defaultElaborations) ++
+    elaborations
+  elaborated <- elaborateRewritesInternal fixityEnv es rrs
   return Options
     { additionalImports = parsedImports
-    , rewrites = rrs
+    , elaborations = es
+    , rewrites = elaborated
     , singleThreaded = singleThreaded || verbosity == Loud
     , ..
     }

@@ -265,17 +265,6 @@ instance PatternMap OLMap where
 -- Statement lists bind to the right, so we need to extend the environment
 -- as we move down it. Thus we cannot simply store them as ListMap SMap a.
 
--- Note [Dollar Fork]
--- When 'f $ x' appears in the pattern, we insert two things in the EMap
--- instead of just one:
---
--- * The original infix application of ($).
--- * The expression transformed into a normal application with parens around
---   the right argument to ($). i.e. f (x)
---
--- This allows us to put ($) in the LHS of rewrites and match both literal ($)
--- applications and the parenthesized equivalent.
-
 data EMap a
   = EMEmpty
   | EM { emHole  :: Map RdrName a -- See Note [Holes]
@@ -347,13 +336,6 @@ instance PatternMap EMap where
   mAlter env vs e f EMEmpty = mAlter env vs e f emptyEMapWrapper
   mAlter env vs e f m@EM{} = go (unLoc e)
     where
-      -- See Note [Dollar Fork]
-      dollarFork v@HsVar{} l r
-        | Just (L _ rdr) <- varRdrName v
-        , occNameString (occName rdr) == "$" =
-          go (HsApp noExtField l (noLoc (HsPar noExtField r)))
-      dollarFork _ _ _ = m
-
       go (HsVar _ v)
         | unLoc v `isQ` vs = m { emHole  = mAlter env vs (unLoc v) f (emHole m) }
         | otherwise        = m { emVar   = mAlter env vs (unLoc v) f (emVar m) }
@@ -379,8 +361,8 @@ instance PatternMap EMap where
       go (HsOverLit _ ol) = m { emOverLit = mAlter env vs (ol_val ol) f (emOverLit m) }
       go (NegApp _ e' _) = m { emNegApp = mAlter env vs e' f (emNegApp m) }
       go (HsPar _ e') = m { emPar  = mAlter env vs e' f (emPar m) }
-      go (OpApp _ l o r) = (dollarFork (unLoc o) l r)
-        { emOpApp = mAlter env vs o (toA (mAlter env vs l (toA (mAlter env vs r f)))) (emOpApp m) }
+      go (OpApp _ l o r) =
+        m { emOpApp = mAlter env vs o (toA (mAlter env vs l (toA (mAlter env vs r f)))) (emOpApp m) }
       go (RecordCon _ v fs) =
         m { emRecordCon = mAlter env vs (unLoc v) (toA (mAlter env vs (fieldsToRdrNames $ rec_flds fs) f)) (emRecordCon m) }
       go (RecordUpd _ e' fs) =

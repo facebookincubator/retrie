@@ -65,6 +65,11 @@ replaceImpl c e = do
       , any (`elemFVs` fvs) (ctxtBinders c) = NoMatch
       | otherwise = match
 
+  -- We want to match through HsPar so we can make a decision
+  -- about whether to keep the parens or not based on the
+  -- resulting expression, but we need to know the entry location
+  -- of the parens, not the inner expression, so we have to
+  -- keep both expressions around.
   match <- runRewriter f c (ctxtRewriter c) (getUnparened e)
 
   case match of
@@ -108,14 +113,6 @@ instance Monoid Change where
   mappend other        NoChange     = other
   mappend (Change rs1 is1) (Change rs2 is2) =
     Change (rs1 <> rs2) (is1 <> is2)
-
--- We want to match through HsPar so we can make a decision
--- about whether to keep the parens or not based on the
--- resulting expression, but we need to know the entry location
--- of the parens, not the inner expression, so we have to
--- keep both expressions around.
-getUnparened :: Data k => k -> k
-getUnparened = mkT unparen `extT` unparenT `extT` unparenP
 
 -- The location of 'e' accurately points to the first non-space character
 -- of 'e', but when we exactprint 'e', we might get some leading spaces (if

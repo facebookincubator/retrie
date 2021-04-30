@@ -10,6 +10,7 @@
 {-# LANGUAGE ViewPatterns #-}
 module Retrie.Expr
   ( bitraverseHsConDetails
+  , getUnparened
   , grhsToExpr
   , mkApps
   , mkConPatIn
@@ -263,6 +264,9 @@ parenify Context{..} le@(L _ e)
     needed NeverParen _ = False
     needed _ Nothing = True
     needed _ _ = False
+
+getUnparened :: Data k => k -> k
+getUnparened = mkT unparen `extT` unparenT `extT` unparenP
 
 unparen :: LHsExpr GhcPs -> LHsExpr GhcPs
 unparen (L _ (HsPar _ e)) = e
