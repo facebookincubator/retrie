@@ -30,17 +30,17 @@ groundTermsTest = TestLabel "ground terms" $ TestList
       ""
       [Adhoc "forall f g xs. map f (map g xs) = map (f . g) xs"]
       [["map"]]
-      [("", "grep -R --include=\"*.hs\" -l 'map' ~/si_sigma")]
+      [["grep -R --include=\"*.hs\" -l 'map' ~/si_sigma"]]
   , gtTest "isSpace"
       ""
       [Adhoc "forall xs. or (map isSpace xs) = any isSpace xs"]
       [["or", "map isSpace"]]
-      [("", "grep -R --include=\"*.hs\" -l 'or' ~/si_sigma | xargs grep -l 'map[[:space:]]\\+isSpace'")]
+      [["grep -R --include=\"*.hs\" -l 'or' ~/si_sigma", "grep -l 'map[[:space:]]\\+isSpace'"]]
   , gtTest "MyType"
       "type MyType a = MyOtherType a"
       [TypeForward "Test.MyType"]
       [["MyType"]]
-      [("", "grep -R --include=\"*.hs\" -l 'MyType' ~/si_sigma")]
+      [["grep -R --include=\"*.hs\" -l 'MyType' ~/si_sigma"]]
   ]
 
 gtTest
@@ -48,7 +48,7 @@ gtTest
   -> Text
   -> [RewriteSpec]
   -> [[String]]
-  -> [(String, String)]
+  -> [[String]]
   -> Test
 gtTest lbl contents specs expected expectedCmds =
   TestLabel ("groundTerms: " ++ lbl) $ TestCase $ do
@@ -73,11 +73,11 @@ gtTest lbl contents specs expected expectedCmds =
 
     forM_ (zip gtss expectedCmds) $ \(gts, expectedCmd) ->
       case buildGrepChain "~/si_sigma" gts [] of
-        Left _ -> assertFailure "gtTest: Left"
-        Right (i, c) ->
+        ([], c) ->
           assertEqual "buildGrepChain did not give expected command"
             expectedCmd
-            (i, unwords c)
+            c
+        _ -> assertFailure "gtTest: Should not have paths"
 
 getFocusTests :: IO [Test]
 getFocusTests = do

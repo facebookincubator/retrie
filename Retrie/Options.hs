@@ -411,9 +411,8 @@ getTargetFiles Options{..} gtss = do
   fpSets <- forM (dedup gtss) $ \ gts -> do
     -- See Note [Ground Terms]
     fps <-
-      case buildGrepChain targetDir gts targetFiles of
-        Left fs -> return fs
-        Right (stdin, cmd) -> doCmd targetDir verbosity stdin (unwords cmd)
+      let (files, commands) = buildGrepChain targetDir gts targetFiles
+      in runGrepChain targetDir verbosity commands files
 
     let
       r = filter (not . ignore)
@@ -438,8 +437,8 @@ buildGrepChain
   :: FilePath
   -> HashSet String
   -> [FilePath]
-  -> Either [FilePath] (String, [String])
-buildGrepChain targetDir gts =
+  -> ([FilePath], [String])
+buildGrepChain targetDir gts filesGiven =
   -- Limit the size of the shell command we build by only selecting
   -- up to 10 ground terms. The goal is to filter file list down to
   -- a manageable size. It doesn't have to be exact.
@@ -452,28 +451,50 @@ buildGrepChain targetDir gts =
 
     hsExtension = "\"*.hs\""
 
-    filterFiles [] [] = Right ("", findCmd) -- all .hs files
-    filterFiles [] fs = Left fs -- targetFiles
-    -- start with all .hs files and filter
-    filterFiles (g:gs) [] =
-      Right ("", intercalate ["|"] $ firstCmd g : filterChain gs)
-    -- start with targetFiles and filter
-    filterFiles gs fs =
-      Right (unlines fs, intercalate ["|"] $ filterChain gs)
+    filterFiles [] 
+      | null filesGiven = ([], [findCmd]) -- all .hs files
+      | otherwise = (filesGiven, [])-- no processing
+    filterFiles (g:gs) 
+      | null filesGiven = ([], firstCmd g : filterChain gs) -- start with recursive grep
+      | otherwise = (filesGiven, filterStart g : filterChain gs) -- start with filter on targetFiles
 
-    findCmd = ["find", addTrailingPathSeparator targetDir, "-iname", hsExtension]
+    findCmd = unwords ["find", addTrailingPathSeparator targetDir, "-iname", hsExtension]
 
     firstCmd g =
-      ["grep", "-R", "--include=" ++ hsExtension, "-l", esc g, targetDir]
+      unwords ["grep", "-R", "--include=" ++ hsExtension, "-l", esc g, targetDir]
 
-    filterChain gs = [ ["xargs", "grep", "-l", esc gt] | gt <- gs ]
+    -- start a filter chain with known files
+    filterStart gs = unwords ["grep", "-l", esc gs] 
+    filterChain gs = [ unwords ["grep", "-l", esc gt] | gt <- gs ]
 
     esc s = "'" ++ intercalate "[[:space:]]\\+" (words s) ++ "'"
 
-doCmd :: FilePath -> Verbosity -> String -> String -> IO [FilePath]
-doCmd targetDir verbosity inp shellCmd = do
-  debugPrint verbosity "stdin:" [inp]
+-- Notes on Windows compatability
+-- The way System.Process handles stdin is currently incompatible with xargs in many ways:
+--
+-- - newlines that are written as `\r\n`so after splitting grep sees `...\r` and can't find the file.
+--       both System.Process and grep automatically use '\r\n' for newlines
+-- - paths like "C:\Users\.." lose the backslashes so grep sees `C:Users...` and can't find the file
+-- - paths aren't quoted so paths with spaces break
+-- - ...
+--
+-- Instead, move the loop into haskell land and invoke grep multiple times
+
+
+
+runGrepChain :: FilePath -> Verbosity -> [String] -> [FilePath] -> IO [FilePath]
+runGrepChain targetDir verbosity steps initialPaths = go steps initialPaths
+  where
+    go [] paths = pure paths
+    go (x:xs) paths = do
+      paths' <- doCmd targetDir verbosity (x <> formatPaths paths)
+      go xs paths'
+    formatPaths [] = ""
+    formatPaths xs = " " <> unwords (map quotePath xs)
+    quotePath x = "'" <> x <> "'"
+doCmd :: FilePath -> Verbosity -> String -> IO [FilePath]
+doCmd targetDir verbosity shellCmd = do
   debugPrint verbosity "shellCmd:" [shellCmd]
   let cmd = (shell shellCmd) { cwd = Just targetDir }
-  (_ec, fps, _) <- readCreateProcessWithExitCode cmd inp
+  (_ec, fps, _) <- readCreateProcessWithExitCode cmd ""
   return $ lines fps
