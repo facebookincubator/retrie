@@ -23,35 +23,44 @@ import Retrie.Rewrites
 import Retrie.Types
 import Retrie.Universe
 import Test.HUnit
-import Retrie.Options (GrepCommands(..))
 
 groundTermsTest :: Test
 groundTermsTest = TestLabel "ground terms" $ TestList
   [ gtTest "map"
       ""
+      []
       [Adhoc "forall f g xs. map f (map g xs) = map (f . g) xs"]
       [["map"]]
-      [GrepCommands [] ["grep -R --include=\"*.hs\" -l 'map' ~/si_sigma"]]
+      [GrepCommands [] ["grep -R --include=\"*.hs\" -l 'map' '~/si_sigma'"]]
   , gtTest "isSpace"
       ""
+      []
       [Adhoc "forall xs. or (map isSpace xs) = any isSpace xs"]
       [["or", "map isSpace"]]
-      [GrepCommands [] ["grep -R --include=\"*.hs\" -l 'or' ~/si_sigma", "grep -l 'map[[:space:]]\\+isSpace'"]]
+      [GrepCommands [] ["grep -R --include=\"*.hs\" -l 'or' '~/si_sigma'", "grep -l 'map[[:space:]]\\+isSpace'"]]
   , gtTest "MyType"
       "type MyType a = MyOtherType a"
+      []
       [TypeForward "Test.MyType"]
       [["MyType"]]
-      [GrepCommands [] ["grep -R --include=\"*.hs\" -l 'MyType' ~/si_sigma"]]
+      [GrepCommands [] ["grep -R --include=\"*.hs\" -l 'MyType' '~/si_sigma'"]]
+  , gtTest "isSpace with file"
+      ""
+      ["Test.hs", "Test2.hs"]
+      [Adhoc "forall xs. or (map isSpace xs) = any isSpace xs"]
+      [["or", "map isSpace"]]
+      [GrepCommands ["Test.hs", "Test2.hs"] ["grep -l 'or'", "grep -l 'map[[:space:]]\\+isSpace'"]]
   ]
 
 gtTest
   :: String
   -> Text
+  -> [FilePath]
   -> [RewriteSpec]
   -> [[String]]
   -> [GrepCommands]
   -> Test
-gtTest lbl contents specs expected expectedCmds =
+gtTest lbl contents targFiles specs expected expectedCmds =
   TestLabel ("groundTerms: " ++ lbl) $ TestCase $ do
     -- since we 'zip' below
     assertEqual "length of specs and expected ground terms"
@@ -73,12 +82,9 @@ gtTest lbl contents specs expected expectedCmds =
       (HashSet.fromList gtss) -- compare hashsets to avoid ordering issues
 
     forM_ (zip gtss expectedCmds) $ \(gts, expectedCmd) ->
-      case buildGrepChain "~/si_sigma" gts [] of
-        c ->
           assertEqual "buildGrepChain did not give expected command"
             expectedCmd
-            c
-        _ -> assertFailure "gtTest: Should not have paths"
+            (buildGrepChain "~/si_sigma" gts targFiles)
 
 getFocusTests :: IO [Test]
 getFocusTests = do
