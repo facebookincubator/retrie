@@ -430,8 +430,8 @@ getTargetFiles Options{..} gtss = do
         putStrLn "Reading VCS ignore failed! Continuing without ignoring."
       return $ const False
 
--- | Either returns an exact list of target paths, or a command for finding
--- them.
+-- | Return a chain of grep commands to find files with relevant groundTerms
+-- If filesGiven is empty, use all *.hs files under targetDir
 buildGrepChain
   :: FilePath
   -> HashSet String
@@ -450,8 +450,8 @@ buildGrepChain targetDir gts filesGiven = GrepCommands {initialFileSet=filesGive
         [] -> [findCmd] -- all .hs files
         g:gs -> recursiveGrep g : map normalGrep gs -- start with recursive grep
 
-    findCmd = unwords ["find", addTrailingPathSeparator targetDir, "-iname", hsExtension]
-    recursiveGrep g = unwords ["grep", "-R", "--include=" ++ hsExtension, "-l", esc g, targetDir]
+    findCmd = unwords ["find", quotePath (addTrailingPathSeparator targetDir), "-iname", hsExtension]
+    recursiveGrep g = unwords ["grep", "-R", "--include=" ++ hsExtension, "-l", esc g, quotePath targetDir]
     normalGrep gt = unwords ["grep", "-l", esc gt]
 
    -- Limit the number of the shell command we build by only selecting
@@ -487,7 +487,8 @@ commandStep targetDir verbosity files cmd = doCmd targetDir verbosity (cmd <> fo
  where
     formatPaths [] = ""
     formatPaths xs = " " <> unwords (map quotePath xs)
-    quotePath x = "'" <> x <> "'"
+quotePath :: FilePath -> FilePath
+quotePath x = "'" <> x <> "'"
 
 
 doCmd :: FilePath -> Verbosity -> String -> IO [FilePath]
