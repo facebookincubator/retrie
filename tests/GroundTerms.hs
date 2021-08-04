@@ -23,6 +23,7 @@ import Retrie.Rewrites
 import Retrie.Types
 import Retrie.Universe
 import Test.HUnit
+import Retrie.Options (GrepCommands(..))
 
 groundTermsTest :: Test
 groundTermsTest = TestLabel "ground terms" $ TestList
@@ -30,17 +31,17 @@ groundTermsTest = TestLabel "ground terms" $ TestList
       ""
       [Adhoc "forall f g xs. map f (map g xs) = map (f . g) xs"]
       [["map"]]
-      [["grep -R --include=\"*.hs\" -l 'map' ~/si_sigma"]]
+      [GrepCommands [] ["grep -R --include=\"*.hs\" -l 'map' ~/si_sigma"]]
   , gtTest "isSpace"
       ""
       [Adhoc "forall xs. or (map isSpace xs) = any isSpace xs"]
       [["or", "map isSpace"]]
-      [["grep -R --include=\"*.hs\" -l 'or' ~/si_sigma", "grep -l 'map[[:space:]]\\+isSpace'"]]
+      [GrepCommands [] ["grep -R --include=\"*.hs\" -l 'or' ~/si_sigma", "grep -l 'map[[:space:]]\\+isSpace'"]]
   , gtTest "MyType"
       "type MyType a = MyOtherType a"
       [TypeForward "Test.MyType"]
       [["MyType"]]
-      [["grep -R --include=\"*.hs\" -l 'MyType' ~/si_sigma"]]
+      [GrepCommands [] ["grep -R --include=\"*.hs\" -l 'MyType' ~/si_sigma"]]
   ]
 
 gtTest
@@ -48,7 +49,7 @@ gtTest
   -> Text
   -> [RewriteSpec]
   -> [[String]]
-  -> [[String]]
+  -> [GrepCommands]
   -> Test
 gtTest lbl contents specs expected expectedCmds =
   TestLabel ("groundTerms: " ++ lbl) $ TestCase $ do
@@ -73,7 +74,7 @@ gtTest lbl contents specs expected expectedCmds =
 
     forM_ (zip gtss expectedCmds) $ \(gts, expectedCmd) ->
       case buildGrepChain "~/si_sigma" gts [] of
-        ([], c) ->
+        c ->
           assertEqual "buildGrepChain did not give expected command"
             expectedCmd
             c
