@@ -467,18 +467,13 @@ buildGrepChain targetDir gts filesGiven =
     filterStart gs = unwords ["grep", "-l", esc gs] 
     filterChain gs = [ unwords ["grep", "-l", esc gt] | gt <- gs ]
 
-    esc s = "'" ++ intercalate "[[:space:]]\\+" (words s) ++ "'"
-
--- Notes on Windows compatability
--- The way System.Process handles stdin is currently incompatible with xargs in many ways:
---
--- - newlines that are written as `\r\n`so after splitting grep sees `...\r` and can't find the file.
---       both System.Process and grep automatically use '\r\n' for newlines
--- - paths like "C:\Users\.." lose the backslashes so grep sees `C:Users...` and can't find the file
--- - paths aren't quoted so paths with spaces break
--- - ...
---
--- Instead, move the loop into haskell land and invoke grep multiple times
+    esc s = "'" ++ intercalate "[[:space:]]\\+" (words $ escChars s) ++ "'"
+    escChars = concatMap escChar
+    escChar c
+      | c `elem` magicChars = "\\" <> [c]
+      | otherwise  = [c]
+    magicChars :: [Char]
+    magicChars = "*?[#˜=%\\"
 
 
 
