@@ -28,7 +28,7 @@ targetedWithGroundTerms =
       gts = [HashSet.fromList ["Groundterm"]]
       targetFps = retrieTargetFiles
       -- 'withFakeHgRepo' creates every file with its own name as the contents
-      expectedFps = ["targeted/Groundterm.hs"]
+      expectedFps = ["targeted" </> "Groundterm.hs"]
 
 assertFileListEqual
   :: [FilePath]
