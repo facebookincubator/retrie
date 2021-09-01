@@ -23,10 +23,11 @@ module Retrie.Options
   , parseVerbosity
   , ProtoOptions
   , resolveOptions
+  , GrepCommands(..)
   ) where
 
 import Control.Concurrent.Async (mapConcurrently)
-import Control.Monad (when)
+import Control.Monad (when, foldM)
 import Data.Bool
 import Data.Char (isAlphaNum, isSpace)
 import Data.Default as D
@@ -410,10 +411,7 @@ getTargetFiles Options{..} gtss = do
   let ignore fp = ignorePred fp || extraIgnorePred fp
   fpSets <- forM (dedup gtss) $ \ gts -> do
     -- See Note [Ground Terms]
-    fps <-
-      case buildGrepChain targetDir gts targetFiles of
-        Left fs -> return fs
-        Right (stdin, cmd) -> doCmd targetDir verbosity stdin (unwords cmd)
+    fps <- runGrepChain targetDir verbosity (buildGrepChain targetDir gts targetFiles)
 
     let
       r = filter (not . ignore)
@@ -432,19 +430,34 @@ getTargetFiles Options{..} gtss = do
         putStrLn "Reading VCS ignore failed! Continuing without ignoring."
       return $ const False
 
--- | Either returns an exact list of target paths, or a command for finding
--- them.
+-- | Return a chain of grep commands to find files with relevant groundTerms
+-- If filesGiven is empty, use all *.hs files under targetDir
 buildGrepChain
   :: FilePath
   -> HashSet String
   -> [FilePath]
-  -> Either [FilePath] (String, [String])
-buildGrepChain targetDir gts =
-  -- Limit the size of the shell command we build by only selecting
-  -- up to 10 ground terms. The goal is to filter file list down to
-  -- a manageable size. It doesn't have to be exact.
-  filterFiles (take 10 $ filter p $ HashSet.toList gts)
+  -> GrepCommands
+buildGrepChain targetDir gts filesGiven = GrepCommands {initialFileSet=filesGiven, commandChain=commands}
   where
+    commands = if null filesGiven
+               then commandsWithoutFiles
+               else commandsWithFiles
+
+    commandsWithFiles = case terms of
+        [] -> [] -- no processing
+        gs -> map normalGrep gs
+    commandsWithoutFiles = case terms of
+        [] -> [findCmd] -- all .hs files
+        g:gs -> recursiveGrep g : map normalGrep gs -- start with recursive grep
+
+    findCmd = unwords ["find", quotePath (addTrailingPathSeparator targetDir), "-iname", hsExtension]
+    recursiveGrep g = unwords ["grep", "-R", "--include=" ++ hsExtension, "-l", esc g, quotePath targetDir]
+    normalGrep gt = unwords ["grep", "-l", esc gt]
+
+   -- Limit the number of the shell command we build by only selecting
+   -- up to 10 ground terms. The goal is to filter file list down to
+   -- a manageable size. It doesn't have to be exact.
+    terms = take 10 $ filter p $ HashSet.toList gts
     p [] = False
     p (c:cs)
       | isSpace c = p cs
@@ -452,28 +465,35 @@ buildGrepChain targetDir gts =
 
     hsExtension = "\"*.hs\""
 
-    filterFiles [] [] = Right ("", findCmd) -- all .hs files
-    filterFiles [] fs = Left fs -- targetFiles
-    -- start with all .hs files and filter
-    filterFiles (g:gs) [] =
-      Right ("", intercalate ["|"] $ firstCmd g : filterChain gs)
-    -- start with targetFiles and filter
-    filterFiles gs fs =
-      Right (unlines fs, intercalate ["|"] $ filterChain gs)
+    esc s = "'" ++ intercalate "[[:space:]]\\+" (words $ escChars s) ++ "'"
+    escChars = concatMap escChar
+    escChar c
+      | c `elem` magicChars = "\\" <> [c]
+      | otherwise  = [c]
+    magicChars :: [Char]
+    magicChars = "*?[#˜=%\\"
 
-    findCmd = ["find", addTrailingPathSeparator targetDir, "-iname", hsExtension]
 
-    firstCmd g =
-      ["grep", "-R", "--include=" ++ hsExtension, "-l", esc g, targetDir]
+type CommandLine = String
+data GrepCommands = GrepCommands { initialFileSet :: [FilePath], commandChain :: [CommandLine] }
+  deriving (Eq, Show)
 
-    filterChain gs = [ ["xargs", "grep", "-l", esc gt] | gt <- gs ]
+runGrepChain :: FilePath -> Verbosity -> GrepCommands -> IO [FilePath]
+runGrepChain targetDir verbosity GrepCommands{..} = foldM (commandStep targetDir verbosity)  initialFileSet commandChain
 
-    esc s = "'" ++ intercalate "[[:space:]]\\+" (words s) ++ "'"
+-- | run a command with a list of files as quoted arguments
+commandStep :: FilePath -> Verbosity -> [FilePath]-> CommandLine -> IO [FilePath]
+commandStep targetDir verbosity files cmd = doCmd targetDir verbosity (cmd <> formatPaths files)
+ where
+    formatPaths [] = ""
+    formatPaths xs = " " <> unwords (map quotePath xs)
+quotePath :: FilePath -> FilePath
+quotePath x = "'" <> x <> "'"
 
-doCmd :: FilePath -> Verbosity -> String -> String -> IO [FilePath]
-doCmd targetDir verbosity inp shellCmd = do
-  debugPrint verbosity "stdin:" [inp]
+
+doCmd :: FilePath -> Verbosity -> String -> IO [FilePath]
+doCmd targetDir verbosity shellCmd = do
   debugPrint verbosity "shellCmd:" [shellCmd]
   let cmd = (shell shellCmd) { cwd = Just targetDir }
-  (_ec, fps, _) <- readCreateProcessWithExitCode cmd inp
+  (_ec, fps, _) <- readCreateProcessWithExitCode cmd ""
   return $ lines fps
