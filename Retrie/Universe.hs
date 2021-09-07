@@ -32,19 +32,19 @@ data Universe
   = ULHsExpr (LHsExpr GhcPs)
   | ULStmt (LStmt GhcPs (LHsExpr GhcPs))
   | ULType (LHsType GhcPs)
-  | ULPat (Located (Pat GhcPs))
+  | ULPat (LPat GhcPs)
   deriving (Data)
 
 -- | Exactprint an annotated 'Universe'.
 printU :: Annotated Universe -> String
-printU u = exactPrintU (astA u) (annsA u)
+printU u = exactPrintU (astA u)
 
 -- | Primitive exactprint for 'Universe'.
-exactPrintU :: Universe -> Anns -> String
-exactPrintU (ULHsExpr e) anns = exactPrint e anns
-exactPrintU (ULStmt s) anns = exactPrint s anns
-exactPrintU (ULType t) anns = exactPrint t anns
-exactPrintU (ULPat p) anns = exactPrint p anns
+exactPrintU :: Universe -> String
+exactPrintU (ULHsExpr e) = exactPrint e
+exactPrintU (ULStmt s) = exactPrint s
+exactPrintU (ULType t) = exactPrint t
+exactPrintU (ULPat p) = exactPrint p
 
 -------------------------------------------------------------------------------
 
@@ -68,29 +68,29 @@ instance Matchable Universe where
   getOrigin (ULType t) = getOrigin t
   getOrigin (ULPat p) = getOrigin p
 
-instance Matchable (LHsExpr GhcPs) where
+instance Matchable (LocatedA (HsExpr GhcPs)) where
   inject = ULHsExpr
   project (ULHsExpr x) = x
   project _ = error "project LHsExpr"
-  getOrigin e = getLoc e
+  getOrigin e = getLocA e
 
-instance Matchable (LStmt GhcPs (LHsExpr GhcPs)) where
+instance Matchable (LocatedA (Stmt GhcPs (LocatedA (HsExpr GhcPs)))) where
   inject = ULStmt
   project (ULStmt x) = x
   project _ = error "project LStmt"
-  getOrigin e = getLoc e
+  getOrigin e = getLocA e
 
-instance Matchable (LHsType GhcPs) where
+instance Matchable (LocatedA (HsType GhcPs)) where
   inject = ULType
   project (ULType t) = t
   project _ = error "project ULType"
-  getOrigin e = getLoc e
+  getOrigin e = getLocA e
 
-instance Matchable (Located (Pat GhcPs)) where
+instance Matchable (LocatedA (Pat GhcPs)) where
   inject = ULPat
   project (ULPat p) = p
   project _ = error "project ULPat"
-  getOrigin = getLoc
+  getOrigin = getLocA
 
 -------------------------------------------------------------------------------
 

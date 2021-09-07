@@ -72,10 +72,8 @@ groundTerms Query{..} = HashSet.fromList $ go $ astA qPattern
     printer :: GenericQ [String]
     printer = mkQ [] printExpr `extQ` printTy
 
-    anns = annsA qPattern
-
     printExpr :: LHsExpr GhcPs -> [String]
-    printExpr e = [exactPrint e anns]
+    printExpr e = [exactPrint e]
 
     printTy :: LHsType GhcPs -> [String]
-    printTy t = [exactPrint t anns]
+    printTy t = [exactPrint t]

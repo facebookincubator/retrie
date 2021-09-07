@@ -10,7 +10,6 @@ module Retrie.ExactPrint.Annotated
   ( -- * Annotated
     Annotated
   , astA
-  , annsA
   , seedA
   -- ** Synonyms
   , AnnotatedHsDecl
@@ -42,8 +41,8 @@ import Language.Haskell.GHC.ExactPrint hiding
   , transferEntryDPT
   , transferEntryDP
   )
-import Language.Haskell.GHC.ExactPrint.Annotate (Annotate)
-import Language.Haskell.GHC.ExactPrint.Types (emptyAnns)
+import Language.Haskell.GHC.ExactPrint.ExactPrint (ExactPrint(..))
+-- import Language.Haskell.GHC.ExactPrint.Types (emptyAnns)
 
 import Retrie.GHC
 import Retrie.SYB
@@ -56,7 +55,7 @@ type AnnotatedHsType = Annotated (LHsType GhcPs)
 type AnnotatedImport = Annotated (LImportDecl GhcPs)
 type AnnotatedImports = Annotated [LImportDecl GhcPs]
 type AnnotatedModule = Annotated (Located HsModule)
-type AnnotatedPat = Annotated (Located (Pat GhcPs))
+type AnnotatedPat = Annotated (LPat GhcPs)
 type AnnotatedStmt = Annotated (LStmt GhcPs (LHsExpr GhcPs))
 
 -- | 'Annotated' packages an AST fragment with the annotations necessary to
@@ -64,8 +63,6 @@ type AnnotatedStmt = Annotated (LStmt GhcPs (LHsExpr GhcPs))
 data Annotated ast = Annotated
   { astA :: ast
   -- ^ Examine the actual AST.
-  , annsA  :: Anns
-  -- ^ Annotations generated/consumed by ghc-exactprint
   , seedA  :: Int
   -- ^ Name supply used by ghc-exactprint to generate unique locations.
   }
@@ -81,29 +78,29 @@ instance Traversable Annotated where
     (\ast -> Annotated{astA = ast, ..}) <$> f astA
 
 instance Default ast => Default (Annotated ast) where
-  def = Annotated D.def emptyAnns 0
+  def = Annotated D.def 0
 
 instance (Data ast, Monoid ast) => Semigroup (Annotated ast) where
   (<>) = mappend
 
 instance (Data ast, Monoid ast) => Monoid (Annotated ast) where
-  mempty = Annotated mempty emptyAnns 0
-  mappend a1 (Annotated ast2 anns _) =
+  mempty = Annotated mempty 0
+  mappend a1 (Annotated ast2 _) =
     runIdentity $ transformA a1 $ \ ast1 ->
-      mappend ast1 <$> graftT anns ast2
+      mappend ast1 <$> return ast2
 
 -- | Construct an 'Annotated'.
 -- This should really only be used in the parsing functions, hence the scary name.
 -- Don't use this unless you know what you are doing.
-unsafeMkA :: ast -> Anns -> Int -> Annotated ast
+unsafeMkA :: ast -> Int -> Annotated ast
 unsafeMkA = Annotated
 
 -- | Transform an 'Annotated' thing.
 transformA
   :: Monad m => Annotated ast1 -> (ast1 -> TransformT m ast2) -> m (Annotated ast2)
-transformA (Annotated ast anns seed) f = do
-  (ast',(anns',seed'),_) <- runTransformFromT seed anns (f ast)
-  return $ Annotated ast' anns' seed'
+transformA (Annotated ast seed) f = do
+  (ast',seed',_) <- runTransformFromT seed (f ast)
+  return $ Annotated ast' seed'
 
 -- | Graft an 'Annotated' thing into the current transformation.
 -- The resulting AST will have proper annotations within the 'TransformT'
@@ -118,7 +115,7 @@ transformA (Annotated ast anns seed) f = do
 -- >     return [d1, d2]
 --
 graftA :: (Data ast, Monad m) => Annotated ast -> TransformT m ast
-graftA (Annotated x anns _) = graftT anns x
+graftA (Annotated x _) = return x
 
 -- | Encapsulate something in the current transformation into an 'Annotated'
 -- thing. This is the inverse of 'graftT'. For example:
@@ -130,7 +127,7 @@ graftA (Annotated x anns _) = graftT anns x
 -- >   return (y, ys)
 --
 pruneA :: (Data ast, Monad m) => ast -> TransformT m (Annotated ast)
-pruneA ast = Annotated ast <$> getAnnsT <*> gets snd
+pruneA ast = Annotated ast <$> gets id
 
 -- | Trim the annotation data to only include annotations for 'ast'.
 -- (Usually, the annotation data is a superset of what is necessary.)
@@ -146,5 +143,5 @@ trimA = runIdentity . transformA nil . const . graftA
     nil = mempty
 
 -- | Exactprint an 'Annotated' thing.
-printA :: Annotate ast => Annotated (Located ast) -> String
-printA (Annotated ast anns _) = exactPrint ast anns
+printA :: ExactPrint ast => Annotated ast -> String
+printA (Annotated ast _) = exactPrint ast

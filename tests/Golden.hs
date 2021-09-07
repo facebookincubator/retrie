@@ -38,17 +38,18 @@ data RetrieTest a = RetrieTest
   }
 
 parseOptions
-  :: Parser ProtoOptions
+  :: LibDir
+  -> Parser ProtoOptions
   -> FilePath
   -> RetrieTest a
   -> IO Options
-parseOptions p dir RetrieTest{..} = do
+parseOptions libdir p dir RetrieTest{..} = do
   flags <- takeFlags <$> readFileNoComments (rtDir </> rtTest)
   case runParserOnString p flags of
     Nothing   ->
       fail $ unwords [rtName, " options did not parse: ", flags]
     Just opts -> do
-      resolveOptions opts { targetDir = dir, verbosity = rtVerbosity }
+      resolveOptions libdir opts { targetDir = dir, verbosity = rtVerbosity }
 
 runParserOnString :: Parser a -> String -> Maybe a
 runParserOnString p args = getParseResult $
@@ -63,41 +64,43 @@ runParserOnString p args = getParseResult $
         s' -> recurse $ break isSpace s'
 
 runTestWrapper
-  :: Parser ProtoOptions
+  :: LibDir
+  -> Parser ProtoOptions
   -> RetrieTest a
   -> (Options -> IO b)
   -> IO b
-runTestWrapper p t@RetrieTest{..} f =
+runTestWrapper libdir p t@RetrieTest{..} f =
   withTmpCopyOfInputs rtDir $ \dir -> do
     -- Make the Rewrites from the temp file, to get correct SrcSpan's
-    opts <- parseOptions p dir t
+    opts <- parseOptions libdir p dir t
     f opts { targetFiles = [dir </> replaceExtension rtTest ".hs"] }
 
 runQueryTest
   :: Monoid a
-  => Parser ProtoOptions
+  => LibDir
+  -> Parser ProtoOptions
   -> RetrieTest a
   -> IO a
-runQueryTest p t@RetrieTest{..} =
-  runTestWrapper p t $ \opts -> do
+runQueryTest libdir p t@RetrieTest{..} =
+  runTestWrapper libdir p t $ \opts -> do
     let writeFn _fp _locs _res = return
     retrie <- rtRetrie opts
     -- A 'writeFn' is only executed if the module changes, so add empty imports
     -- to trip the Changed flag.
-    fmap mconcat $ run writeFn id opts $ do
+    fmap mconcat $ run libdir writeFn id opts $ do
       r <- retrie
       addImports mempty
       return r
 
-runTest :: Parser ProtoOptions -> RetrieTest () -> IO ()
-runTest p t@RetrieTest{..} =
-  runTestWrapper p t $ \opts@Options{..} -> do
+runTest :: LibDir -> Parser ProtoOptions -> RetrieTest () -> IO ()
+runTest libdir p t@RetrieTest{..} =
+  runTestWrapper libdir p t $ \opts@Options{..} -> do
     let
       writeFn fp _locs res _ = writeFile fp res
       [tmpFile] = targetFiles
     before <- evaluate . force =<< readFile tmpFile
     retrie <- rtRetrie opts
-    void $ run writeFn id opts $ iterateR iterateN retrie
+    void $ run libdir writeFn id opts $ iterateR iterateN retrie
     res <- readFile tmpFile
     expected <- readFile $ targetDir </> replaceExtension rtTest ".expected"
     displayAndAssertEqual before expected res

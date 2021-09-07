@@ -53,9 +53,9 @@ substExpr ctxt e@(L l1 (HsVar x (L l2 v))) =
   case lookupHoleVar v ctxt of
     Just (HoleExpr eA) -> do
       e' <- graftA (unparen <$> eA)
-      comments <- hasComments e'
-      unless comments $ transferEntryDPT e e'
-      transferAnnsT isComma e e'
+      -- comments <- hasComments e'
+      -- unless comments $ transferEntryDPT e e'
+      -- transferAnnsT isComma e e'
       parenify ctxt e'
     Just (HoleRdr rdr) ->
       return $ L l1 $ HsVar x $ L l2 rdr
@@ -76,7 +76,7 @@ substPat ctxt (dLPat -> Just p@(L l1 (VarPat x vl@(L l2 v)))) = fmap cLPat $
       -- the OccName and not to the VarPat.
       -- This seems to be the case only when the pattern comes from a lhs,
       -- whereas it has no annotations in patterns found in rhs's.
-      tryTransferEntryDPT vl p'
+      -- tryTransferEntryDPT vl p'
       parenifyP ctxt p'
     Just (HoleRdr rdr) ->
       return $ L l1 $ VarPat x $ L l2 rdr

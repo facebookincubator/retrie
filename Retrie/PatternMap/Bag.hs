@@ -140,11 +140,7 @@ instance PatternMap FSEnv where
 
 ------------------------------------------------------------------------
 
-#if __GLASGOW_HASKELL__ < 900
-newtype UniqFM a = UniqFM { unUniqFM :: GHC.UniqFM [a] }
-#else
-newtype UniqFM a = UniqFM { unUniqFM :: GHC.UniqFM (Key UniqFM) [a] }
-#endif
+newtype UniqFM a = UniqFM { unUniqFM :: GHC.UniqFM GHC.Unique [a] }
   deriving (Functor)
 
 instance PatternMap UniqFM where

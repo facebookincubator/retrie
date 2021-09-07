@@ -47,30 +47,30 @@ import Retrie.Util
 -- >   return $ apply rr
 --
 -- To run the script, compile the program and execute it.
-runScript :: (Options -> IO (Retrie ())) -> IO ()
-runScript f = runScriptWithModifiedOptions (\opts -> (opts,) <$> f opts)
+runScript :: LibDir -> (Options -> IO (Retrie ())) -> IO ()
+runScript libdir f = runScriptWithModifiedOptions libdir (\opts -> (opts,) <$> f opts)
 
 -- | Define a custom refactoring script and run it with modified options.
 -- This is the same as 'runScript', but the returned 'Options' will be used
 -- during rewriting.
-runScriptWithModifiedOptions :: (Options -> IO (Options, Retrie ())) -> IO ()
-runScriptWithModifiedOptions f = do
-  opts <- parseOptions mempty
+runScriptWithModifiedOptions :: LibDir -> (Options -> IO (Options, Retrie ())) -> IO ()
+runScriptWithModifiedOptions libdir f = do
+  opts <- parseOptions libdir mempty
   (opts', retrie) <- f opts
-  execute opts' retrie
+  execute libdir opts' retrie
 
 -- | Implements retrie's iteration and execution modes.
-execute :: Options -> Retrie () -> IO ()
-execute opts@Options{..} retrie0 = do
+execute :: LibDir -> Options -> Retrie () -> IO ()
+execute libdir opts@Options{..} retrie0 = do
   let retrie = iterateR iterateN retrie0
   case executionMode of
-    ExecDryRun -> void $ run (writeDiff opts) id opts retrie
-    ExecExtract -> void $ run (writeExtract opts) id opts retrie
+    ExecDryRun -> void $ run libdir (writeDiff opts) id opts retrie
+    ExecExtract -> void $ run libdir (writeExtract opts) id opts retrie
     ExecRewrite -> do
-      s <- mconcat <$> run writeCountLines id opts retrie
+      s <- mconcat <$> run libdir writeCountLines id opts retrie
       when (verbosity > Silent) $
         putStrLn $ "Done! " ++ show (getSum s) ++ " lines changed."
-    ExecSearch -> void $ run (writeSearch opts) id opts retrie
+    ExecSearch -> void $ run libdir (writeSearch opts) id opts retrie
 
 -- | Callback function to actually write the resulting file back out.
 -- Is given list of changed spans, module contents, and user-defined data.
@@ -79,15 +79,16 @@ type WriteFn a b = [Replacement] -> String -> a -> IO b
 -- | Primitive means of running a 'Retrie' computation.
 run
   :: Monoid b
-  => (FilePath -> WriteFn a b)
+  => LibDir
+  -> (FilePath -> WriteFn a b)
      -- ^ write action when a file changes, unchanged files result in 'mempty'
   -> (IO b -> IO c)            -- ^ wrap per-file rewrite action
   -> Options -> Retrie a -> IO [c]
-run writeFn wrapper opts@Options{..} r = do
+run libdir writeFn wrapper opts@Options{..} r = do
   fps <- getTargetFiles opts (getGroundTerms r)
   forFn opts fps $ \ fp -> wrapper $ do
     debugPrint verbosity "Processing:" [fp]
-    p <- trySync $ parseCPPFile (parseContent fixityEnv) fp
+    p <- trySync $ parseCPPFile (parseContent libdir fixityEnv) fp
     case p of
       Left ex -> do
         when (verbosity > Silent) $ print ex

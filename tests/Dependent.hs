@@ -13,15 +13,15 @@ import Golden
 import Retrie
 import Retrie.Options
 
-dependentStmtTest :: FilePath -> Parser ProtoOptions -> Verbosity -> Test
-dependentStmtTest rtDir p rtVerbosity =
+dependentStmtTest :: LibDir -> FilePath -> Parser ProtoOptions -> Verbosity -> Test
+dependentStmtTest libdir rtDir p rtVerbosity =
   TestLabel "dependent stmt" $ TestCase $
-    runTest p RetrieTest
+    runTest libdir p RetrieTest
       { rtName = "dependent stmt"
       , rtTest = "DependentStmt.custom"
       , rtRetrie = \opts -> do
-          rrs <- parseRewrites opts [ Adhoc "forall x. foo x = baz x" ]
-          stmt <- parseStmt "y <- bar 54"
+          rrs <- parseRewrites libdir opts [ Adhoc "forall x. foo x = baz x" ]
+          stmt <- parseStmt libdir "y <- bar 54"
           let
             rr = toURewrite $
               Query emptyQs stmt

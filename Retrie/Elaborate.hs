@@ -74,8 +74,8 @@ elaboratePat c p
   | otherwise = return p
 
 elaborateImpl
-  :: forall ast m. (Annotate ast, Matchable (Located ast), MonadIO m)
-  => Context -> Located ast -> ListT (TransformT m) (Located ast)
+  :: forall ast m. (Data ast, ExactPrint ast, Matchable (LocatedA ast), MonadIO m)
+  => Context -> LocatedA ast -> ListT (TransformT m) (LocatedA ast)
 elaborateImpl ctxt e = do
   elaborations <- lift $ do
     matches <- runMatcher ctxt (ctxtRewriter ctxt) (getUnparened e)
@@ -86,7 +86,7 @@ elaborateImpl ctxt e = do
       -- substitute for quantifiers in grafted template
       r <- subst sub ctxt t'
       -- copy appropriate annotations from old expression to template
-      addAllAnnsT e r
+      -- addAllAnnsT e r
       -- add parens to template if needed
       (mkM (parenify ctxt) `extM` parenifyT ctxt `extM` parenifyP ctxt) r
 

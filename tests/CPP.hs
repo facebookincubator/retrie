@@ -12,6 +12,7 @@ import Data.List (intersperse, sort)
 import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Text.IO as Text
+import qualified GHC.Paths as GHC.Paths
 import Retrie.CPP
 import Retrie.ExactPrint
 import Retrie.Util
@@ -253,7 +254,7 @@ cppForkTest CPPTest{..} = TestLabel ("cpp fork: " ++ name) $ TestCase $ do
 
 roundTripTest :: CPPTest -> Test
 roundTripTest CPPTest{..} = TestLabel ("roundtrip: " ++ name) $ TestCase $ do
-  r <- trySync $ parseCPP (parseContentNoFixity "roundTripTest") code
+  r <- trySync $ parseCPP (parseContentNoFixity GHC.Paths.libdir "roundTripTest") code
   case r of
     Left msg -> assertFailure (show msg)
     Right cpp -> assertEqual "cpp did not roundtrip correctly"

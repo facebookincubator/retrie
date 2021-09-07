@@ -33,7 +33,7 @@ lookupOp :: LHsExpr GhcPs -> FixityEnv -> Fixity
 lookupOp (L _ e) | Just n <- varRdrName e = lookupOpRdrName n
 lookupOp _ = error "lookupOp: called with non-variable!"
 
-lookupOpRdrName :: Located RdrName -> FixityEnv -> Fixity
+lookupOpRdrName :: LocatedN RdrName -> FixityEnv -> Fixity
 lookupOpRdrName (L _ n) (FixityEnv env) =
   maybe defaultFixity snd $ lookupFsEnv env (occNameFS $ occName n)
 

@@ -9,11 +9,12 @@ import Test.HUnit
 import Test.Tasty
 import Test.Tasty.HUnit
 
+import qualified GHC.Paths as GHC.Paths
 import Retrie
 import AllTests
 
 main :: IO ()
-main = allTests Silent >>= defaultMain . toTasty . TestLabel "retrie"
+main = allTests GHC.Paths.libdir Silent >>= defaultMain . toTasty . TestLabel "retrie"
 
 toTasty :: Test -> TestTree
 toTasty (TestLabel lbl (TestCase io)) = testCase lbl io

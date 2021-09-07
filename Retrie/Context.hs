@@ -61,7 +61,7 @@ updateContext c i =
     -- In left child, prec is 10, so HsApp child will NOT get paren'd
     -- In right child, prec is 11, so every child gets paren'd (unless atomic)
     updExp (OpApp _ _ op _) = c { ctxtParentPrec = HasPrec $ lookupOp op (ctxtFixityEnv c) }
-    updExp (HsLet _ lbs _) = addInScope neverParen $ collectLocalBinders $ unLoc lbs
+    updExp (HsLet _ lbs _) = addInScope neverParen $ collectLocalBinders CollNoDictBinders lbs
     updExp _ = neverParen
 
     updType :: HsType GhcPs -> Context
@@ -72,12 +72,12 @@ updateContext c i =
     updMatch :: Match GhcPs (LHsExpr GhcPs) -> Context
     updMatch
       | i == 2  -- m_pats field
-      = addInScope c{ctxtParentPrec = IsLhs} . collectPatsBinders . m_pats
-      | otherwise = addInScope neverParen . collectPatsBinders . m_pats
+      = addInScope c{ctxtParentPrec = IsLhs} . collectPatsBinders CollNoDictBinders . m_pats
+      | otherwise = addInScope neverParen . collectPatsBinders CollNoDictBinders . m_pats
       where
 
     updGRHSs :: GRHSs GhcPs (LHsExpr GhcPs) -> Context
-    updGRHSs = addInScope neverParen . collectLocalBinders . unLoc . grhssLocalBinds
+    updGRHSs = addInScope neverParen . collectLocalBinders CollNoDictBinders . grhssLocalBinds
 
     updGRHS :: GRHS GhcPs (LHsExpr GhcPs) -> Context
 #if __GLASGOW_HASKELL__ < 900
@@ -88,7 +88,7 @@ updateContext c i =
       | i > firstChild = addInScope neverParen bs
       | otherwise = fst $ updateSubstitution neverParen bs
       where
-        bs = collectLStmtsBinders gs
+        bs = collectLStmtsBinders CollNoDictBinders gs
 
     updStmt :: Stmt GhcPs (LHsExpr GhcPs) -> Context
     updStmt _ = neverParen
@@ -99,11 +99,11 @@ updateContext c i =
         -- binders are in scope over tail of list (right child)
       | i > 0 = insertDependentRewrites neverParen bs ls
         -- lets are recursive in do-blocks
-      | L _ (LetStmt _ (L _ bnds)) <- ls =
-          return $ addInScope neverParen $ collectLocalBinders bnds
+      | L _ (LetStmt _ bnds) <- ls =
+          return $ addInScope neverParen $ collectLocalBinders CollNoDictBinders bnds
       | otherwise = return $ fst $ updateSubstitution neverParen bs
       where
-        bs = collectLStmtBinders ls
+        bs = collectLStmtBinders CollNoDictBinders ls
 
     updHsBind :: HsBind GhcPs -> Context
     updHsBind FunBind{..} =

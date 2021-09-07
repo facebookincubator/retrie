@@ -78,11 +78,12 @@ instance Semigroup ClassifiedRewrites where
     ClassifiedRewrites (a <> a') (b <> b') (c <> c') (d <> d')
 
 parseRewriteSpecs
-  :: (FilePath -> IO (CPP AnnotatedModule))
+  :: LibDir
+  -> (FilePath -> IO (CPP AnnotatedModule))
   -> FixityEnv
   -> [RewriteSpec]
   -> IO [Rewrite Universe]
-parseRewriteSpecs parser fixityEnv specs = do
+parseRewriteSpecs libdir parser fixityEnv specs = do
   ClassifiedRewrites{..} <- mconcat <$> sequence
     [ case spec of
         Adhoc rule -> return mempty{adhocRules = [rule]}
@@ -98,10 +99,10 @@ parseRewriteSpecs parser fixityEnv specs = do
         Unfold name -> mkFileBased FoldUnfold LeftToRight name
     | spec <- specs
     ]
-  fbRewrites <- parseFileBased parser fileBased
-  adhocExpressionRewrites <- parseAdhocs fixityEnv adhocRules
-  adhocTypeRewrites <- parseAdhocTypes fixityEnv adhocTypes
-  adhocPatternRewrites <- parseAdhocPatterns fixityEnv adhocPatterns
+  fbRewrites <- parseFileBased libdir parser fileBased
+  adhocExpressionRewrites <- parseAdhocs libdir fixityEnv adhocRules
+  adhocTypeRewrites <- parseAdhocTypes libdir fixityEnv adhocTypes
+  adhocPatternRewrites <- parseAdhocPatterns libdir fixityEnv adhocPatterns
   return $
     fbRewrites ++
     adhocExpressionRewrites ++
@@ -117,11 +118,12 @@ data FileBasedTy = FoldUnfold | Rule | Type | Pattern
   deriving (Eq, Ord)
 
 parseFileBased
-  :: (FilePath -> IO (CPP AnnotatedModule))
+  :: LibDir
+  -> (FilePath -> IO (CPP AnnotatedModule))
   -> [(FilePath, [(FileBasedTy, [(FastString, Direction)])])]
   -> IO [Rewrite Universe]
-parseFileBased _ [] = return []
-parseFileBased parser specs = concat <$> mapM (uncurry goFile) (gather specs)
+parseFileBased _ _ [] = return []
+parseFileBased libdir parser specs = concat <$> mapM (uncurry goFile) (gather specs)
   where
     gather :: Ord a => [(a,[b])] -> [(a,[b])]
     gather = Map.toList . Map.fromListWith (++)
@@ -132,14 +134,14 @@ parseFileBased parser specs = concat <$> mapM (uncurry goFile) (gather specs)
       -> IO [Rewrite Universe]
     goFile fp rules = do
       cpp <- parser fp
-      concat <$> mapM (uncurry $ constructRewrites cpp) (gather rules)
+      concat <$> mapM (uncurry $ constructRewrites libdir cpp) (gather rules)
 
-parseAdhocs :: FixityEnv -> [String] -> IO [Rewrite Universe]
-parseAdhocs _ [] = return []
-parseAdhocs fixities adhocs = do
+parseAdhocs :: LibDir -> FixityEnv -> [String] -> IO [Rewrite Universe]
+parseAdhocs _ _ [] = return []
+parseAdhocs libdir fixities adhocs = do
   cpp <-
-    parseCPP (parseContent fixities "parseAdhocs") (Text.unlines adhocRules)
-  constructRewrites cpp Rule adhocSpecs
+    parseCPP (parseContent libdir fixities "parseAdhocs") (Text.unlines adhocRules)
+  constructRewrites libdir cpp Rule adhocSpecs
   where
     -- In search mode, there is no need to specify a right-hand side, but we
     -- need one to parse as a RULE, so add it if necessary.
@@ -154,13 +156,13 @@ parseAdhocs fixities adhocs = do
       , let nm = "adhoc" ++ show (i::Int)
       ]
 
-parseAdhocTypes :: FixityEnv -> [String] -> IO [Rewrite Universe]
-parseAdhocTypes _ [] = return []
-parseAdhocTypes fixities tySyns = do
+parseAdhocTypes :: LibDir -> FixityEnv -> [String] -> IO [Rewrite Universe]
+parseAdhocTypes _ _ [] = return []
+parseAdhocTypes libdir fixities tySyns = do
   print adhocTySyns
   cpp <-
-    parseCPP (parseContent fixities "parseAdhocTypes") (Text.unlines adhocTySyns)
-  constructRewrites cpp Type adhocSpecs
+    parseCPP (parseContent libdir fixities "parseAdhocTypes") (Text.unlines adhocTySyns)
+  constructRewrites libdir cpp Type adhocSpecs
   where
     (adhocSpecs, adhocTySyns) = unzip
       [ ( (mkFastString nm, LeftToRight), "type " <> Text.pack s)
@@ -168,13 +170,13 @@ parseAdhocTypes fixities tySyns = do
       , Just nm <- [listToMaybe $ words s]
       ]
 
-parseAdhocPatterns :: FixityEnv -> [String] -> IO [Rewrite Universe]
-parseAdhocPatterns _ [] = return []
-parseAdhocPatterns fixities patSyns = do
+parseAdhocPatterns :: LibDir -> FixityEnv -> [String] -> IO [Rewrite Universe]
+parseAdhocPatterns _ _ [] = return []
+parseAdhocPatterns libdir fixities patSyns = do
   cpp <-
-    parseCPP (parseContent fixities "parseAdhocPatterns")
+    parseCPP (parseContent libdir fixities "parseAdhocPatterns")
              (Text.unlines $ pragma : adhocPatSyns)
-  constructRewrites cpp Pattern adhocSpecs
+  constructRewrites libdir cpp Pattern adhocSpecs
   where
     pragma = "{-# LANGUAGE PatternSynonyms #-}"
     (adhocSpecs, adhocPatSyns) = unzip
@@ -184,12 +186,13 @@ parseAdhocPatterns fixities patSyns = do
       ]
 
 constructRewrites
-  :: CPP AnnotatedModule
+  :: LibDir
+  -> CPP AnnotatedModule
   -> FileBasedTy
   -> [(FastString, Direction)]
   -> IO [Rewrite Universe]
-constructRewrites cpp ty specs = do
-  cppM <- traverse (tyBuilder ty specs) cpp
+constructRewrites libdir cpp ty specs = do
+  cppM <- traverse (tyBuilder libdir ty specs) cpp
   let
     names = nonDetEltsUniqSet $ mkUniqSet $ map fst specs
 
@@ -207,7 +210,8 @@ constructRewrites cpp ty specs = do
       Just rrs -> return rrs
 
 tyBuilder
-  :: FileBasedTy
+  :: LibDir
+  -> FileBasedTy
   -> [(FastString, Direction)]
   -> AnnotatedModule
 #if __GLASGOW_HASKELL__ < 900
@@ -215,10 +219,10 @@ tyBuilder
 #else
   -> IO (UniqFM FastString [Rewrite Universe])
 #endif
-tyBuilder FoldUnfold specs am = promote <$> dfnsToRewrites specs am
-tyBuilder Rule specs am = promote <$> rulesToRewrites specs am
-tyBuilder Type specs am = promote <$> typeSynonymsToRewrites specs am
-tyBuilder Pattern specs am = patternSynonymsToRewrites specs am
+tyBuilder libdir FoldUnfold specs am = promote <$> dfnsToRewrites libdir specs am
+tyBuilder _libdir Rule specs am = promote <$> rulesToRewrites specs am
+tyBuilder _libdir Type specs am = promote <$> typeSynonymsToRewrites specs am
+tyBuilder libdir Pattern specs am = patternSynonymsToRewrites libdir specs am
 
 #if __GLASGOW_HASKELL__ < 900
 promote :: Matchable a => UniqFM [Rewrite a] -> UniqFM [Rewrite Universe]

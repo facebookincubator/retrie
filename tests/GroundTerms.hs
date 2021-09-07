@@ -24,27 +24,27 @@ import Retrie.Types
 import Retrie.Universe
 import Test.HUnit
 
-groundTermsTest :: Test
-groundTermsTest = TestLabel "ground terms" $ TestList
-  [ gtTest "map"
+groundTermsTest :: LibDir -> Test
+groundTermsTest libdir = TestLabel "ground terms" $ TestList
+  [ gtTest libdir "map"
       ""
       []
       [Adhoc "forall f g xs. map f (map g xs) = map (f . g) xs"]
       [["map"]]
       [GrepCommands [] ["grep -R --include=\"*.hs\" -l 'map' '~/si_sigma'"]]
-  , gtTest "isSpace"
+  , gtTest libdir "isSpace"
       ""
       []
       [Adhoc "forall xs. or (map isSpace xs) = any isSpace xs"]
       [["or", "map isSpace"]]
       [GrepCommands [] ["grep -R --include=\"*.hs\" -l 'or' '~/si_sigma'", "grep -l 'map[[:space:]]\\+isSpace'"]]
-  , gtTest "MyType"
+  , gtTest libdir "MyType"
       "type MyType a = MyOtherType a"
       []
       [TypeForward "Test.MyType"]
       [["MyType"]]
       [GrepCommands [] ["grep -R --include=\"*.hs\" -l 'MyType' '~/si_sigma'"]]
-  , gtTest "isSpace with file"
+  , gtTest libdir "isSpace with file"
       ""
       ["Test.hs", "Test2.hs"]
       [Adhoc "forall xs. or (map isSpace xs) = any isSpace xs"]
@@ -53,14 +53,15 @@ groundTermsTest = TestLabel "ground terms" $ TestList
   ]
 
 gtTest
-  :: String
+  :: LibDir
+  -> String
   -> Text
   -> [FilePath]
   -> [RewriteSpec]
   -> [[String]]
   -> [GrepCommands]
   -> Test
-gtTest lbl contents targFiles specs expected expectedCmds =
+gtTest libdir lbl contents targFiles specs expected expectedCmds =
   TestLabel ("groundTerms: " ++ lbl) $ TestCase $ do
     -- since we 'zip' below
     assertEqual "length of specs and expected ground terms"
@@ -71,8 +72,8 @@ gtTest lbl contents targFiles specs expected expectedCmds =
       (length expectedCmds)
 
     rrs <-
-      parseRewriteSpecs
-        (\_ -> parseCPP (parseContent defaultFixityEnv "Test") contents)
+      parseRewriteSpecs libdir
+        (\_ -> parseCPP (parseContent libdir defaultFixityEnv "Test") contents)
         defaultFixityEnv
         specs
     let gtss = map groundTerms rrs
@@ -86,10 +87,10 @@ gtTest lbl contents targFiles specs expected expectedCmds =
             expectedCmd
             (buildGrepChain "~/si_sigma" gts targFiles)
 
-getFocusTests :: IO [Test]
-getFocusTests = do
-  rrs1 <- parseAdhocs defaultFixityEnv ["forall xs. or (map isSpace xs) = any isSpace xs"]
-  rrs2 <- parseAdhocs defaultFixityEnv ["forall f g xs. map f (map g xs) = map (f . g) xs"]
+getFocusTests :: LibDir -> IO [Test]
+getFocusTests libdir = do
+  rrs1 <- parseAdhocs libdir defaultFixityEnv ["forall xs. or (map isSpace xs) = any isSpace xs"]
+  rrs2 <- parseAdhocs libdir defaultFixityEnv ["forall f g xs. map f (map g xs) = map (f . g) xs"]
   let
     -- compare hashsets to avoid ordering issues
     terms = HashSet.fromList $ map groundTerms rrs1

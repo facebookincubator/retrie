@@ -18,6 +18,7 @@ module Retrie.Expr
   , mkLams
   , mkLet
   , mkLoc
+  , mkLocA
   , mkLocatedHsVar
   , mkVarPat
   , mkTyVar
@@ -26,7 +27,7 @@ module Retrie.Expr
   , parenifyP
   , patToExpr
   , patToExprA
-  , setAnnsFor
+  -- , setAnnsFor
   , unparen
   , unparenP
   , unparenT
@@ -37,6 +38,7 @@ import Control.Monad.State.Lazy
 import Data.Functor.Identity
 import qualified Data.Map as M
 import Data.Maybe
+import Data.Void
 
 import Retrie.AlphaEnv
 import Retrie.ExactPrint
@@ -47,36 +49,51 @@ import Retrie.Types
 
 -------------------------------------------------------------------------------
 
-mkLocatedHsVar :: Monad m => Located RdrName -> TransformT m (LHsExpr GhcPs)
-mkLocatedHsVar v = do
+mkLocatedHsVar :: Monad m => LocatedN RdrName -> TransformT m (LHsExpr GhcPs)
+mkLocatedHsVar n@(L l _) = do
   -- This special casing for [] is gross, but this is apparently how the
   -- annotations work.
-  let anns =
-        case occNameString (occName (unLoc v)) of
-          "[]" -> [(G AnnOpenS, DP (0,0)), (G AnnCloseS, DP (0,0))]
-          _    -> [(G AnnVal, DP (0,0))]
-  r <- setAnnsFor v anns
-  lv@(L _ v') <- cloneT (noLoc (HsVar noExtField r))
-  case v' of
-    HsVar _ x ->
-      swapEntryDPT x lv
-    _ -> return ()
-  return lv
+  -- let anns =
+  --       case occNameString (occName (unLoc v)) of
+  --         "[]" -> [(G AnnOpenS, DP (0,0)), (G AnnCloseS, DP (0,0))]
+  --         _    -> [(G AnnVal, DP (0,0))]
+  -- r <- setAnnsFor v anns
+  return (L (l2l l)  (HsVar noExtField n))
 
 -------------------------------------------------------------------------------
 
-setAnnsFor :: (Data e, Monad m)
-           => Located e -> [(KeywordId, DeltaPos)] -> TransformT m (Located e)
-setAnnsFor e anns = modifyAnnsT (M.alter f (mkAnnKey e)) >> return e
-  where f Nothing  = Just annNone { annsDP = anns }
-        f (Just a) = Just a { annsDP = M.toList
-                                     $ M.union (M.fromList anns)
-                                               (M.fromList (annsDP a)) }
+-- setAnnsFor :: (Data e, Monad m)
+--            => Located e -> [(KeywordId, DeltaPos)] -> TransformT m (Located e)
+-- setAnnsFor e anns = modifyAnnsT (M.alter f (mkAnnKey e)) >> return e
+--   where f Nothing  = Just annNone { annsDP = anns }
+--         f (Just a) = Just a { annsDP = M.toList
+--                                      $ M.union (M.fromList anns)
+--                                                (M.fromList (annsDP a)) }
 
 mkLoc :: (Data e, Monad m) => e -> TransformT m (Located e)
 mkLoc e = do
-  le <- L <$> uniqueSrcSpanT <*> pure e
-  setAnnsFor le []
+  L <$> uniqueSrcSpanT <*> pure e
+
+-- ++AZ++:TODO: move to ghc-exactprint
+mkLocA :: (Data e, Monad m, Monoid an) => DeltaPos -> e -> TransformT m (LocatedAn an e)
+mkLocA dp e = do
+  l <- uniqueSrcSpanT
+  let anc = Anchor (realSrcSpan l) (MovedAnchor dp)
+  return (L (SrcSpanAnn (EpAnn anc mempty emptyComments) l) e)
+
+-- ++AZ++:TODO: move to ghc-exactprint
+mkLocAA :: (Data e, Monad m) => DeltaPos -> an -> e -> TransformT m (LocatedAn an e)
+mkLocAA dp an e = do
+  l <- uniqueSrcSpanT
+  let anc = Anchor (realSrcSpan l) (MovedAnchor dp)
+  return (L (SrcSpanAnn (EpAnn anc an emptyComments) l) e)
+
+
+-- ++AZ++:TODO: move to ghc-exactprint
+mkEpAnn :: Monad m => DeltaPos -> an -> TransformT m (EpAnn an)
+mkEpAnn dp an = do
+  l <- uniqueSrcSpanT
+  return $ EpAnn (Anchor (realSrcSpan l) (MovedAnchor dp)) an emptyComments
 
 -------------------------------------------------------------------------------
 
@@ -86,55 +103,62 @@ mkLams
   -> TransformT IO (LHsExpr GhcPs)
 mkLams [] e = return e
 mkLams vs e = do
+  matches <- mkLocA (SameLine 1) [mkMatch LambdaExpr vs e emptyLocalBinds]
   let
     mg =
-      mkMatchGroup Generated [mkMatch LambdaExpr vs e (noLoc emptyLocalBinds)]
-  m' <- case unLoc $ mg_alts mg of
-    [m] -> setAnnsFor m [(G AnnLam, DP (0,0)),(G AnnRarrow, DP (0,1))]
-    _   -> fail "mkLams: lambda expression can only have a single match!"
-  cloneT $ noLoc $ HsLam noExtField mg { mg_alts = noLoc [m'] }
+      mkMatchGroup Generated matches
+  -- m' <- case unLoc $ mg_alts mg of
+  --   [m] -> setAnnsFor m [(G AnnLam, DP (0,0)),(G AnnRarrow, DP (0,1))]
+  --   _   -> fail "mkLams: lambda expression can only have a single match!"
+  -- cloneT $ noLoc $ HsLam noExtField mg { mg_alts = noLoc [m'] }
+  mkLocA (SameLine 1) $ HsLam noExtField mg
 
 mkLet :: Monad m => HsLocalBinds GhcPs -> LHsExpr GhcPs -> TransformT m (LHsExpr GhcPs)
 mkLet EmptyLocalBinds{} e = return e
 mkLet lbs e = do
-  llbs <- mkLoc lbs
-  le <- mkLoc $ HsLet noExtField llbs e
-  setAnnsFor le [(G AnnLet, DP (0,0)), (G AnnIn, DP (1,1))]
+  an <- mkEpAnn (DifferentLine 1 0)
+                (AnnsLet {
+                   alLet = EpaDelta (SameLine 0),
+                   alIn = EpaDelta (DifferentLine 1 1)
+                 })
+  le <- mkLocA (SameLine 1) $ HsLet an lbs e
+  return le
+
+
 
 mkApps :: Monad m => LHsExpr GhcPs -> [LHsExpr GhcPs] -> TransformT m (LHsExpr GhcPs)
 mkApps e []     = return e
 mkApps f (a:as) = do
-  f' <- mkLoc (HsApp noExtField f a)
+  f' <- mkLocA (SameLine 1) (HsApp noAnn f a)
   mkApps f' as
 
 -- GHC never generates HsAppTy in the parser, using HsAppsTy to keep a list
 -- of types.
 mkHsAppsTy :: Monad m => [LHsType GhcPs] -> TransformT m (LHsType GhcPs)
 mkHsAppsTy [] = error "mkHsAppsTy: empty list"
-mkHsAppsTy (t:ts) = foldM (\t1 t2 -> mkLoc (HsAppTy noExtField t1 t2)) t ts
+mkHsAppsTy (t:ts) = foldM (\t1 t2 -> mkLocA (SameLine 1) (HsAppTy noExtField t1 t2)) t ts
 
-mkTyVar :: Monad m => Located RdrName -> TransformT m (LHsType GhcPs)
+mkTyVar :: Monad m => LocatedN RdrName -> TransformT m (LHsType GhcPs)
 mkTyVar nm = do
-  tv <- mkLoc (HsTyVar noExtField NotPromoted nm)
-  _ <- setAnnsFor nm [(G AnnVal, DP (0,0))]
-  swapEntryDPT tv nm
+  tv <- mkLocA (SameLine 1) (HsTyVar noAnn NotPromoted nm)
+  -- _ <- setAnnsFor nm [(G AnnVal, DP (0,0))]
+  -- swapEntryDPT tv nm
   return tv
 
-mkVarPat :: Monad m => Located RdrName -> TransformT m (LPat GhcPs)
-mkVarPat nm = cLPat <$> mkLoc (VarPat noExtField nm)
+mkVarPat :: Monad m => LocatedN RdrName -> TransformT m (LPat GhcPs)
+mkVarPat nm = cLPat <$> mkLocA (SameLine 1) (VarPat noExtField nm)
+
+-- type HsConPatDetails p = HsConDetails (HsPatSigType (NoGhcTc p)) (LPat p) (HsRecFields p (LPat p))
 
 mkConPatIn
   :: Monad m
-  => Located RdrName
+  => LocatedN RdrName
   -> HsConPatDetails GhcPs
-  -> TransformT m (Located (Pat GhcPs))
+  -- -> HsConDetails Void (LocatedN RdrName) [RecordPatSynField GhcPs]
+  -> TransformT m (LPat GhcPs)
 mkConPatIn patName params = do
-#if __GLASGOW_HASKELL__ < 900
-  p <- mkLoc $ ConPatIn patName params
-#else
-  p <- mkLoc $ ConPat noExtField patName params
-#endif
-  setEntryDPT p (DP (0,0))
+  p <- mkLocA (SameLine 0) $ ConPat noAnn patName params
+  -- setEntryDPT p (DP (0,0))
   return p
 
 -------------------------------------------------------------------------------
@@ -180,10 +204,14 @@ patToExpr orig = case dLPat orig of
   Nothing -> error "patToExpr: called on unlocated Pat!"
   Just lp@(L _ p) -> do
     e <- go p
-    lift $ transferEntryDPT lp e
+    -- lift $ transferEntryDPT lp e
     return e
   where
-    go WildPat{} = newWildVar >>= lift . mkLocatedHsVar . noLoc
+    -- go :: Pat GhcPs -> PatQ m (LHsExpr GhcPs)
+    go WildPat{} = do
+      w <- newWildVar
+      v <- lift $ mkLocA (SameLine 1) w
+      lift $ mkLocatedHsVar v
 #if __GLASGOW_HASKELL__ < 900
     go XPat{} = error "patToExpr XPat"
     go CoPat{} = error "patToExpr CoPat"
@@ -197,24 +225,29 @@ patToExpr orig = case dLPat orig of
     go (ListPat _ ps) = do
       ps' <- mapM patToExpr ps
       lift $ do
-        el <- mkLoc $ ExplicitList noExtField Nothing ps'
-        setAnnsFor el [(G AnnOpenS, DP (0,0)), (G AnnCloseS, DP (0,0))]
+        an <- mkEpAnn (SameLine 1)
+                      (AnnList Nothing (Just (AddEpAnn AnnOpenS d0)) (Just (AddEpAnn AnnCloseS d0)) [] [])
+        el <- mkLocA (SameLine 1) $ ExplicitList an ps'
+        -- setAnnsFor el [(G AnnOpenS, DP (0,0)), (G AnnCloseS, DP (0,0))]
+        return el
     go (LitPat _ lit) = lift $ do
-      lit' <- cloneT lit
-      mkLoc $ HsLit noExtField lit'
+      -- lit' <- cloneT lit
+      mkLocA (SameLine 1) $ HsLit noAnn lit
     go (NPat _ llit mbNeg _) = lift $ do
-      L _ lit <- cloneT llit
-      e <- mkLoc $ HsOverLit noExtField lit
-      negE <- maybe (return e) (mkLoc . NegApp noExtField e) mbNeg
-      addAllAnnsT llit negE
+      -- L _ lit <- cloneT llit
+      e <- mkLocA (SameLine 1) $ HsOverLit noAnn (unLoc llit)
+      negE <- maybe (return e) (mkLocA (SameLine 0) . NegApp noAnn e) mbNeg
+      -- addAllAnnsT llit negE
       return negE
-    go (ParPat _ p') = lift . mkParen (HsPar noExtField) =<< patToExpr p'
+    go (ParPat an p') = do
+      p <- patToExpr p'
+      lift $ mkLocA (SameLine 1) (HsPar an p)
     go SigPat{} = error "patToExpr SigPat"
-    go (TuplePat _ ps boxity) = do
+    go (TuplePat an ps boxity) = do
       es <- forM ps $ \pat -> do
         e <- patToExpr pat
-        lift $ mkLoc $ Present noExtField e
-      lift $ mkLoc $ ExplicitTuple noExtField es boxity
+        return $ Present noAnn e
+      lift $ mkLocA (SameLine 1) $ ExplicitTuple an es boxity
     go (VarPat _ i) = lift $ mkLocatedHsVar i
     go AsPat{} = error "patToExpr AsPat"
     go NPlusKPat{} = error "patToExpr NPlusKPat"
@@ -223,15 +256,16 @@ patToExpr orig = case dLPat orig of
     go ViewPat{} = error "patToExpr ViewPat"
 
 conPatHelper :: Monad m
-             => Located RdrName
+             => LocatedN RdrName
              -> HsConPatDetails GhcPs
              -> PatQ m (LHsExpr GhcPs)
 conPatHelper con (InfixCon x y) =
-  lift . mkLoc =<< OpApp <$> pure noExtField
+  lift . mkLocA (SameLine 1)
+               =<< OpApp <$> pure noAnn
                          <*> patToExpr x
                          <*> lift (mkLocatedHsVar con)
                          <*> patToExpr y
-conPatHelper con (PrefixCon xs) = do
+conPatHelper con (PrefixCon tyargs xs) = do
   f <- lift $ mkLocatedHsVar con
   as <- mapM patToExpr xs
   lift $ mkApps f as
@@ -239,7 +273,7 @@ conPatHelper _ _ = error "conPatHelper RecCon"
 
 -------------------------------------------------------------------------------
 
-grhsToExpr :: LGRHS p (LHsExpr p) -> LHsExpr p
+grhsToExpr :: LGRHS GhcPs (LHsExpr GhcPs) -> LHsExpr GhcPs
 grhsToExpr (L _ (GRHS _ [] e)) = e
 grhsToExpr (L _ (GRHS _ (_:_) e)) = e -- not sure about this
 grhsToExpr _ = error "grhsToExpr"
@@ -255,7 +289,7 @@ parenify
   :: Monad m => Context -> LHsExpr GhcPs -> TransformT m (LHsExpr GhcPs)
 parenify Context{..} le@(L _ e)
   | needed ctxtParentPrec (precedence ctxtFixityEnv e) && needsParens e =
-    mkParen (HsPar noExtField) le
+    mkParen' (\an -> HsPar an le)
   | otherwise = return le
   where
            {- parent -}               {- child -}
@@ -279,8 +313,17 @@ needsParens = hsExprNeedsParens (PprPrec 10)
 mkParen :: (Data x, Monad m) => (Located x -> x) -> Located x -> TransformT m (Located x)
 mkParen k e = do
   pe <- mkLoc (k e)
-  _ <- setAnnsFor pe [(G AnnOpenP, DP (0,0)), (G AnnCloseP, DP (0,0))]
-  swapEntryDPT e pe
+  -- _ <- setAnnsFor pe [(G AnnOpenP, DP (0,0)), (G AnnCloseP, DP (0,0))]
+  -- swapEntryDPT e pe
+  return pe
+
+mkParen' :: (Data x, Monad m, Monoid an)
+         => (EpAnn AnnParen -> x) -> TransformT m (LocatedAn an x)
+mkParen' k = do
+  let an = AnnParen AnnParens d0 d0
+  l <- uniqueSrcSpanT
+  let anc = Anchor (realSrcSpan l) (MovedAnchor (SameLine 1))
+  pe <- mkLocA (SameLine 1) (k (EpAnn anc an emptyComments))
   return pe
 
 -- This explicitly operates on 'Located (Pat GhcPs)' instead of 'LPat GhcPs'
@@ -288,12 +331,12 @@ mkParen k e = do
 parenifyP
   :: Monad m
   => Context
-  -> Located (Pat GhcPs)
-  -> TransformT m (Located (Pat GhcPs))
+  -> LPat GhcPs
+  -> TransformT m (LPat GhcPs)
 parenifyP Context{..} p@(L _ pat)
   | IsLhs <- ctxtParentPrec
   , needed pat =
-    mkParen (ParPat noExtField . cLPat) p
+    mkParen' (\an -> ParPat an (cLPat p))
   | otherwise = return p
   where
     needed BangPat{}                          = False
@@ -309,14 +352,14 @@ parenifyP Context{..} p@(L _ pat)
     needed (ConPatIn _ (PrefixCon []))        = False
     needed ConPatOut{pat_args = PrefixCon []} = False
 #else
-    needed (ConPat _ _ (PrefixCon []))        = False
+    needed (ConPat _ _ (PrefixCon _ []))      = False
 #endif
     needed _                                  = True
 
 parenifyT
   :: Monad m => Context -> LHsType GhcPs -> TransformT m (LHsType GhcPs)
 parenifyT Context{..} lty@(L _ ty)
-  | needed ty = mkParen (HsParTy noExtField) lty
+  | needed ty = mkParen' (\an -> HsParTy an lty)
   | otherwise = return lty
   where
     needed HsAppTy{}
@@ -328,23 +371,22 @@ unparenT :: LHsType GhcPs -> LHsType GhcPs
 unparenT (L _ (HsParTy _ ty)) = ty
 unparenT ty = ty
 
--- This explicitly operates on 'Located (Pat GhcPs)' instead of 'LPat GhcPs'
--- to ensure 'dLPat' was called on the input.
-unparenP :: Located (Pat GhcPs) -> Located (Pat GhcPs)
-unparenP (L _ (ParPat _ p)) | Just lp <- dLPat p = lp
+unparenP :: LPat GhcPs -> LPat GhcPs
+unparenP (L _ (ParPat _ p)) = p
 unparenP p = p
 
 --------------------------------------------------------------------
 
 bitraverseHsConDetails
   :: Applicative m
-  => (arg -> m arg')
+  => ([tyarg] -> m [tyarg'])
+  -> (arg -> m arg')
   -> (rec -> m rec')
-  -> HsConDetails arg rec
-  -> m (HsConDetails arg' rec')
-bitraverseHsConDetails argf _ (PrefixCon args) =
-  PrefixCon <$> (argf `traverse` args)
-bitraverseHsConDetails _ recf (RecCon r) =
+  -> HsConDetails tyarg arg rec
+  -> m (HsConDetails tyarg' arg' rec')
+bitraverseHsConDetails argt argf _ (PrefixCon tyargs args) =
+  PrefixCon <$> (argt tyargs) <*> (argf `traverse` args)
+bitraverseHsConDetails _ _ recf (RecCon r) =
   RecCon <$> recf r
-bitraverseHsConDetails argf _ (InfixCon a1 a2) =
+bitraverseHsConDetails _ argf _ (InfixCon a1 a2) =
   InfixCon <$> argf a1 <*> argf a2

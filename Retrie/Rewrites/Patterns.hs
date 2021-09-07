@@ -12,6 +12,7 @@ module Retrie.Rewrites.Patterns (patternSynonymsToRewrites) where
 import Control.Monad.State (StateT(runStateT))
 import Control.Monad
 import Data.Maybe
+import Data.Void
 
 import Retrie.ExactPrint
 import Retrie.Expr
@@ -23,17 +24,14 @@ import Retrie.Universe
 import Retrie.Util
 
 patternSynonymsToRewrites
-  :: [(FastString, Direction)]
+  :: LibDir
+  -> [(FastString, Direction)]
   -> AnnotatedModule
-#if __GLASGOW_HASKELL__ < 900
-  -> IO (UniqFM [Rewrite Universe])
-#else
   -> IO (UniqFM FastString [Rewrite Universe])
-#endif
-patternSynonymsToRewrites specs am = fmap astA $ transformA am $ \(L _ m) -> do
+patternSynonymsToRewrites libdir specs am = fmap astA $ transformA am $ \(L _ m) -> do
   let
     fsMap = uniqBag specs
-  imports <- getImports RightToLeft (hsmodName m)
+  imports <- getImports libdir RightToLeft (hsmodName m)
   rrs <- sequence
       [ do
           patRewrite <- mkPatRewrite dir imports nm params lrhs
@@ -50,69 +48,73 @@ patternSynonymsToRewrites specs am = fmap astA $ transformA am $ \(L _ m) -> do
 mkPatRewrite
   :: Direction
   -> AnnotatedImports
-  -> LRdrName
-  -> HsConDetails LRdrName [RecordPatSynField LRdrName]
-  -> Located (Pat GhcPs)
-  -> TransformT IO (Rewrite (Located (Pat GhcPs)))
+  -> LocatedN RdrName
+  -> HsConDetails Void (LocatedN RdrName) [RecordPatSynField GhcPs]
+  -> LPat GhcPs
+  -> TransformT IO (Rewrite (LPat GhcPs))
 mkPatRewrite dir imports patName params rhs = do
   lhs <- asPat patName params
 
   (pat, temp) <- case dir of
     LeftToRight -> return (lhs, rhs)
     RightToLeft -> do
-      setEntryDPT lhs (DP (0,0))
+      let lhs' = setEntryDP lhs (SameLine 0)
       -- Patterns from lhs have wonky annotations,
       -- the space will be attached to the name, not to the ConPatIn ast node
-      setEntryDPTunderConPatIn lhs (DP (0,0))
-      return (rhs, lhs)
+      let lhs'' = setEntryDPTunderConPatIn lhs' (SameLine 0)
+      return (rhs, lhs'')
 
   p <- pruneA pat
   t <- pruneA temp
-  let bs = collectPatBinders (cLPat temp)
+  let bs = collectPatBinders CollNoDictBinders (cLPat temp)
   return $ addRewriteImports imports $ mkRewrite (mkQs bs) p t
 
   where
-    setEntryDPTunderConPatIn
-      :: Monad m => Located (Pat GhcPs) -> DeltaPos -> TransformT m ()
-#if __GLASGOW_HASKELL__ < 900
-    setEntryDPTunderConPatIn (L _ (ConPatIn nm _)) = setEntryDPT nm
-#else
-    setEntryDPTunderConPatIn (L _ (ConPat _ nm _)) = setEntryDPT nm
-#endif
-    setEntryDPTunderConPatIn _ = const $ return ()
+    setEntryDPTunderConPatIn :: LPat GhcPs -> DeltaPos -> LPat GhcPs
+    setEntryDPTunderConPatIn (L l (ConPat x nm args)) dp
+      = (L l (ConPat x (setEntryDP nm dp) args))
+    setEntryDPTunderConPatIn p _ = p
 
 asPat
   :: Monad m
-  => LRdrName
-  -> HsConDetails LRdrName [RecordPatSynField LRdrName]
-  -> TransformT m (Located (Pat GhcPs))
+  => LocatedN RdrName
+  -> HsConDetails Void (LocatedN RdrName) [RecordPatSynField GhcPs]
+  -> TransformT m (LPat GhcPs)
 asPat patName params = do
-  params' <- bitraverseHsConDetails mkVarPat convertFields params
+  params' <- bitraverseHsConDetails convertTyVars mkVarPat convertFields params
   mkConPatIn patName params'
   where
 
+    convertTyVars :: (Monad m) => [Void] -> TransformT m [HsPatSigType GhcPs]
+    convertTyVars _ = return []
+
+    convertFields :: (Monad m) => [RecordPatSynField GhcPs]
+                      -> TransformT m (HsRecFields GhcPs (LPat GhcPs))
     convertFields fields =
       HsRecFields <$> traverse convertField fields <*> pure Nothing
 
+    convertField :: (Monad m) => RecordPatSynField GhcPs
+                      -> TransformT m (LHsRecField GhcPs (LPat GhcPs))
     convertField RecordPatSynField{..} = do
-      hsRecFieldLbl <- mkLoc $ mkFieldOcc recordPatSynSelectorId
+      hsRecFieldLbl <- mkLoc $ recordPatSynField
       hsRecFieldArg <- mkVarPat recordPatSynPatVar
       let hsRecPun = False
-      mkLoc HsRecField{..}
+      let hsRecFieldAnn = noAnn
+      mkLocA (SameLine 0) HsRecField{..}
 
 
 mkExpRewrite
   :: Direction
   -> AnnotatedImports
-  -> LRdrName
-  -> HsConDetails LRdrName [RecordPatSynField LRdrName]
+  -> LocatedN RdrName
+  -> HsConDetails Void (LocatedN RdrName) [RecordPatSynField GhcPs]
   -> LPat GhcPs
   -> HsPatSynDir GhcPs
   -> TransformT IO [Rewrite (LHsExpr GhcPs)]
 mkExpRewrite dir imports patName params rhs patDir = do
   fe <- mkLocatedHsVar patName
   let altsFromParams = case params of
-        PrefixCon names -> buildMatch names rhs
+        PrefixCon _tyargs names -> buildMatch names rhs
         InfixCon a1 a2 -> buildMatch [a1, a2] rhs
         RecCon{} -> missingSyntax "RecCon"
   alts <- case patDir of
@@ -123,12 +125,12 @@ mkExpRewrite dir imports patName params rhs patDir = do
 
 buildMatch
   :: Monad m
-  => [Located (IdP GhcPs)]
+  => [LocatedN RdrName]
   -> LPat GhcPs
   -> TransformT m [LMatch GhcPs (LHsExpr GhcPs)]
 buildMatch names rhs = do
   pats <- traverse mkVarPat names
-  let bs = collectPatBinders rhs
+  let bs = collectPatBinders CollNoDictBinders rhs
   (rhsExpr,(_,_bs')) <- runStateT (patToExpr rhs) (wildSupply bs, bs)
-  let alt = mkMatch PatSyn pats rhsExpr (noLoc emptyLocalBinds)
+  let alt = mkMatch PatSyn pats rhsExpr emptyLocalBinds
   return [alt]

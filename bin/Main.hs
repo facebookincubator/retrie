@@ -8,6 +8,7 @@ module Main (main) where
 
 import Control.Monad
 import Fixity
+import qualified GHC.Paths as GHC.Paths
 import Retrie
 import Retrie.Debug
 import Retrie.Options
@@ -15,10 +16,11 @@ import Retrie.Run
 
 main :: IO ()
 main = do
-  opts@Options{..} <- parseOptions defaultFixityEnv
-  doRoundtrips fixityEnv targetDir roundtrips
+  let libdir = GHC.Paths.libdir
+  opts@Options{..} <- parseOptions libdir defaultFixityEnv
+  doRoundtrips libdir fixityEnv targetDir roundtrips
   unless (null rewrites) $ do
     when (verbosity > Silent) $ do
       putStrLn "Adding:"
       mapM_ (putStrLn . ppRewrite) rewrites
-    execute opts $ apply rewrites
+    execute libdir opts $ apply rewrites

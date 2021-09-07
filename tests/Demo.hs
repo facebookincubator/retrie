@@ -11,15 +11,15 @@ import Retrie
 argMapping :: [(FastString, String)]
 argMapping = [("foo", "Foo"), ("bar", "Bar")]
 
-stringToFooArg :: MatchResultTransformer
-stringToFooArg _ctxt match
+stringToFooArg :: LibDir -> MatchResultTransformer
+stringToFooArg libdir _ctxt match
   | MatchResult substitution template <- match
   , Just (HoleExpr expr) <- lookupSubst "arg" substitution
   , L _ (HsLit _ (HsString _ str)) <- astA expr = do
     newExpr <- case lookup str argMapping of
       Nothing ->
-        parseExpr $ "error \"invalid argument: " ++ unpackFS str ++ "\""
-      Just constructor -> parseExpr constructor
+        parseExpr libdir $ "error \"invalid argument: " ++ unpackFS str ++ "\""
+      Just constructor -> parseExpr libdir constructor
     return $
       MatchResult (extendSubst substitution "arg" (HoleExpr newExpr)) template
   | otherwise = return NoMatch

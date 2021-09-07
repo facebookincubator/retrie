@@ -157,9 +157,9 @@ runMatcher
   -> ast
   -> TransformT m [(Substitution, v)]
 runMatcher Context{..} (Matcher m) ast = do
-  (anns, seed) <- get
+  seed <- get
   let
-    matchEnv = ME ctxtInScope (\x -> unsafeMkA x anns seed)
+    matchEnv = ME ctxtInScope (\x -> unsafeMkA x seed)
     uast = inject ast
 
   return

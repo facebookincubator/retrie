@@ -48,8 +48,8 @@ replacePat c p
 -- 'Rewriter' carried by the context, instantiates templates, handles parens
 -- and other whitespace bookkeeping, and emits resulting 'Replacement's.
 replaceImpl
-  :: forall ast m. (Annotate ast, Matchable (Located ast), MonadIO m)
-  => Context -> Located ast -> TransformT (WriterT Change m) (Located ast)
+  :: forall ast m. (Data ast, ExactPrint ast, Matchable (LocatedA ast), MonadIO m)
+  => Context -> LocatedA ast -> TransformT (WriterT Change m) (LocatedA ast)
 replaceImpl c e = do
   let
     -- Prevent rewriting source of the rewrite itself by refusing to
@@ -59,7 +59,7 @@ replaceImpl c e = do
           fmap (fmap (check rrOrigin rrQuantifiers)) <$> rrTransformer
       }
     check origin quantifiers match
-      | getLoc e `overlaps` origin = NoMatch
+      | getLocA e `overlaps` origin = NoMatch
       | MatchResult _ Template{..} <- match
       , fvs <- freeVars quantifiers (astA tTemplate)
       , any (`elemFVs` fvs) (ctxtBinders c) = NoMatch
@@ -80,13 +80,13 @@ replaceImpl c e = do
       -- substitute for quantifiers in grafted template
       r <- subst sub c t'
       -- copy appropriate annotations from old expression to template
-      addAllAnnsT e r
+      -- addAllAnnsT e r
       -- add parens to template if needed
       res <- (mkM (parenify c) `extM` parenifyT c `extM` parenifyP c) r
       -- prune the resulting expression and log it with location
       orig <- printNoLeadingSpaces <$> pruneA e
       repl <- printNoLeadingSpaces <$> pruneA res
-      let replacement = Replacement (getLoc e) orig repl
+      let replacement = Replacement (getLocA e) orig repl
       TransformT $ lift $ tell $ Change [replacement] [tImports]
       -- make the actual replacement
       return res
@@ -121,5 +121,5 @@ instance Monoid Change where
 -- Unfortunately, its hard to find the right annEntryDelta (it may not be the
 -- top of the redex) and zero it out. As janky as it seems, its easier to just
 -- drop leading spaces like this.
-printNoLeadingSpaces :: Annotate k => Annotated (Located k) -> String
+printNoLeadingSpaces :: ExactPrint k => Annotated k -> String
 printNoLeadingSpaces = dropWhile isSpace . printA
