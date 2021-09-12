@@ -73,7 +73,7 @@ groundTerms Query{..} = HashSet.fromList $ go $ astA qPattern
     printer = mkQ [] printExpr `extQ` printTy
 
     printExpr :: LHsExpr GhcPs -> [String]
-    printExpr e = [exactPrint e]
+    printExpr e = [exactPrint (setEntryDP e (SameLine 0))]
 
     printTy :: LHsType GhcPs -> [String]
-    printTy t = [exactPrint t]
+    printTy t = [exactPrint (setEntryDP t (SameLine 0))]

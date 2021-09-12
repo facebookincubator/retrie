@@ -38,6 +38,7 @@ data Universe
 -- | Exactprint an annotated 'Universe'.
 printU :: Annotated Universe -> String
 printU u = exactPrintU (astA u)
+    `debug` ("printU:" ++ showAst (astA u))
 
 -- | Primitive exactprint for 'Universe'.
 exactPrintU :: Universe -> String

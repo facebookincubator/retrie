@@ -31,6 +31,7 @@ import Retrie.Rewrites.Rules
 import Retrie.Rewrites.Types
 import Retrie.Types
 import Retrie.Universe
+import Retrie.Util
 
 -- | A qualified name. (e.g. @"Module.Name.functionName"@)
 type QualifiedName = String
@@ -101,8 +102,11 @@ parseRewriteSpecs libdir parser fixityEnv specs = do
     ]
   fbRewrites <- parseFileBased libdir parser fileBased
   adhocExpressionRewrites <- parseAdhocs libdir fixityEnv adhocRules
+  debugPrint Loud "parseRewriteSpecs" (["adhocExpressionRewrites:" ++ show adhocRules]  ++ map (\r -> showAst ((astA . qPattern) r)) adhocExpressionRewrites)
   adhocTypeRewrites <- parseAdhocTypes libdir fixityEnv adhocTypes
+  debugPrint Loud "parseRewriteSpecs" (["adhocTypeRewrites:"] ++ map (\r -> showAst ((astA . qPattern) r)) adhocTypeRewrites)
   adhocPatternRewrites <- parseAdhocPatterns libdir fixityEnv adhocPatterns
+  debugPrint Loud "parseRewriteSpecs" (["adhocPatternRewrites:"] ++ map (\r -> showAst ((astA . qPattern) r)) adhocPatternRewrites)
   return $
     fbRewrites ++
     adhocExpressionRewrites ++
@@ -139,8 +143,11 @@ parseFileBased libdir parser specs = concat <$> mapM (uncurry goFile) (gather sp
 parseAdhocs :: LibDir -> FixityEnv -> [String] -> IO [Rewrite Universe]
 parseAdhocs _ _ [] = return []
 parseAdhocs libdir fixities adhocs = do
+  debugPrint Loud "parseAdhocs:adhocs" adhocs
+  debugPrint Loud "parseAdhocs:adhocRules" (map show adhocRules)
   cpp <-
     parseCPP (parseContent libdir fixities "parseAdhocs") (Text.unlines adhocRules)
+  -- debugPrint Loud "parseAdhocs:cpp" [showCpp cpp]
   constructRewrites libdir cpp Rule adhocSpecs
   where
     -- In search mode, there is no need to specify a right-hand side, but we
@@ -155,6 +162,9 @@ parseAdhocs libdir fixities adhocs = do
       | (i,s) <- zip [1..] $ map addRHS adhocs
       , let nm = "adhoc" ++ show (i::Int)
       ]
+
+showCpp (NoCPP c) = showAstA c
+showCpp (CPP{}) = "CPP{}"
 
 parseAdhocTypes :: LibDir -> FixityEnv -> [String] -> IO [Rewrite Universe]
 parseAdhocTypes _ _ [] = return []
@@ -207,7 +217,9 @@ constructRewrites libdir cpp ty specs = do
     case lookupUFM m fs of
       Nothing ->
         fail $ "could not find " ++ nameOf ty ++ " named " ++ unpackFS fs
-      Just rrs -> return rrs
+      Just rrs -> do
+        debugPrint Loud "constructRewrites:cppM" ["enter"]
+        return rrs
 
 tyBuilder
   :: LibDir

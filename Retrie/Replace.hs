@@ -86,6 +86,8 @@ replaceImpl c e = do
       -- prune the resulting expression and log it with location
       orig <- printNoLeadingSpaces <$> pruneA e
       repl <- printNoLeadingSpaces <$> pruneA res
+      -- repl <- printA <$> pruneA r
+      -- repl <- return $ showAst t'
       let replacement = Replacement (getLocA e) orig repl
       TransformT $ lift $ tell $ Change [replacement] [tImports]
       -- make the actual replacement
@@ -98,7 +100,7 @@ data Replacement = Replacement
   { replLocation :: SrcSpan
   , replOriginal :: String
   , replReplacement :: String
-  }
+  } deriving Show
 
 -- | Used as the writer type during matching to indicate whether any change
 -- to the module should be made.
@@ -121,5 +123,5 @@ instance Monoid Change where
 -- Unfortunately, its hard to find the right annEntryDelta (it may not be the
 -- top of the redex) and zero it out. As janky as it seems, its easier to just
 -- drop leading spaces like this.
-printNoLeadingSpaces :: ExactPrint k => Annotated k -> String
+printNoLeadingSpaces :: (Data k, ExactPrint k) => Annotated k -> String
 printNoLeadingSpaces = dropWhile isSpace . printA

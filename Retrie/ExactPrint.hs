@@ -26,14 +26,15 @@ module Retrie.ExactPrint
   -- , addAllAnnsT
   -- , cloneT
   -- , setEntryDPT
-  , swapEntryDPT
+  -- , swapEntryDPT
   -- , transferAnnsT
-  , transferEntryAnnsT
+  -- , transferEntryAnnsT
   , transferEntryDPT
   -- , tryTransferEntryDPT
     -- * Utils
   , debugDump
   , debugParse
+  , debug
   -- , hasComments
   , isComma
     -- * Annotated AST
@@ -42,26 +43,27 @@ module Retrie.ExactPrint
   , module Language.Haskell.GHC.ExactPrint
   -- , module Language.Haskell.GHC.ExactPrint.Annotate
   , module Language.Haskell.GHC.ExactPrint.Types
-  -- , module Language.Haskell.GHC.ExactPrint.Utils
+  , module Language.Haskell.GHC.ExactPrint.Utils
   , module Language.Haskell.GHC.ExactPrint.Transform
   ) where
 
 import Control.Exception
 import Control.Monad.State.Lazy hiding (fix)
-import Data.Function (on)
+-- import Data.Function (on)
 import Data.List (transpose)
-import Data.Maybe
-import qualified Data.Map as M
+-- import Data.Maybe
+-- import qualified Data.Map as M
 import Text.Printf
 
 import Language.Haskell.GHC.ExactPrint hiding
-  ( cloneT
-  , setEntryDP
-  , setEntryDPT
-  , transferEntryDPT
+  ( -- cloneT
+   setEntryDP
+  -- , setEntryDPT
+  -- , transferEntryDPT
   , transferEntryDP
   )
-import Language.Haskell.GHC.ExactPrint.ExactPrint (ExactPrint)
+-- import Language.Haskell.GHC.ExactPrint.ExactPrint (ExactPrint)
+import Language.Haskell.GHC.ExactPrint.Utils hiding (debug)
 import qualified Language.Haskell.GHC.ExactPrint.Parsers as Parsers
 import Language.Haskell.GHC.ExactPrint.Types
   ( KeywordId(..)
@@ -73,8 +75,13 @@ import Retrie.ExactPrint.Annotated
 import Retrie.Fixity
 import Retrie.GHC
 import Retrie.SYB hiding (ext1)
+import Retrie.Util
 
 import GHC.Stack
+import Debug.Trace
+
+debug :: c -> String -> c
+debug c s = trace s c
 
 -- Fixity traversal -----------------------------------------------------------
 
@@ -100,20 +107,20 @@ fixOneExpr
   => FixityEnv
   -> LHsExpr GhcPs
   -> TransformT m (LHsExpr GhcPs)
-fixOneExpr env (L l2 (OpApp x2 ap1@(L l1 (OpApp x1 x op1 y)) op2 z))
+fixOneExpr env (L l2 (OpApp x2 _ap1@(L l1 (OpApp x1 x op1 y)) op2 z))
   | associatesRight (lookupOp op1 env) (lookupOp op2 env) = do
     let ap2' = L l2 $ OpApp x2 y op2 z
-    swapEntryDPT ap1 ap2'
+    -- swapEntryDPT ap1 ap2'
     -- transferAnnsT isComma ap2' ap1
     rhs <- fixOneExpr env ap2'
     return $ L l1 $ OpApp x1 x op1 rhs
 fixOneExpr _ e = return e
 
 fixOnePat :: Monad m => FixityEnv -> LPat GhcPs -> TransformT m (LPat GhcPs)
-fixOnePat env (dLPat -> Just (L l2 (ConPat ext2 op2 (InfixCon (dLPat -> Just ap1@(L l1 (ConPat ext1 op1 (InfixCon x y)))) z))))
+fixOnePat env (dLPat -> Just (L l2 (ConPat ext2 op2 (InfixCon (dLPat -> Just _ap1@(L l1 (ConPat ext1 op1 (InfixCon x y)))) z))))
   | associatesRight (lookupOpRdrName op1 env) (lookupOpRdrName op2 env) = do
     let ap2' = L l2 (ConPat ext2 op2 (InfixCon y z))
-    swapEntryDPT ap1 ap2'
+    -- swapEntryDPT ap1 ap2'
     -- transferAnnsT isComma ap2' ap1
     rhs <- fixOnePat env (cLPat ap2')
     return $ cLPat $ L l1 (ConPat ext1 op1 (InfixCon x rhs))
@@ -128,7 +135,7 @@ fixOneEntry
   => LocatedA a -- ^ Overall application
   -> LocatedA a -- ^ Left child
   -> TransformT m (LocatedA a)
-fixOneEntry e x = do
+fixOneEntry e _x = do
   -- anns <- getAnnsT
   -- let
   --   zeros = SameLine 0
@@ -146,7 +153,7 @@ fixOneEntry e x = do
   -- when (actualRow == 0) $ do
   --   setEntryDPT e $ deltaPos (er, xc + ec)
   --   setEntryDPT x $ deltaPos (xr, 0)
-  return e
+  return $ setEntryDP e (SameLine 1)
 
 fixOneEntryExpr :: Monad m => LHsExpr GhcPs -> TransformT m (LHsExpr GhcPs)
 fixOneEntryExpr e@(L _ (OpApp _ x _ _)) = fixOneEntry e x
@@ -164,22 +171,21 @@ fixOneEntryPat pat
 
 -------------------------------------------------------------------------------
 
-swapEntryDPT
-  :: (Data a, Data b, Monad m)
-  => LocatedAn a1 a -> LocatedAn a2 b -> TransformT m ()
-swapEntryDPT a b =
-  -- modifyAnnsT $ \ anns ->
-  -- let akey = mkAnnKey a
-  --     bkey = mkAnnKey b
-  --     aann = fromMaybe annNone $ M.lookup akey anns
-  --     bann = fromMaybe annNone $ M.lookup bkey anns
-  -- in M.insert akey
-  --     aann { annEntryDelta = annEntryDelta bann
-  --          , annPriorComments = annPriorComments bann } $
-  --    M.insert bkey
-  --     bann { annEntryDelta = annEntryDelta aann
-  --          , annPriorComments = annPriorComments aann } anns
-  error "swapEntryDPT"
+-- swapEntryDPT
+--   :: (Data a, Data b, Monad m)
+--   => LocatedAn a1 a -> LocatedAn a2 b -> TransformT m ()
+-- swapEntryDPT a b =
+--   modifyAnnsT $ \ anns ->
+--   let akey = mkAnnKey a
+--       bkey = mkAnnKey b
+--       aann = fromMaybe annNone $ M.lookup akey anns
+--       bann = fromMaybe annNone $ M.lookup bkey anns
+--   in M.insert akey
+--       aann { annEntryDelta = annEntryDelta bann
+--            , annPriorComments = annPriorComments bann } $
+--      M.insert bkey
+--       bann { annEntryDelta = annEntryDelta aann
+--            , annPriorComments = annPriorComments aann } anns
 
 -------------------------------------------------------------------------------
 
@@ -228,7 +234,12 @@ parsePattern libdir str = parseHelper libdir "parsePattern" Parsers.parsePattern
 
 -- | Parse a 'Stmt'.
 parseStmt :: Parsers.LibDir -> String -> IO AnnotatedStmt
-parseStmt libdir str = parseHelper libdir "parseStmt" Parsers.parseStmt str
+parseStmt libdir str = do
+  debugPrint Loud "parseStmt:for" [str]
+  res <- parseHelper libdir "parseStmt" Parsers.parseStmt str
+  return (setEntryDPA res (DifferentLine 1 0))
+  -- return res
+
 
 -- | Parse a 'HsType'.
 parseType :: Parsers.LibDir -> String -> IO AnnotatedHsType
@@ -249,7 +260,7 @@ parseHelper libdir fp parser str = join $ Parsers.withDynFlags libdir $ \dflags 
 
 -------------------------------------------------------------------------------
 
-debugDump :: ExactPrint a => Annotated (Located a) -> IO ()
+debugDump :: (Data a, ExactPrint a) => Annotated a -> IO ()
 debugDump ax = do
   let
     str = printA ax
@@ -263,29 +274,31 @@ debugDump ax = do
   putStrLn tens
   putStrLn ones
   putStrLn str
+  putStrLn "------------------------------------"
+  putStrLn $ showAstA ax
+  putStrLn "------------------------------------"
 
 -- cloneT :: (Data a, Typeable a, Monad m) => a -> TransformT m a
 -- cloneT e = getAnnsT >>= flip graftT e
 
--- The following definitions are all the same as the ones from ghc-exactprint,
--- but the types are liberalized from 'Transform a' to 'TransformT m a'.
-transferEntryAnnsT
-  :: (HasCallStack, Data a, Data b, Monad m)
-  => (KeywordId -> Bool)        -- transfer Anns matching predicate
-  -> LocatedAn an a             -- from
-  -> LocatedAn an b             -- to
-  -> TransformT m ()
-transferEntryAnnsT p a b = do
-  -- transferEntryDPT a b
-  -- transferAnnsT p a b
-  error "transferAnnsT"
+-- -- The following definitions are all the same as the ones from ghc-exactprint,
+-- -- but the types are liberalized from 'Transform a' to 'TransformT m a'.
+-- transferEntryAnnsT
+--   :: (HasCallStack, Data a, Data b, Monad m)
+--   => (KeywordId -> Bool)        -- transfer Anns matching predicate
+--   -> LocatedAn an a             -- from
+--   -> LocatedAn an b             -- to
+--   -> TransformT m ()
+-- transferEntryAnnsT p a b = do
+--   transferEntryDPT a b
+--   transferAnnsT p a b
 
 -- | 'Transform' monad version of 'transferEntryDP'
 transferEntryDPT
   :: (HasCallStack, Data a, Data b, Monad m)
   => Located a -> Located b -> TransformT m ()
 -- transferEntryDPT a b = modifyAnnsT (transferEntryDP a b)
-transferEntryDPT a b = error "transferEntryDPT"
+transferEntryDPT _a _b = error "transferEntryDPT"
 
 -- tryTransferEntryDPT
 --   :: (Data a, Data b, Monad m)

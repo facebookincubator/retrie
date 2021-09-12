@@ -52,6 +52,7 @@ substExpr
 substExpr ctxt e@(L l1 (HsVar x (L l2 v))) =
   case lookupHoleVar v ctxt of
     Just (HoleExpr eA) -> do
+      -- error ( "substExpr:HoleExpr" ++ showAst e)
       e' <- graftA (unparen <$> eA)
       -- comments <- hasComments e'
       -- unless comments $ transferEntryDPT e e'
@@ -71,7 +72,7 @@ substPat ctxt (dLPat -> Just p@(L l1 (VarPat x vl@(L l2 v)))) = fmap cLPat $
   case lookupHoleVar v ctxt of
     Just (HolePat pA) -> do
       p' <- graftA (unparenP <$> pA)
-      transferEntryAnnsT isComma p p'
+      -- transferEntryAnnsT isComma p p'
       -- the relevant entry delta is sometimes attached to
       -- the OccName and not to the VarPat.
       -- This seems to be the case only when the pattern comes from a lhs,
@@ -92,7 +93,7 @@ substType ctxt ty
   | Just (L _ v) <- tyvarRdrName (unLoc ty)
   , Just (HoleType tyA) <- lookupHoleVar v ctxt = do
     ty' <- graftA (unparenT <$> tyA)
-    transferEntryAnnsT isComma ty ty'
+    -- transferEntryAnnsT isComma ty ty'
     parenifyT ctxt ty'
 substType _ ty = return ty
 

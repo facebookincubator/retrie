@@ -3,6 +3,7 @@
 -- This source code is licensed under the MIT license found in the
 -- LICENSE file in the root directory of this source tree.
 --
+{-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -11,6 +12,7 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 module Retrie.Types
@@ -49,6 +51,7 @@ import Control.Monad.IO.Class
 import Control.Monad.State
 import Data.Bifunctor
 import qualified Data.IntMap.Strict as I
+import Data.Data hiding (Fixity)
 import Data.Maybe
 
 import Retrie.AlphaEnv
@@ -111,6 +114,10 @@ instance Functor (Query ast) where
 
 instance Bifunctor Query where
   bimap f g (Query qs ast v) = Query qs (fmap f ast) (g v)
+
+instance (Data (Annotated ast), Show ast, Show v) => Show (Query ast v) where
+  show (Query q p r) = "Query " ++ show q ++ " " ++ showAst p ++ " " ++ show r
+
 
 ------------------------------------------------------------------------
 

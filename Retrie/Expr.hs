@@ -36,9 +36,9 @@ module Retrie.Expr
 
 import Control.Monad.State.Lazy
 import Data.Functor.Identity
-import qualified Data.Map as M
+-- import qualified Data.Map as M
 import Data.Maybe
-import Data.Void
+-- import Data.Void
 
 import Retrie.AlphaEnv
 import Retrie.ExactPrint

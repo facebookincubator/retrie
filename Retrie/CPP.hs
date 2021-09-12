@@ -102,6 +102,7 @@ parseCPP p orig
 
 printCPP :: [Replacement] -> CPP AnnotatedModule -> String
 printCPP _ (NoCPP m) = printA m
+-- printCPP _ (NoCPP m) = error $ "printCPP:m=" ++ showAstA m
 printCPP repls (CPP orig is ms) = Text.unpack $ Text.unlines $
   case is of
     [] -> splice "" 1 1 sorted origLines

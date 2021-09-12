@@ -22,11 +22,12 @@ import Retrie.GHC
 
 annotatedTest :: Test
 annotatedTest = TestLabel "Annotated" $ TestList
-  [ increasingSeedTest
+  [ -- increasingSeedTest
   -- , elemsPostGraftTest
-  , inverseTest
+  -- ,
+  inverseTest
   , uniqueSrcSpanTest
-  , trimTest
+  -- , trimTest
   ]
 
 exprs :: [String]
@@ -69,12 +70,12 @@ testChainedTransforms f = forAst $ \at -> do
   _ <- fmap astA $ transformA at (f >=> f >=> f >=> f)
   return ()
 
-increasingSeedTest :: Test
-increasingSeedTest = TestLabel "graft increases seed" $ TestCase $
-  testChainedTransforms transform
-  where
-    transform :: Data a => a -> TransformT IO a
-    transform = transformWithSeedIncreaseCheck . (pruneA >=> graftA)
+-- increasingSeedTest :: Test
+-- increasingSeedTest = TestLabel "graft increases seed" $ TestCase $
+--   testChainedTransforms transform
+--   where
+--     transform :: Data a => a -> TransformT IO a
+--     transform = transformWithSeedIncreaseCheck . (pruneA >=> graftA)
 
 -- Following a graft, the annotation map in the state has the expected elements
 -- elemsPostGraftTest :: Test
@@ -115,11 +116,11 @@ uniqueSrcSpanTest = TestLabel "unique src span" $ TestCase $
     ss <- transformWithSeedIncreaseCheck uniqueSrcSpanT
     lift $ liftIO $ assertGoodSrcSpan ss
 
-trimTest :: Test
-trimTest = TestLabel "trimA" $ TestCase $
-  forAst $ \at ->
-    let at' = trimA at in
-    assertLocsReplaced (astA at')
+-- trimTest :: Test
+-- trimTest = TestLabel "trimA" $ TestCase $
+--   forAst $ \at ->
+--     let at' = trimA at in
+--     assertLocsReplaced (astA at')
 
 transformWithSeedIncreaseCheck :: TransformT IO a -> TransformT IO a
 transformWithSeedIncreaseCheck m = do

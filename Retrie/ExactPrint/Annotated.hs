@@ -25,7 +25,9 @@ module Retrie.ExactPrint.Annotated
   , graftA
   , transformA
   , trimA
+  , setEntryDPA
   , printA
+  , showAstA
     -- * Internal
   , unsafeMkA
   ) where
@@ -35,14 +37,14 @@ import Data.Default as D
 import Data.Functor.Identity
 
 import Language.Haskell.GHC.ExactPrint hiding
-  ( cloneT
-  , setEntryDP
-  , setEntryDPT
-  , transferEntryDPT
-  , transferEntryDP
+  ( -- cloneT
+    -- setEntryDP
+  -- , setEntryDPT
+  -- , transferEntryDPT
+    transferEntryDP
   )
-import Language.Haskell.GHC.ExactPrint.ExactPrint (ExactPrint(..))
--- import Language.Haskell.GHC.ExactPrint.Types (emptyAnns)
+-- import Language.Haskell.GHC.ExactPrint.ExactPrint (ExactPrint(..))
+import Language.Haskell.GHC.ExactPrint.Utils
 
 import Retrie.GHC
 import Retrie.SYB
@@ -142,6 +144,15 @@ trimA = runIdentity . transformA nil . const . graftA
     nil :: Annotated ()
     nil = mempty
 
+setEntryDPA :: (Monoid an)
+            => Annotated (LocatedAn an ast) -> DeltaPos -> Annotated (LocatedAn an ast)
+setEntryDPA (Annotated ast s) dp = Annotated (setEntryDP ast dp) s
+
 -- | Exactprint an 'Annotated' thing.
-printA :: ExactPrint ast => Annotated ast -> String
+printA :: (Data ast, ExactPrint ast) => Annotated ast -> String
 printA (Annotated ast _) = exactPrint ast
+    `debug` ("printA:" ++ showAst ast)
+
+-- | showAst an 'Annotated' thing.
+showAstA :: (Data ast, ExactPrint ast) => Annotated ast -> String
+showAstA (Annotated ast _) = showAst ast

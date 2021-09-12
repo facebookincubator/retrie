@@ -28,5 +28,6 @@ dependentStmtTest libdir rtDir p rtVerbosity =
                 (Template stmt mempty (Just rrs), defaultTransformer)
 
           return $ apply [rr]
+      , rtVerbosity = Loud
       , ..
       }
