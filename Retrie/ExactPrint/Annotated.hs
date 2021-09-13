@@ -27,6 +27,7 @@ module Retrie.ExactPrint.Annotated
   , trimA
   , setEntryDPA
   , printA
+  , printA'
   , showAstA
     -- * Internal
   , unsafeMkA
@@ -152,6 +153,9 @@ setEntryDPA (Annotated ast s) dp = Annotated (setEntryDP ast dp) s
 printA :: (Data ast, ExactPrint ast) => Annotated ast -> String
 printA (Annotated ast _) = exactPrint ast
     `debug` ("printA:" ++ showAst ast)
+
+printA' :: (Data ast, ExactPrint ast) => Annotated ast -> String
+printA' (Annotated ast _) = "[" ++ exactPrint ast ++ "]\n" ++ showAst ast
 
 -- | showAst an 'Annotated' thing.
 showAstA :: (Data ast, ExactPrint ast) => Annotated ast -> String

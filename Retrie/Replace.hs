@@ -84,14 +84,17 @@ replaceImpl c e = do
       -- add parens to template if needed
       res <- (mkM (parenify c) `extM` parenifyT c `extM` parenifyP c) r
       -- prune the resulting expression and log it with location
-      orig <- printNoLeadingSpaces <$> pruneA e
-      repl <- printNoLeadingSpaces <$> pruneA res
-      -- repl <- printA <$> pruneA r
+      -- orig <- printNoLeadingSpaces <$> pruneA e
+      orig <- printA' <$> pruneA e
+      -- repl <- printNoLeadingSpaces <$> pruneA res
+      -- repl <- printA' <$> pruneA r
+      repl <- printA' <$> pruneA res
       -- repl <- return $ showAst t'
       let replacement = Replacement (getLocA e) orig repl
       TransformT $ lift $ tell $ Change [replacement] [tImports]
       -- make the actual replacement
       return res
+
 
 -- | Records a replacement made. In cases where we cannot use ghc-exactprint
 -- to print the resulting AST (e.g. CPP modules), we fall back on splicing

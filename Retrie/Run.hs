@@ -74,7 +74,7 @@ execute libdir opts@Options{..} retrie0 = do
 
 -- | Callback function to actually write the resulting file back out.
 -- Is given list of changed spans, module contents, and user-defined data.
-type WriteFn a b = [Replacement] -> String -> a -> IO b
+type WriteFn a b = [Replacement] -> String -> CPP AnnotatedModule -> a -> IO b
 
 -- | Primitive means of running a 'Retrie' computation.
 run
@@ -113,14 +113,15 @@ runOneModule writeFn Options{..} r cpp = do
     Change repls imports -> do
       debugPrint Loud "runOneModule" ["change", show repls]
       let cpp'' = addImportsCPP (additionalImports:imports) cpp'
-      writeFn repls (printCPP repls cpp'') x
+      writeFn repls (printCPP repls cpp'') cpp'' x
 
-isCpp (NoCPP m) = "NoCPP:" ++ showAstA m
-isCpp (CPP{}) = "CPP"
+-- isCpp :: CPP AnnotatedModule -> String
+-- isCpp (NoCPP m) = "NoCPP:" ++ showAstA m
+-- isCpp (CPP{}) = "CPP"
 
 -- | Write action which counts changed lines using 'diff'
 writeCountLines :: FilePath -> WriteFn a (Sum Int)
-writeCountLines fp reps str _ = do
+writeCountLines fp reps str _ _ = do
   let lc = lineCount $ map replLocation reps
   putStrLn $ "Writing: " ++ fp ++ " (" ++ show lc ++ " lines changed)"
   writeFile fp str
@@ -128,7 +129,7 @@ writeCountLines fp reps str _ = do
 
 -- | Print the lines before replacement and after replacement.
 writeDiff :: Options -> FilePath -> WriteFn a (Sum Int)
-writeDiff Options{..} fp repls _ _ = do
+writeDiff Options{..} fp repls _ _ _ = do
   fl <- linesMap fp
   forM_ repls $ \Replacement{..} -> do
     let ppLines lineStart color = unlines
@@ -145,7 +146,7 @@ writeDiff Options{..} fp repls _ _ = do
 
 -- | Print lines that match the query and highligh the matched string.
 writeSearch :: Options -> FilePath -> WriteFn a ()
-writeSearch Options{..} fp repls _ _ = do
+writeSearch Options{..} fp repls _ _ _ = do
   fl <- linesMap fp
   forM_ repls $ \Replacement{..} ->
     putStrLn $ mconcat
@@ -161,7 +162,7 @@ writeSearch Options{..} fp repls _ _ = do
 
 -- | Print only replacement.
 writeExtract :: Options -> FilePath -> WriteFn a ()
-writeExtract Options{..} _ repls _ _ = do
+writeExtract Options{..} _ repls _ _ _ = do
   forM_ repls $ \Replacement{..} -> do
     putStrLn $ mconcat
       [ ppSrcSpan colorise replLocation

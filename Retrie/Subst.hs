@@ -57,7 +57,8 @@ substExpr ctxt e@(L l1 (HsVar x (L l2 v))) =
       -- comments <- hasComments e'
       -- unless comments $ transferEntryDPT e e'
       -- transferAnnsT isComma e e'
-      parenify ctxt e'
+      let e'' = setEntryDP e' (SameLine 1)
+      parenify ctxt e''
     Just (HoleRdr rdr) ->
       return $ L l1 $ HsVar x $ L l2 rdr
     _ -> return e
@@ -68,7 +69,7 @@ substPat
   => Context
   -> LPat GhcPs
   -> TransformT m (LPat GhcPs)
-substPat ctxt (dLPat -> Just p@(L l1 (VarPat x vl@(L l2 v)))) = fmap cLPat $
+substPat ctxt (dLPat -> Just p@(L l1 (VarPat x _vl@(L l2 v)))) = fmap cLPat $
   case lookupHoleVar v ctxt of
     Just (HolePat pA) -> do
       p' <- graftA (unparenP <$> pA)

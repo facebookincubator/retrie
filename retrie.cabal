@@ -162,6 +162,7 @@ test-suite test
     data-default,
     deepseq,
     directory,
+    exceptions,
     filepath,
     ghc >= 8.8 && < 9.2,
     ghc-exactprint,
