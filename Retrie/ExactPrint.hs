@@ -31,6 +31,7 @@ module Retrie.ExactPrint
   -- , transferEntryAnnsT
   , transferEntryDPT
   -- , tryTransferEntryDPT
+  , transferAnchor
     -- * Utils
   , debugDump
   , debugParse
@@ -341,6 +342,11 @@ transferEntryDPT _a _b = error "transferEntryDPT"
 --           , annFollowingComments = ((++) `on` annFollowingComments) ann ann'
 --           , annsDP = ((++) `on` annsDP) ann ann'
 --           }
+
+transferAnchor :: LocatedA a -> LocatedA b -> LocatedA b
+transferAnchor (L (SrcSpanAnn EpAnnNotUsed l)    _) lb = setAnchorAn lb (spanAsAnchor l)
+transferAnchor (L (SrcSpanAnn (EpAnn anc _ _) _) _) lb = setAnchorAn lb anc
+
 
 isComma :: KeywordId -> Bool
 isComma (G AnnComma) = True

@@ -107,7 +107,11 @@ runOneModule
   -> IO b
 runOneModule writeFn Options{..} r cpp = do
   debugPrint Loud "runOneModule" ["enter"]
-  (x, cpp', changed) <- runRetrie fixityEnv r cpp
+  let cpp0 = case cpp of
+               -- NoCPP am -> NoCPP (am { astA =  (makeDeltaAst (astA am)) })
+               NoCPP am -> error $ "after makeDeltaAst:\n" ++ showAst (makeDeltaAst (astA am))
+               nocpp -> nocpp
+  (x, cpp', changed) <- runRetrie fixityEnv r cpp0
   case changed of
     NoChange -> return mempty
     Change repls imports -> do

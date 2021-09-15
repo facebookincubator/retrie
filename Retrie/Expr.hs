@@ -116,7 +116,7 @@ mkLams vs e = do
 mkLet :: Monad m => HsLocalBinds GhcPs -> LHsExpr GhcPs -> TransformT m (LHsExpr GhcPs)
 mkLet EmptyLocalBinds{} e = return e
 mkLet lbs e = do
-  an <- mkEpAnn (DifferentLine 1 0)
+  an <- mkEpAnn (DifferentLine 1 5)
                 (AnnsLet {
                    alLet = EpaDelta (SameLine 0),
                    alIn = EpaDelta (DifferentLine 1 1)

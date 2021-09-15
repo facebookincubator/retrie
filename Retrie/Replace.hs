@@ -82,7 +82,11 @@ replaceImpl c e = do
       -- copy appropriate annotations from old expression to template
       -- addAllAnnsT e r
       -- add parens to template if needed
-      res <- (mkM (parenify c) `extM` parenifyT c `extM` parenifyP c) r
+      res' <- (mkM (parenify c) `extM` parenifyT c `extM` parenifyP c) r
+      -- Make sure the replacement has the same anchor as the thing
+      -- being replaced
+      let res = transferAnchor e res'
+
       -- prune the resulting expression and log it with location
       -- orig <- printNoLeadingSpaces <$> pruneA e
       orig <- printA' <$> pruneA e
@@ -93,7 +97,7 @@ replaceImpl c e = do
       let replacement = Replacement (getLocA e) orig repl
       TransformT $ lift $ tell $ Change [replacement] [tImports]
       -- make the actual replacement
-      return res
+      return res'
 
 
 -- | Records a replacement made. In cases where we cannot use ghc-exactprint
