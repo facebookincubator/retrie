@@ -118,8 +118,8 @@ mkLet EmptyLocalBinds{} e = return e
 mkLet lbs e = do
   an <- mkEpAnn (DifferentLine 1 5)
                 (AnnsLet {
-                   alLet = EpaDelta (SameLine 0),
-                   alIn = EpaDelta (DifferentLine 1 1)
+                   alLet = EpaDelta (SameLine 0) [],
+                   alIn = EpaDelta (DifferentLine 1 1) []
                  })
   le <- mkLocA (SameLine 1) $ HsLet an lbs e
   return le
@@ -204,8 +204,7 @@ patToExpr orig = case dLPat orig of
   Nothing -> error "patToExpr: called on unlocated Pat!"
   Just lp@(L _ p) -> do
     e <- go p
-    -- lift $ transferEntryDPT lp e
-    return e
+    lift $ transferEntryDP lp e
   where
     -- go :: Pat GhcPs -> PatQ m (LHsExpr GhcPs)
     go WildPat{} = do

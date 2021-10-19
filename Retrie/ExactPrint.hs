@@ -57,18 +57,15 @@ import Data.List (transpose)
 import Text.Printf
 
 import Language.Haskell.GHC.ExactPrint hiding
-  ( -- cloneT
+  (
    setEntryDP
-  -- , setEntryDPT
-  -- , transferEntryDPT
   , transferEntryDP
   )
 -- import Language.Haskell.GHC.ExactPrint.ExactPrint (ExactPrint)
 import Language.Haskell.GHC.ExactPrint.Utils hiding (debug)
 import qualified Language.Haskell.GHC.ExactPrint.Parsers as Parsers
 import Language.Haskell.GHC.ExactPrint.Types
-  ( KeywordId(..)
-  , showGhc
+  ( showGhc
   )
 import Language.Haskell.GHC.ExactPrint.Transform
 
@@ -135,8 +132,8 @@ fixOneEntry
   :: (Monad m, Data a)
   => LocatedA a -- ^ Overall application
   -> LocatedA a -- ^ Left child
-  -> TransformT m (LocatedA a)
-fixOneEntry e _x = do
+  -> TransformT m (LocatedA a, LocatedA a)
+fixOneEntry e x = do
   -- anns <- getAnnsT
   -- let
   --   zeros = SameLine 0
@@ -154,20 +151,60 @@ fixOneEntry e _x = do
   -- when (actualRow == 0) $ do
   --   setEntryDPT e $ deltaPos (er, xc + ec)
   --   setEntryDPT x $ deltaPos (xr, 0)
-  return $ setEntryDP e (SameLine 1)
+
+  -- We assume that ghc-exactprint has converted all Anchor's to use their delta variants.
+  -- Get the dp for the x component
+  let xdp = entryDP x
+  let xr = getDeltaLine xdp
+  let xc = deltaColumn xdp
+  -- Get the dp for the e component
+  let edp = entryDP e
+  let er = getDeltaLine edp
+  let ec = deltaColumn edp
+  case xdp of
+    SameLine n -> do
+      return ( setEntryDP e (deltaPos er (xc + ec))
+             , setEntryDP x (deltaPos xr 0))
+    _ -> return (e,x)
+
+  -- anns <- getAnnsT
+  -- let
+  --   zeros = DP (0,0)
+  --   (DP (xr,xc), DP (actualRow,_)) =
+  --     case M.lookup (mkAnnKey x) anns of
+  --       Nothing -> (zeros, zeros)
+  --       Just ann -> (annLeadingCommentEntryDelta ann, annEntryDelta ann)
+  --   DP (er,ec) =
+  --     maybe zeros annLeadingCommentEntryDelta $ M.lookup (mkAnnKey e) anns
+  -- when (actualRow == 0) $ do
+  --   setEntryDPT e $ DP (er, xc + ec)
+  --   setEntryDPT x $ DP (xr, 0)
+  -- return e
+
+-- TODO: move this somewhere more appropriate
+entryDP :: LocatedA a -> DeltaPos
+entryDP (L (SrcSpanAnn EpAnnNotUsed _) _) = SameLine 1
+entryDP (L (SrcSpanAnn (EpAnn anc _ _) _) _)
+  = case anchor_op anc of
+      UnchangedAnchor -> SameLine 1
+      MovedAnchor dp -> dp
+
 
 fixOneEntryExpr :: Monad m => LHsExpr GhcPs -> TransformT m (LHsExpr GhcPs)
-fixOneEntryExpr e@(L _ (OpApp _ x _ _)) = fixOneEntry e x
+fixOneEntryExpr e@(L l (OpApp a x b c)) = do
+  (e',x') <- fixOneEntry e x
+  return (L (getLoc e') (OpApp a x' b c))
 fixOneEntryExpr e = return e
 
 fixOneEntryPat :: Monad m => LPat GhcPs -> TransformT m (LPat GhcPs)
 fixOneEntryPat pat
 #if __GLASGOW_HASKELL__ < 900
-  | Just p@(L _ (ConPatIn _ (InfixCon x _))) <- dLPat pat =
+  | Just p@(L l (ConPatIn a (InfixCon x b))) <- dLPat pat = do
 #else
-  | Just p@(L _ (ConPat _ _ (InfixCon x _))) <- dLPat pat =
+  | Just p@(L l (ConPat a b (InfixCon x c))) <- dLPat pat = do
 #endif
-    cLPat <$> fixOneEntry p (dLPatUnsafe x)
+    (p', x') <- fixOneEntry p (dLPatUnsafe x)
+    return (cLPat $ (L (getLoc p') (ConPat a b (InfixCon x' c))))
   | otherwise = return pat
 
 -------------------------------------------------------------------------------
@@ -202,7 +239,7 @@ parseContentNoFixity libdir fp str = do
 #else
       fail $ show $ bagToList msg
 #endif
-    Right m -> return $ unsafeMkA m 0
+    Right m -> return $ unsafeMkA (makeDeltaAst m) 0
 
 parseContent :: Parsers.LibDir -> FixityEnv -> FilePath -> String -> IO AnnotatedModule
 parseContent libdir fixities fp =
@@ -236,7 +273,7 @@ parsePattern libdir str = parseHelper libdir "parsePattern" Parsers.parsePattern
 -- | Parse a 'Stmt'.
 parseStmt :: Parsers.LibDir -> String -> IO AnnotatedStmt
 parseStmt libdir str = do
-  debugPrint Loud "parseStmt:for" [str]
+  -- debugPrint Loud "parseStmt:for" [str]
   res <- parseHelper libdir "parseStmt" Parsers.parseStmt str
   return (setEntryDPA res (DifferentLine 1 0))
   -- return res
@@ -282,17 +319,17 @@ debugDump ax = do
 -- cloneT :: (Data a, Typeable a, Monad m) => a -> TransformT m a
 -- cloneT e = getAnnsT >>= flip graftT e
 
--- -- The following definitions are all the same as the ones from ghc-exactprint,
--- -- but the types are liberalized from 'Transform a' to 'TransformT m a'.
--- transferEntryAnnsT
---   :: (HasCallStack, Data a, Data b, Monad m)
---   => (KeywordId -> Bool)        -- transfer Anns matching predicate
---   -> LocatedAn an a             -- from
---   -> LocatedAn an b             -- to
---   -> TransformT m ()
--- transferEntryAnnsT p a b = do
---   transferEntryDPT a b
---   transferAnnsT p a b
+-- The following definitions are all the same as the ones from ghc-exactprint,
+-- but the types are liberalized from 'Transform a' to 'TransformT m a'.
+transferEntryAnnsT
+  :: (HasCallStack, Data a, Data b, Monad m)
+  => (AnnKeywordId -> Bool)        -- transfer Anns matching predicate
+  -> LocatedA a             -- from
+  -> LocatedA b             -- to
+  -> TransformT m (LocatedA b)
+transferEntryAnnsT p a b = do
+  b' <- transferEntryDP a b
+  transferAnnsT p a b'
 
 -- | 'Transform' monad version of 'transferEntryDP'
 transferEntryDPT
@@ -344,16 +381,16 @@ transferEntryDPT _a _b = error "transferEntryDPT"
 --           }
 
 transferAnchor :: LocatedA a -> LocatedA b -> LocatedA b
-transferAnchor (L (SrcSpanAnn EpAnnNotUsed l)    _) lb = setAnchorAn lb (spanAsAnchor l)
-transferAnchor (L (SrcSpanAnn (EpAnn anc _ _) _) _) lb = setAnchorAn lb anc
+transferAnchor (L (SrcSpanAnn EpAnnNotUsed l)    _) lb = setAnchorAn lb (spanAsAnchor l) emptyComments
+transferAnchor (L (SrcSpanAnn (EpAnn anc _ _) _) _) lb = setAnchorAn lb anc              emptyComments 
 
 
-isComma :: KeywordId -> Bool
-isComma (G AnnComma) = True
+isComma :: AnnKeywordId -> Bool
+isComma AnnComma = True
 isComma _ = False
 
-isCommentKeyword :: KeywordId -> Bool
-isCommentKeyword (AnnComment _) = True
+isCommentKeyword :: AnnKeywordId -> Bool
+-- isCommentKeyword (AnnComment _) = True
 isCommentKeyword _ = False
 
 -- isCommentAnnotation :: Annotation -> Bool
@@ -382,6 +419,24 @@ isCommentKeyword _ = False
 --       anB <- M.lookup bKey anns
 --       let anB' = anB { annsDP = annsDP anB ++ filter (p . fst) (annsDP anA) }
 --       return $ M.insert bKey anB' anns
+
+transferAnnsT
+  :: (Data a, Data b, Monad m)
+  => (AnnKeywordId -> Bool)     -- transfer Anns matching predicate
+  -> LocatedA a                 -- from
+  -> LocatedA b                 -- to
+  -> TransformT m (LocatedA b)
+transferAnnsT p (L (SrcSpanAnn EpAnnNotUsed _) _) b = return b
+transferAnnsT p (L (SrcSpanAnn (EpAnn anc (AnnListItem ts) cs) l) a) (L (SrcSpanAnn an lb) b) = do
+  let isMatch t =
+        case trailingAnnToAddEpAnn t of
+          AddEpAnn kw _ -> p kw
+  let ps = filter isMatch ts
+  let an' = case an of
+        EpAnnNotUsed -> EpAnn (spanAsAnchor lb) (AnnListItem ps) emptyComments
+        EpAnn ancb (AnnListItem tsb) csb -> EpAnn ancb (AnnListItem (tsb++ps)) csb
+  return (L (SrcSpanAnn an' lb) b)
+
 
 -- -- | 'Transform' monad version of 'setEntryDP',
 -- --   which sets the entry 'DeltaPos' for an annotation.

@@ -25,6 +25,7 @@ import Retrie.GHC
 import Retrie.Subst
 import Retrie.Types
 import Retrie.Universe
+import Retrie.Util
 
 ------------------------------------------------------------------------
 
@@ -88,12 +89,17 @@ replaceImpl c e = do
       let res = transferAnchor e res'
 
       -- prune the resulting expression and log it with location
-      -- orig <- printNoLeadingSpaces <$> pruneA e
-      orig <- printA' <$> pruneA e
-      -- repl <- printNoLeadingSpaces <$> pruneA res
+      orig <- printNoLeadingSpaces <$> pruneA e
+      -- orig <- printA' <$> pruneA e
+
+      repl <- printNoLeadingSpaces <$> pruneA res
       -- repl <- printA' <$> pruneA r
-      repl <- printA' <$> pruneA res
+      -- repl <- printA' <$> pruneA res
       -- repl <- return $ showAst t'
+
+      -- lift $ liftIO $ debugPrint Loud "replaceImpl:r="  [showAst r]
+      -- lift $ liftIO $ debugPrint Loud "replaceImpl:t'=" [showAst t']
+
       let replacement = Replacement (getLocA e) orig repl
       TransformT $ lift $ tell $ Change [replacement] [tImports]
       -- make the actual replacement

@@ -17,6 +17,7 @@ module Retrie.Rewrites
 import Control.Exception
 import qualified Data.Map as Map
 import Data.Maybe
+import Data.Data hiding (Fixity)
 import qualified Data.Text as Text
 import Data.Traversable
 import System.FilePath
@@ -102,11 +103,11 @@ parseRewriteSpecs libdir parser fixityEnv specs = do
     ]
   fbRewrites <- parseFileBased libdir parser fileBased
   adhocExpressionRewrites <- parseAdhocs libdir fixityEnv adhocRules
-  debugPrint Loud "parseRewriteSpecs" (["adhocExpressionRewrites:" ++ show adhocRules]  ++ map (\r -> showAst ((astA . qPattern) r)) adhocExpressionRewrites)
+  -- debugPrint Loud "parseRewriteSpecs" (["adhocExpressionRewrites:" ++ show adhocRules]  ++ map (\r -> showAst ((astA . qPattern) r)) adhocExpressionRewrites)
   adhocTypeRewrites <- parseAdhocTypes libdir fixityEnv adhocTypes
-  debugPrint Loud "parseRewriteSpecs" (["adhocTypeRewrites:"] ++ map (\r -> showAst ((astA . qPattern) r)) adhocTypeRewrites)
+  -- debugPrint Loud "parseRewriteSpecs" (["adhocTypeRewrites:"] ++ map (\r -> showAst ((astA . qPattern) r)) adhocTypeRewrites)
   adhocPatternRewrites <- parseAdhocPatterns libdir fixityEnv adhocPatterns
-  debugPrint Loud "parseRewriteSpecs" (["adhocPatternRewrites:"] ++ map (\r -> showAst ((astA . qPattern) r)) adhocPatternRewrites)
+  -- debugPrint Loud "parseRewriteSpecs" (["adhocPatternRewrites:"] ++ map (\r -> showAst ((astA . qPattern) r)) adhocPatternRewrites)
   return $
     fbRewrites ++
     adhocExpressionRewrites ++
@@ -143,8 +144,8 @@ parseFileBased libdir parser specs = concat <$> mapM (uncurry goFile) (gather sp
 parseAdhocs :: LibDir -> FixityEnv -> [String] -> IO [Rewrite Universe]
 parseAdhocs _ _ [] = return []
 parseAdhocs libdir fixities adhocs = do
-  debugPrint Loud "parseAdhocs:adhocs" adhocs
-  debugPrint Loud "parseAdhocs:adhocRules" (map show adhocRules)
+  -- debugPrint Loud "parseAdhocs:adhocs" adhocs
+  -- debugPrint Loud "parseAdhocs:adhocRules" (map show adhocRules)
   cpp <-
     parseCPP (parseContent libdir fixities "parseAdhocs") (Text.unlines adhocRules)
   -- debugPrint Loud "parseAdhocs:cpp" [showCpp cpp]
@@ -163,6 +164,8 @@ parseAdhocs libdir fixities adhocs = do
       , let nm = "adhoc" ++ show (i::Int)
       ]
 
+
+showCpp :: (Data ast, ExactPrint ast) => CPP (Annotated ast) -> String
 showCpp (NoCPP c) = showAstA c
 showCpp (CPP{}) = "CPP{}"
 
@@ -218,7 +221,7 @@ constructRewrites libdir cpp ty specs = do
       Nothing ->
         fail $ "could not find " ++ nameOf ty ++ " named " ++ unpackFS fs
       Just rrs -> do
-        debugPrint Loud "constructRewrites:cppM" ["enter"]
+        -- debugPrint Loud "constructRewrites:cppM" ["enter"]
         return rrs
 
 tyBuilder

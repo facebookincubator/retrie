@@ -52,12 +52,13 @@ substExpr
 substExpr ctxt e@(L l1 (HsVar x (L l2 v))) =
   case lookupHoleVar v ctxt of
     Just (HoleExpr eA) -> do
-      -- error ( "substExpr:HoleExpr" ++ showAst e)
+      -- debugPrint Loud "substExpr:HoleExpr" [showAst e]
       e' <- graftA (unparen <$> eA)
       -- comments <- hasComments e'
       -- unless comments $ transferEntryDPT e e'
       -- transferAnnsT isComma e e'
-      let e'' = setEntryDP e' (SameLine 1)
+      -- let e'' = setEntryDP e' (SameLine 1)
+      e'' <- transferEntryDP e e'
       parenify ctxt e''
     Just (HoleRdr rdr) ->
       return $ L l1 $ HsVar x $ L l2 rdr

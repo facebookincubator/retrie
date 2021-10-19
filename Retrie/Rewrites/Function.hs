@@ -49,7 +49,7 @@ dfnsToRewrites libdir specs am = fmap astA $ transformA am $ \ (L _ m) -> do
 ------------------------------------------------------------------------
 
 getImports
-  :: LibDir -> Direction -> Maybe (Located ModuleName) -> TransformT IO AnnotatedImports
+  :: LibDir -> Direction -> Maybe (LocatedA ModuleName) -> TransformT IO AnnotatedImports
 getImports libdir RightToLeft (Just (L _ mn)) = -- See Note [fold only]
   lift $ liftIO $ parseImports libdir ["import " ++ moduleNameString mn]
 getImports _ _ _ = return mempty
