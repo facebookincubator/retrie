@@ -17,6 +17,7 @@ import Retrie.GHC
 import Retrie.Substitution
 import Retrie.SYB
 import Retrie.Types
+import Retrie.Util
 
 ------------------------------------------------------------------------
 
@@ -45,14 +46,15 @@ lookupHoleVar rdr ctxt = do
   lookupSubst (rdrFS rdr) sub
 
 substExpr
-  :: Monad m
+  :: MonadIO m
   => Context
   -> LHsExpr GhcPs
   -> TransformT m (LHsExpr GhcPs)
 substExpr ctxt e@(L l1 (HsVar x (L l2 v))) =
   case lookupHoleVar v ctxt of
     Just (HoleExpr eA) -> do
-      -- debugPrint Loud "substExpr:HoleExpr" [showAst e]
+      lift $ liftIO $ debugPrint Loud "substExpr:HoleExpr:e" [showAst e]
+      lift $ liftIO $ debugPrint Loud "substExpr:HoleExpr:eA" [showAst eA]
       e' <- graftA (unparen <$> eA)
       -- comments <- hasComments e'
       -- unless comments $ transferEntryDPT e e'
@@ -66,37 +68,41 @@ substExpr ctxt e@(L l1 (HsVar x (L l2 v))) =
 substExpr _ e = return e
 
 substPat
-  :: Monad m
+  :: MonadIO m
   => Context
   -> LPat GhcPs
   -> TransformT m (LPat GhcPs)
 substPat ctxt (dLPat -> Just p@(L l1 (VarPat x _vl@(L l2 v)))) = fmap cLPat $
   case lookupHoleVar v ctxt of
     Just (HolePat pA) -> do
+      lift $ liftIO $ debugPrint Loud "substPat:HolePat:p" [showAst p]
+      lift $ liftIO $ debugPrint Loud "substPat:HolePat:pA" [showAst pA]
       p' <- graftA (unparenP <$> pA)
-      -- transferEntryAnnsT isComma p p'
+      p0 <- transferEntryAnnsT isComma p p'
       -- the relevant entry delta is sometimes attached to
       -- the OccName and not to the VarPat.
       -- This seems to be the case only when the pattern comes from a lhs,
       -- whereas it has no annotations in patterns found in rhs's.
       -- tryTransferEntryDPT vl p'
-      parenifyP ctxt p'
+      parenifyP ctxt p0
     Just (HoleRdr rdr) ->
       return $ L l1 $ VarPat x $ L l2 rdr
     _ -> return p
 substPat _ p = return p
 
 substType
-  :: Monad m
+  :: MonadIO m
   => Context
   -> LHsType GhcPs
   -> TransformT m (LHsType GhcPs)
 substType ctxt ty
   | Just (L _ v) <- tyvarRdrName (unLoc ty)
   , Just (HoleType tyA) <- lookupHoleVar v ctxt = do
+    lift $ liftIO $ debugPrint Loud "substType:HoleType:ty" [showAst ty]
+    lift $ liftIO $ debugPrint Loud "substType:HoleType:tyA" [showAst tyA]
     ty' <- graftA (unparenT <$> tyA)
-    -- transferEntryAnnsT isComma ty ty'
-    parenifyT ctxt ty'
+    ty0 <- transferEntryAnnsT isComma ty ty'
+    parenifyT ctxt ty0
 substType _ ty = return ty
 
 -- You might reasonably think that we would replace the RdrName in FunBind...

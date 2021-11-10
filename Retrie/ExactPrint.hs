@@ -23,12 +23,12 @@ module Retrie.ExactPrint
   , parseStmt
   , parseType
     -- * Primitive Transformations
-  -- , addAllAnnsT
+  , addAllAnnsT
   -- , cloneT
   -- , setEntryDPT
-  -- , swapEntryDPT
+  , swapEntryDPT
   -- , transferAnnsT
-  -- , transferEntryAnnsT
+  , transferEntryAnnsT
   , transferEntryDPT
   -- , tryTransferEntryDPT
   , transferAnchor
@@ -86,7 +86,7 @@ debug c s = trace s c
 -- | Re-associate AST using given 'FixityEnv'. (The GHC parser has no knowledge
 -- of operator fixity, because that requires running the renamer, so it parses
 -- all operators as left-associated.)
-fix :: (Data ast, Monad m) => FixityEnv -> ast -> TransformT m ast
+fix :: (Data ast, MonadIO m) => FixityEnv -> ast -> TransformT m ast
 fix env = fixAssociativity >=> fixEntryDP
   where
     fixAssociativity = everywhereM (mkM (fixOneExpr env) `extM` fixOnePat env)
@@ -101,26 +101,30 @@ associatesRight (Fixity _ p1 a1) (Fixity _ p2 _a2) =
 -- operator application. We also know that this will be applied bottom-up
 -- by 'everywhere', so we can assume the children are already fixed.
 fixOneExpr
-  :: Monad m
+  :: MonadIO m
   => FixityEnv
   -> LHsExpr GhcPs
   -> TransformT m (LHsExpr GhcPs)
-fixOneExpr env (L l2 (OpApp x2 _ap1@(L l1 (OpApp x1 x op1 y)) op2 z))
+fixOneExpr env (L l2 (OpApp x2 ap1@(L l1 (OpApp x1 x op1 y)) op2 z))
   | associatesRight (lookupOp op1 env) (lookupOp op2 env) = do
+    lift $ liftIO $ debugPrint Loud "fixOneExpr:(l1,l2)="  [showAst (l1,l2)] 
     let ap2' = L l2 $ OpApp x2 y op2 z
-    -- swapEntryDPT ap1 ap2'
-    -- transferAnnsT isComma ap2' ap1
-    rhs <- fixOneExpr env ap2'
-    return $ L l1 $ OpApp x1 x op1 rhs
+    (ap1_0, ap2'_0) <- swapEntryDPT ap1 ap2'
+    ap1_1 <- transferAnnsT isComma ap2'_0 ap1_0
+    lift $ liftIO $ debugPrint Loud "fixOneExpr:recursing"  [] 
+    rhs <- fixOneExpr env ap2'_0
+    lift $ liftIO $ debugPrint Loud "fixOneExpr:returning"  [showAst (L l1 $ OpApp x1 x op1 rhs)] 
+    -- return $ L l1 $ OpApp x1 x op1 rhs
+    return $ L l2 $ OpApp x1 x op1 rhs
 fixOneExpr _ e = return e
 
 fixOnePat :: Monad m => FixityEnv -> LPat GhcPs -> TransformT m (LPat GhcPs)
-fixOnePat env (dLPat -> Just (L l2 (ConPat ext2 op2 (InfixCon (dLPat -> Just _ap1@(L l1 (ConPat ext1 op1 (InfixCon x y)))) z))))
+fixOnePat env (dLPat -> Just (L l2 (ConPat ext2 op2 (InfixCon (dLPat -> Just ap1@(L l1 (ConPat ext1 op1 (InfixCon x y)))) z))))
   | associatesRight (lookupOpRdrName op1 env) (lookupOpRdrName op2 env) = do
     let ap2' = L l2 (ConPat ext2 op2 (InfixCon y z))
-    -- swapEntryDPT ap1 ap2'
-    -- transferAnnsT isComma ap2' ap1
-    rhs <- fixOnePat env (cLPat ap2')
+    (ap1_0, ap2'_0) <- swapEntryDPT ap1 ap2'
+    ap1_1 <- transferAnnsT isComma ap2' ap1
+    rhs <- fixOnePat env (cLPat ap2'_0)
     return $ cLPat $ L l1 (ConPat ext1 op1 (InfixCon x rhs))
 fixOnePat _ e = return e
 
@@ -209,6 +213,16 @@ fixOneEntryPat pat
 
 -------------------------------------------------------------------------------
 
+
+-- Swap entryDP and prior comments between the two args
+swapEntryDPT
+  :: (Data a, Data b, Monad m, Monoid a1, Monoid a2)
+  => LocatedAn a1 a -> LocatedAn a2 b -> TransformT m (LocatedAn a1 a, LocatedAn a2 b)
+swapEntryDPT a b = do
+  b' <- transferEntryDP a b
+  a' <- transferEntryDP b a
+  return (a',b')
+
 -- swapEntryDPT
 --   :: (Data a, Data b, Monad m)
 --   => LocatedAn a1 a -> LocatedAn a2 b -> TransformT m ()
@@ -283,7 +297,8 @@ parseStmt libdir str = do
 parseType :: Parsers.LibDir -> String -> IO AnnotatedHsType
 parseType libdir str = parseHelper libdir "parseType" Parsers.parseType str
 
-parseHelper :: Parsers.LibDir -> FilePath -> Parsers.Parser a -> String -> IO (Annotated a)
+parseHelper :: (ExactPrint a)
+  => Parsers.LibDir -> FilePath -> Parsers.Parser a -> String -> IO (Annotated a)
 parseHelper libdir fp parser str = join $ Parsers.withDynFlags libdir $ \dflags ->
   case parser dflags fp str of
 #if __GLASGOW_HASKELL__ < 810
@@ -291,7 +306,7 @@ parseHelper libdir fp parser str = join $ Parsers.withDynFlags libdir $ \dflags 
 #else
     Left errBag -> throwIO $ ErrorCall (show $ bagToList errBag)
 #endif
-    Right x -> return $ unsafeMkA x 0
+    Right x -> return $ unsafeMkA (makeDeltaAst x) 0
 
 -- type Parser a = GHC.DynFlags -> FilePath -> String -> ParseResult a
 
@@ -358,6 +373,14 @@ transferEntryDPT _a _b = error "transferEntryDPT"
 --     (anns',dp) = fromMaybe
 --                   (error $ "transferEntryDP: lookup failed: " ++ show (mkAnnKey a))
 --                   maybeAnns
+
+addAllAnnsT
+  :: (HasCallStack, Monoid an, Data a, Data b, MonadIO m)
+  => LocatedAn an a -> LocatedAn an b -> TransformT m (LocatedAn an b)
+addAllAnnsT a b = do
+  -- AZ: to start with, just transfer the entry DP from a to b
+  transferEntryDP a b
+  
 
 -- addAllAnnsT
 --   :: (HasCallStack, Data a, Data b, Monad m)
@@ -468,7 +491,7 @@ debugParse libdir fixityEnv s = do
   case r of
     Left _ -> putStrLn "parse failed"
     Right modl -> do
-      let m = unsafeMkA modl 0
+      let m = unsafeMkA (makeDeltaAst modl) 0
       putStrLn "parseModule"
       debugDump m
       void $ transformDebug m

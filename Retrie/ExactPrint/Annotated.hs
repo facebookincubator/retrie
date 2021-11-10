@@ -6,6 +6,8 @@
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE DeriveDataTypeable #-}
 module Retrie.ExactPrint.Annotated
   ( -- * Annotated
     Annotated
@@ -69,6 +71,7 @@ data Annotated ast = Annotated
   , seedA  :: Int
   -- ^ Name supply used by ghc-exactprint to generate unique locations.
   }
+deriving instance (Data ast) => Data (Annotated ast)
 
 instance Functor Annotated where
   fmap f Annotated{..} = Annotated{astA = f astA, ..}

@@ -81,9 +81,9 @@ replaceImpl c e = do
       -- substitute for quantifiers in grafted template
       r <- subst sub c t'
       -- copy appropriate annotations from old expression to template
-      -- addAllAnnsT e r
+      r0 <- addAllAnnsT e r
       -- add parens to template if needed
-      res' <- (mkM (parenify c) `extM` parenifyT c `extM` parenifyP c) r
+      res' <- (mkM (parenify c) `extM` parenifyT c `extM` parenifyP c) r0
       -- Make sure the replacement has the same anchor as the thing
       -- being replaced
       let res = transferAnchor e res'
@@ -97,8 +97,8 @@ replaceImpl c e = do
       -- repl <- printA' <$> pruneA res
       -- repl <- return $ showAst t'
 
-      -- lift $ liftIO $ debugPrint Loud "replaceImpl:r="  [showAst r]
-      -- lift $ liftIO $ debugPrint Loud "replaceImpl:t'=" [showAst t']
+      lift $ liftIO $ debugPrint Loud "replaceImpl:r="  [showAst r]
+      lift $ liftIO $ debugPrint Loud "replaceImpl:t'=" [showAst t']
 
       let replacement = Replacement (getLocA e) orig repl
       TransformT $ lift $ tell $ Change [replacement] [tImports]

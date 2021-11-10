@@ -75,7 +75,8 @@ mkLoc e = do
   L <$> uniqueSrcSpanT <*> pure e
 
 -- ++AZ++:TODO: move to ghc-exactprint
-mkLocA :: (Data e, Monad m, Monoid an) => DeltaPos -> e -> TransformT m (LocatedAn an e)
+mkLocA :: (Data e, Monad m, Monoid an)
+  => DeltaPos -> e -> TransformT m (LocatedAn an e)
 mkLocA dp e = do
   l <- uniqueSrcSpanT
   let anc = Anchor (realSrcSpan l) (MovedAnchor dp)
@@ -142,8 +143,8 @@ mkTyVar :: Monad m => LocatedN RdrName -> TransformT m (LHsType GhcPs)
 mkTyVar nm = do
   tv <- mkLocA (SameLine 1) (HsTyVar noAnn NotPromoted nm)
   -- _ <- setAnnsFor nm [(G AnnVal, DP (0,0))]
-  -- swapEntryDPT tv nm
-  return tv
+  (tv', nm') <- swapEntryDPT tv nm
+  return tv'
 
 mkVarPat :: Monad m => LocatedN RdrName -> TransformT m (LPat GhcPs)
 mkVarPat nm = cLPat <$> mkLocA (SameLine 1) (VarPat noExtField nm)
@@ -309,12 +310,13 @@ unparen e = e
 needsParens :: HsExpr GhcPs -> Bool
 needsParens = hsExprNeedsParens (PprPrec 10)
 
-mkParen :: (Data x, Monad m) => (Located x -> x) -> Located x -> TransformT m (Located x)
+mkParen :: (Data x, Monad m, Monoid an)
+  => (LocatedAn an x -> x) -> LocatedAn an x -> TransformT m (LocatedAn an x)
 mkParen k e = do
-  pe <- mkLoc (k e)
+  pe <- mkLocA (SameLine 1) (k e)
   -- _ <- setAnnsFor pe [(G AnnOpenP, DP (0,0)), (G AnnCloseP, DP (0,0))]
-  -- swapEntryDPT e pe
-  return pe
+  (e0,pe0) <- swapEntryDPT e pe
+  return pe0
 
 mkParen' :: (Data x, Monad m, Monoid an)
          => (EpAnn AnnParen -> x) -> TransformT m (LocatedAn an x)
@@ -322,7 +324,7 @@ mkParen' k = do
   let an = AnnParen AnnParens d0 d0
   l <- uniqueSrcSpanT
   let anc = Anchor (realSrcSpan l) (MovedAnchor (SameLine 1))
-  pe <- mkLocA (SameLine 1) (k (EpAnn anc an emptyComments))
+  pe <- mkLocA (SameLine 0) (k (EpAnn anc an emptyComments))
   return pe
 
 -- This explicitly operates on 'Located (Pat GhcPs)' instead of 'LPat GhcPs'
@@ -335,7 +337,7 @@ parenifyP
 parenifyP Context{..} p@(L _ pat)
   | IsLhs <- ctxtParentPrec
   , needed pat =
-    mkParen' (\an -> ParPat an (cLPat p))
+    mkParen' (\an -> ParPat an (setEntryDP p (SameLine 0)))
   | otherwise = return p
   where
     needed BangPat{}                          = False
@@ -358,7 +360,7 @@ parenifyP Context{..} p@(L _ pat)
 parenifyT
   :: Monad m => Context -> LHsType GhcPs -> TransformT m (LHsType GhcPs)
 parenifyT Context{..} lty@(L _ ty)
-  | needed ty = mkParen' (\an -> HsParTy an lty)
+  | needed ty = mkParen' (\an -> HsParTy an (setEntryDP lty (SameLine 0)))
   | otherwise = return lty
   where
     needed HsAppTy{}

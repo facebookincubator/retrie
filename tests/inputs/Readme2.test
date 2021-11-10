@@ -16,8 +16,8 @@
 
 -{-# RULES "myRule" forall x. maybe Nothing Just x = x #-}
 +{-# RULES "myRule" forall x. case x of
-+            Nothing -> Nothing
-+            Just x1 -> Just x1 = x #-}
++  Nothing -> Nothing
++  Just x1 -> Just x1 = x #-}
 
  foo :: MyMaybe
 -foo = maybe Nothing Just (Just 5)

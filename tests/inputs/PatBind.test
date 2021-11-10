@@ -19,11 +19,9 @@
  zzz :: ()
 -zzz = let (alpha, beta) = one global
 -       in f alpha
-+zzz = let (y,x) = two global
-+       in f x
++zzz = let (y,x) = two global in f x
 
  yyy :: ()
 -yyy = let snd:fst:xs = flipFirst global
 -       in f fst snd
-+yyy = let x1:x2:xs = global
-+       in f x1 x2
++yyy = let x1:x2:xs = global in f x1 x2

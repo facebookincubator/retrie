@@ -86,9 +86,9 @@ elaborateImpl ctxt e = do
       -- substitute for quantifiers in grafted template
       r <- subst sub ctxt t'
       -- copy appropriate annotations from old expression to template
-      -- addAllAnnsT e r
+      r0 <- addAllAnnsT e r
       -- add parens to template if needed
-      (mkM (parenify ctxt) `extM` parenifyT ctxt `extM` parenifyP ctxt) r
+      (mkM (parenify ctxt) `extM` parenifyT ctxt `extM` parenifyP ctxt) r0
 
   fromFoldable (e : elaborations)
 
