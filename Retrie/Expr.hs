@@ -58,7 +58,7 @@ mkLocatedHsVar n@(L l _) = do
   --         "[]" -> [(G AnnOpenS, DP (0,0)), (G AnnCloseS, DP (0,0))]
   --         _    -> [(G AnnVal, DP (0,0))]
   -- r <- setAnnsFor v anns
-  return (L (l2l l)  (HsVar noExtField n))
+  return (L (moveAnchor l)  (HsVar noExtField n))
 
 -------------------------------------------------------------------------------
 
@@ -77,10 +77,7 @@ mkLoc e = do
 -- ++AZ++:TODO: move to ghc-exactprint
 mkLocA :: (Data e, Monad m, Monoid an)
   => DeltaPos -> e -> TransformT m (LocatedAn an e)
-mkLocA dp e = do
-  l <- uniqueSrcSpanT
-  let anc = Anchor (realSrcSpan l) (MovedAnchor dp)
-  return (L (SrcSpanAnn (EpAnn anc mempty emptyComments) l) e)
+mkLocA dp e = mkLocAA dp mempty e
 
 -- ++AZ++:TODO: move to ghc-exactprint
 mkLocAA :: (Data e, Monad m) => DeltaPos -> an -> e -> TransformT m (LocatedAn an e)
@@ -93,8 +90,13 @@ mkLocAA dp an e = do
 -- ++AZ++:TODO: move to ghc-exactprint
 mkEpAnn :: Monad m => DeltaPos -> an -> TransformT m (EpAnn an)
 mkEpAnn dp an = do
+  anc <- mkAnchor dp
+  return $ EpAnn anc an emptyComments
+
+mkAnchor :: Monad m => DeltaPos -> TransformT m (Anchor)
+mkAnchor dp = do
   l <- uniqueSrcSpanT
-  return $ EpAnn (Anchor (realSrcSpan l) (MovedAnchor dp)) an emptyComments
+  return (Anchor (realSrcSpan l) (MovedAnchor dp))
 
 -------------------------------------------------------------------------------
 
@@ -104,14 +106,20 @@ mkLams
   -> TransformT IO (LHsExpr GhcPs)
 mkLams [] e = return e
 mkLams vs e = do
-  matches <- mkLocA (SameLine 1) [mkMatch LambdaExpr vs e emptyLocalBinds]
+  ancg <- mkAnchor (SameLine 0)
+  ancm <- mkAnchor (SameLine 0)
+  let
+    ga = GrhsAnn Nothing (AddEpAnn AnnRarrow (EpaDelta (SameLine 1) []))
+    ang = EpAnn ancg ga emptyComments
+    anm = EpAnn ancm [(AddEpAnn AnnLam (EpaDelta (SameLine 0) []))] emptyComments
+    L l (Match x ctxt pats (GRHSs cs grhs binds)) = mkMatch LambdaExpr vs e emptyLocalBinds
+    grhs' = case grhs of
+      [L lg (GRHS an guards rhs)] -> [L lg (GRHS ang guards rhs)]
+      _ -> fail "mkLams: lambda expression can only have a single grhs!"
+  matches <- mkLocA (SameLine 0) [L l (Match anm ctxt pats (GRHSs cs grhs' binds))]
   let
     mg =
       mkMatchGroup Generated matches
-  -- m' <- case unLoc $ mg_alts mg of
-  --   [m] -> setAnnsFor m [(G AnnLam, DP (0,0)),(G AnnRarrow, DP (0,1))]
-  --   _   -> fail "mkLams: lambda expression can only have a single match!"
-  -- cloneT $ noLoc $ HsLam noExtField mg { mg_alts = noLoc [m'] }
   mkLocA (SameLine 1) $ HsLam noExtField mg
 
 mkLet :: Monad m => HsLocalBinds GhcPs -> LHsExpr GhcPs -> TransformT m (LHsExpr GhcPs)
@@ -130,7 +138,7 @@ mkLet lbs e = do
 mkApps :: Monad m => LHsExpr GhcPs -> [LHsExpr GhcPs] -> TransformT m (LHsExpr GhcPs)
 mkApps e []     = return e
 mkApps f (a:as) = do
-  f' <- mkLocA (SameLine 1) (HsApp noAnn f a)
+  f' <- mkLocA (SameLine 0) (HsApp noAnn f a)
   mkApps f' as
 
 -- GHC never generates HsAppTy in the parser, using HsAppsTy to keep a list
@@ -289,7 +297,7 @@ parenify
   :: Monad m => Context -> LHsExpr GhcPs -> TransformT m (LHsExpr GhcPs)
 parenify Context{..} le@(L _ e)
   | needed ctxtParentPrec (precedence ctxtFixityEnv e) && needsParens e =
-    mkParen' (\an -> HsPar an le)
+    mkParen' (getEntryDP le) (\an -> HsPar an (setEntryDP le (SameLine 0)))
   | otherwise = return le
   where
            {- parent -}               {- child -}
@@ -302,6 +310,7 @@ parenify Context{..} le@(L _ e)
 getUnparened :: Data k => k -> k
 getUnparened = mkT unparen `extT` unparenT `extT` unparenP
 
+-- TODO: what about comments?
 unparen :: LHsExpr GhcPs -> LHsExpr GhcPs
 unparen (L _ (HsPar _ e)) = e
 unparen e = e
@@ -310,7 +319,7 @@ unparen e = e
 needsParens :: HsExpr GhcPs -> Bool
 needsParens = hsExprNeedsParens (PprPrec 10)
 
-mkParen :: (Data x, Monad m, Monoid an)
+mkParen :: (Data x, Monad m, Monoid an, Typeable an)
   => (LocatedAn an x -> x) -> LocatedAn an x -> TransformT m (LocatedAn an x)
 mkParen k e = do
   pe <- mkLocA (SameLine 1) (k e)
@@ -319,12 +328,12 @@ mkParen k e = do
   return pe0
 
 mkParen' :: (Data x, Monad m, Monoid an)
-         => (EpAnn AnnParen -> x) -> TransformT m (LocatedAn an x)
-mkParen' k = do
+         => DeltaPos -> (EpAnn AnnParen -> x) -> TransformT m (LocatedAn an x)
+mkParen' dp k = do
   let an = AnnParen AnnParens d0 d0
   l <- uniqueSrcSpanT
-  let anc = Anchor (realSrcSpan l) (MovedAnchor (SameLine 1))
-  pe <- mkLocA (SameLine 0) (k (EpAnn anc an emptyComments))
+  let anc = Anchor (realSrcSpan l) (MovedAnchor (SameLine 0))
+  pe <- mkLocA dp (k (EpAnn anc an emptyComments))
   return pe
 
 -- This explicitly operates on 'Located (Pat GhcPs)' instead of 'LPat GhcPs'
@@ -337,7 +346,7 @@ parenifyP
 parenifyP Context{..} p@(L _ pat)
   | IsLhs <- ctxtParentPrec
   , needed pat =
-    mkParen' (\an -> ParPat an (setEntryDP p (SameLine 0)))
+    mkParen' (getEntryDP p) (\an -> ParPat an (setEntryDP p (SameLine 0)))
   | otherwise = return p
   where
     needed BangPat{}                          = False
@@ -360,7 +369,7 @@ parenifyP Context{..} p@(L _ pat)
 parenifyT
   :: Monad m => Context -> LHsType GhcPs -> TransformT m (LHsType GhcPs)
 parenifyT Context{..} lty@(L _ ty)
-  | needed ty = mkParen' (\an -> HsParTy an (setEntryDP lty (SameLine 0)))
+  | needed ty = mkParen' (getEntryDP lty) (\an -> HsParTy an (setEntryDP lty (SameLine 0)))
   | otherwise = return lty
   where
     needed HsAppTy{}

@@ -27,7 +27,7 @@ module Retrie.ExactPrint
   -- , cloneT
   -- , setEntryDPT
   , swapEntryDPT
-  -- , transferAnnsT
+  , transferAnnsT
   , transferEntryAnnsT
   , transferEntryDPT
   -- , tryTransferEntryDPT
@@ -36,7 +36,7 @@ module Retrie.ExactPrint
   , debugDump
   , debugParse
   , debug
-  -- , hasComments
+  , hasComments
   , isComma
     -- * Annotated AST
   , module Retrie.ExactPrint.Annotated
@@ -216,7 +216,7 @@ fixOneEntryPat pat
 
 -- Swap entryDP and prior comments between the two args
 swapEntryDPT
-  :: (Data a, Data b, Monad m, Monoid a1, Monoid a2)
+  :: (Data a, Data b, Monad m, Monoid a1, Monoid a2, Typeable a1, Typeable a2)
   => LocatedAn a1 a -> LocatedAn a2 b -> TransformT m (LocatedAn a1 a, LocatedAn a2 b)
 swapEntryDPT a b = do
   b' <- transferEntryDP a b
@@ -338,7 +338,7 @@ debugDump ax = do
 -- but the types are liberalized from 'Transform a' to 'TransformT m a'.
 transferEntryAnnsT
   :: (HasCallStack, Data a, Data b, Monad m)
-  => (AnnKeywordId -> Bool)        -- transfer Anns matching predicate
+  => (TrailingAnn -> Bool)  -- transfer Anns matching predicate
   -> LocatedA a             -- from
   -> LocatedA b             -- to
   -> TransformT m (LocatedA b)
@@ -375,7 +375,7 @@ transferEntryDPT _a _b = error "transferEntryDPT"
 --                   maybeAnns
 
 addAllAnnsT
-  :: (HasCallStack, Monoid an, Data a, Data b, MonadIO m)
+  :: (HasCallStack, Monoid an, Data a, Data b, MonadIO m, Typeable an)
   => LocatedAn an a -> LocatedAn an b -> TransformT m (LocatedAn an b)
 addAllAnnsT a b = do
   -- AZ: to start with, just transfer the entry DP from a to b
@@ -408,8 +408,8 @@ transferAnchor (L (SrcSpanAnn EpAnnNotUsed l)    _) lb = setAnchorAn lb (spanAsA
 transferAnchor (L (SrcSpanAnn (EpAnn anc _ _) _) _) lb = setAnchorAn lb anc              emptyComments 
 
 
-isComma :: AnnKeywordId -> Bool
-isComma AnnComma = True
+isComma :: TrailingAnn -> Bool
+isComma (AddCommaAnn _) = True
 isComma _ = False
 
 isCommentKeyword :: AnnKeywordId -> Bool
@@ -421,6 +421,14 @@ isCommentKeyword _ = False
 --   (not . null $ annPriorComments)
 --   || (not . null $ annFollowingComments)
 --   || any (isCommentKeyword . fst) annsDP
+
+hasComments :: LocatedAn an a -> Bool
+hasComments (L (SrcSpanAnn EpAnnNotUsed _) _) = False
+hasComments (L (SrcSpanAnn (EpAnn anc _ cs) _) _)
+  = case cs of
+      EpaComments [] -> False
+      EpaCommentsBalanced [] [] -> False
+      _ -> True
 
 -- hasComments :: (Data a, Monad m) => Located a -> TransformT m Bool
 -- hasComments e = do
@@ -445,16 +453,13 @@ isCommentKeyword _ = False
 
 transferAnnsT
   :: (Data a, Data b, Monad m)
-  => (AnnKeywordId -> Bool)     -- transfer Anns matching predicate
+  => (TrailingAnn -> Bool)      -- transfer Anns matching predicate
   -> LocatedA a                 -- from
   -> LocatedA b                 -- to
   -> TransformT m (LocatedA b)
 transferAnnsT p (L (SrcSpanAnn EpAnnNotUsed _) _) b = return b
 transferAnnsT p (L (SrcSpanAnn (EpAnn anc (AnnListItem ts) cs) l) a) (L (SrcSpanAnn an lb) b) = do
-  let isMatch t =
-        case trailingAnnToAddEpAnn t of
-          AddEpAnn kw _ -> p kw
-  let ps = filter isMatch ts
+  let ps = filter p ts
   let an' = case an of
         EpAnnNotUsed -> EpAnn (spanAsAnchor lb) (AnnListItem ps) emptyComments
         EpAnn ancb (AnnListItem tsb) csb -> EpAnn ancb (AnnListItem (tsb++ps)) csb

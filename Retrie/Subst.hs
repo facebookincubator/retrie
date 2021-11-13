@@ -55,13 +55,16 @@ substExpr ctxt e@(L l1 (HsVar x (L l2 v))) =
     Just (HoleExpr eA) -> do
       lift $ liftIO $ debugPrint Loud "substExpr:HoleExpr:e" [showAst e]
       lift $ liftIO $ debugPrint Loud "substExpr:HoleExpr:eA" [showAst eA]
-      e' <- graftA (unparen <$> eA)
-      -- comments <- hasComments e'
+      e0 <- graftA (unparen <$> eA)
+      let comments = hasComments e0
       -- unless comments $ transferEntryDPT e e'
-      -- transferAnnsT isComma e e'
+      e1 <- if comments
+               then return e0
+               else transferEntryDP e e0
+      e2 <- transferAnnsT isComma e e1
       -- let e'' = setEntryDP e' (SameLine 1)
-      e'' <- transferEntryDP e e'
-      parenify ctxt e''
+      lift $ liftIO $ debugPrint Loud "substExpr:HoleExpr:e''" [showAst e2]
+      parenify ctxt e2
     Just (HoleRdr rdr) ->
       return $ L l1 $ HsVar x $ L l2 rdr
     _ -> return e

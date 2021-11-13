@@ -49,5 +49,5 @@ mkRuleRewrite RightToLeft (RuleInfo name qs lhs rhs) =
 mkRuleRewrite _ RuleInfo{..} = do
   p <- pruneA (setEntryDP riLHS (SameLine 1))
   t <- pruneA (setEntryDP riRHS (SameLine 1))
-  lift $ debugPrint Loud "mkRuleRewrite" [showAstA p, showAstA t]
+  -- lift $ debugPrint Loud "mkRuleRewrite" [showAstA p, showAstA t]
   return (riName, mkRewrite (mkQs riQuantifiers) p t)
