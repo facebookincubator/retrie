@@ -53,8 +53,8 @@ substExpr
 substExpr ctxt e@(L l1 (HsVar x (L l2 v))) =
   case lookupHoleVar v ctxt of
     Just (HoleExpr eA) -> do
-      lift $ liftIO $ debugPrint Loud "substExpr:HoleExpr:e" [showAst e]
-      lift $ liftIO $ debugPrint Loud "substExpr:HoleExpr:eA" [showAst eA]
+      -- lift $ liftIO $ debugPrint Loud "substExpr:HoleExpr:e" [showAst e]
+      -- lift $ liftIO $ debugPrint Loud "substExpr:HoleExpr:eA" [showAst eA]
       e0 <- graftA (unparen <$> eA)
       let comments = hasComments e0
       -- unless comments $ transferEntryDPT e e'
@@ -63,7 +63,7 @@ substExpr ctxt e@(L l1 (HsVar x (L l2 v))) =
                else transferEntryDP e e0
       e2 <- transferAnnsT isComma e e1
       -- let e'' = setEntryDP e' (SameLine 1)
-      lift $ liftIO $ debugPrint Loud "substExpr:HoleExpr:e''" [showAst e2]
+      -- lift $ liftIO $ debugPrint Loud "substExpr:HoleExpr:e2" [showAst e2]
       parenify ctxt e2
     Just (HoleRdr rdr) ->
       return $ L l1 $ HsVar x $ L l2 rdr
@@ -78,8 +78,8 @@ substPat
 substPat ctxt (dLPat -> Just p@(L l1 (VarPat x _vl@(L l2 v)))) = fmap cLPat $
   case lookupHoleVar v ctxt of
     Just (HolePat pA) -> do
-      lift $ liftIO $ debugPrint Loud "substPat:HolePat:p" [showAst p]
-      lift $ liftIO $ debugPrint Loud "substPat:HolePat:pA" [showAst pA]
+      -- lift $ liftIO $ debugPrint Loud "substPat:HolePat:p" [showAst p]
+      -- lift $ liftIO $ debugPrint Loud "substPat:HolePat:pA" [showAst pA]
       p' <- graftA (unparenP <$> pA)
       p0 <- transferEntryAnnsT isComma p p'
       -- the relevant entry delta is sometimes attached to
@@ -101,8 +101,8 @@ substType
 substType ctxt ty
   | Just (L _ v) <- tyvarRdrName (unLoc ty)
   , Just (HoleType tyA) <- lookupHoleVar v ctxt = do
-    lift $ liftIO $ debugPrint Loud "substType:HoleType:ty" [showAst ty]
-    lift $ liftIO $ debugPrint Loud "substType:HoleType:tyA" [showAst tyA]
+    -- lift $ liftIO $ debugPrint Loud "substType:HoleType:ty" [showAst ty]
+    -- lift $ liftIO $ debugPrint Loud "substType:HoleType:tyA" [showAst tyA]
     ty' <- graftA (unparenT <$> tyA)
     ty0 <- transferEntryAnnsT isComma ty ty'
     parenifyT ctxt ty0

@@ -22,6 +22,7 @@ import Retrie.Expr
 import Retrie.GHC
 import Retrie.Quantifiers
 import Retrie.Types
+import Retrie.Util
 
 dfnsToRewrites
   :: LibDir
@@ -35,6 +36,7 @@ dfnsToRewrites libdir specs am = fmap astA $ transformA am $ \ (L _ m) -> do
   rrs <- sequence
     [ do
         fe <- mkLocatedHsVar fRdrName
+        -- lift $ debugPrint Loud "dfnsToRewrites:ef="  [showAst fe]
         imps <- getImports libdir dir (hsmodName m)
         (fName,) . concat <$>
           forM (unLoc $ mg_alts $ fun_matches f) (matchToRewrites fe imps dir)
@@ -61,6 +63,7 @@ matchToRewrites
   -> LMatch GhcPs (LHsExpr GhcPs)
   -> TransformT IO [Rewrite (LHsExpr GhcPs)]
 matchToRewrites e imps dir (L _ alt) = do
+  -- lift $ debugPrint Loud "matchToRewrites:e="  [showAst e]
   let
     pats = m_pats alt
     grhss = m_grhss alt
@@ -99,6 +102,7 @@ makeFunctionQuery e imps dir grhss mkAppFn (argpats, bndpats)
       bs = collectPatsBinders CollNoDictBinders argpats
     -- See Note [Wildcards]
     (es,(_,bs')) <- runStateT (mapM patToExpr argpats) (wildSupply bs, bs)
+    -- lift $ debugPrint Loud "makeFunctionQuery:e="  [showAst e]
     lhs <- mkAppFn e es
     for rhss $ \ grhs -> do
       le <- mkLet lbs (grhsToExpr grhs)

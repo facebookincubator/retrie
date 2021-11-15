@@ -97,10 +97,14 @@ replaceImpl c e = do
       -- repl <- printA' <$> pruneA res
       -- repl <- return $ showAst t'
 
-      lift $ liftIO $ debugPrint Loud "replaceImpl:e="  [showAst e]
-      lift $ liftIO $ debugPrint Loud "replaceImpl:r="  [showAst r]
-      lift $ liftIO $ debugPrint Loud "replaceImpl:t'=" [showAst t']
-      lift $ liftIO $ debugPrint Loud "replaceImpl:res=" [showAst res]
+      -- lift $ liftIO $ debugPrint Loud "replaceImpl:orig="  [orig]
+      -- lift $ liftIO $ debugPrint Loud "replaceImpl:repl="  [repl]
+
+      -- lift $ liftIO $ debugPrint Loud "replaceImpl:e="  [showAst e]
+      -- lift $ liftIO $ debugPrint Loud "replaceImpl:r="  [showAst r]
+      -- lift $ liftIO $ debugPrint Loud "replaceImpl:r0="  [showAst r0]
+      -- lift $ liftIO $ debugPrint Loud "replaceImpl:t'=" [showAst t']
+      -- lift $ liftIO $ debugPrint Loud "replaceImpl:res=" [showAst res]
 
       let replacement = Replacement (getLocA e) orig repl
       TransformT $ lift $ tell $ Change [replacement] [tImports]

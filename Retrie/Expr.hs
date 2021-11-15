@@ -26,7 +26,7 @@ module Retrie.Expr
   , parenifyT
   , parenifyP
   , patToExpr
-  , patToExprA
+  -- , patToExprA
   -- , setAnnsFor
   , unparen
   , unparenP
@@ -46,11 +46,12 @@ import Retrie.Fixity
 import Retrie.GHC
 import Retrie.SYB
 import Retrie.Types
+import Retrie.Util
 
 -------------------------------------------------------------------------------
 
 mkLocatedHsVar :: Monad m => LocatedN RdrName -> TransformT m (LHsExpr GhcPs)
-mkLocatedHsVar n@(L l _) = do
+mkLocatedHsVar ln@(L l n) = do
   -- This special casing for [] is gross, but this is apparently how the
   -- annotations work.
   -- let anns =
@@ -58,7 +59,19 @@ mkLocatedHsVar n@(L l _) = do
   --         "[]" -> [(G AnnOpenS, DP (0,0)), (G AnnCloseS, DP (0,0))]
   --         _    -> [(G AnnVal, DP (0,0))]
   -- r <- setAnnsFor v anns
-  return (L (moveAnchor l)  (HsVar noExtField n))
+  -- return (L (moveAnchor l)  (HsVar noExtField n))
+  mkLocA (SameLine 0)  (HsVar noExtField (L (setMoveAnchor (SameLine 0) l) n))
+
+-- TODO: move to ghc-exactprint
+setMoveAnchor :: (Monoid an) => DeltaPos -> SrcAnn an -> SrcAnn an
+setMoveAnchor dp (SrcSpanAnn EpAnnNotUsed l)
+  = SrcSpanAnn (EpAnn (dpAnchor l dp) mempty emptyComments) l
+setMoveAnchor dp (SrcSpanAnn (EpAnn (Anchor a _) an cs) l)
+  = SrcSpanAnn (EpAnn (Anchor a (MovedAnchor dp)) an cs) l
+
+-- TODO: move to ghc-exactprint
+dpAnchor :: SrcSpan -> DeltaPos -> Anchor
+dpAnchor l dp = Anchor (realSrcSpan l) (MovedAnchor dp)
 
 -------------------------------------------------------------------------------
 
@@ -135,9 +148,10 @@ mkLet lbs e = do
 
 
 
-mkApps :: Monad m => LHsExpr GhcPs -> [LHsExpr GhcPs] -> TransformT m (LHsExpr GhcPs)
+mkApps :: MonadIO m => LHsExpr GhcPs -> [LHsExpr GhcPs] -> TransformT m (LHsExpr GhcPs)
 mkApps e []     = return e
 mkApps f (a:as) = do
+  -- lift $ liftIO $ debugPrint Loud "mkApps:f="  [showAst f]
   f' <- mkLocA (SameLine 0) (HsApp noAnn f a)
   mkApps f' as
 
@@ -204,11 +218,11 @@ wildSupplyP p =
       , let r = mkVarUnqual (mkFastString ('w' : show (i :: Int)))
       , p r ]
 
-patToExprA :: AlphaEnv -> AnnotatedPat -> AnnotatedHsExpr
-patToExprA env pat = runIdentity $ transformA pat $ \ p ->
-  fst <$> runStateT (patToExpr $ cLPat p) (wildSupplyAlphaEnv env, [])
+-- patToExprA :: AlphaEnv -> AnnotatedPat -> AnnotatedHsExpr
+-- patToExprA env pat = runIdentity $ transformA pat $ \ p ->
+--   fst <$> runStateT (patToExpr $ cLPat p) (wildSupplyAlphaEnv env, [])
 
-patToExpr :: Monad m => LPat GhcPs -> PatQ m (LHsExpr GhcPs)
+patToExpr :: MonadIO m => LPat GhcPs -> PatQ m (LHsExpr GhcPs)
 patToExpr orig = case dLPat orig of
   Nothing -> error "patToExpr: called on unlocated Pat!"
   Just lp@(L _ p) -> do
@@ -263,7 +277,7 @@ patToExpr orig = case dLPat orig of
     go SumPat{} = error "patToExpr SumPat"
     go ViewPat{} = error "patToExpr ViewPat"
 
-conPatHelper :: Monad m
+conPatHelper :: MonadIO m
              => LocatedN RdrName
              -> HsConPatDetails GhcPs
              -> PatQ m (LHsExpr GhcPs)
@@ -276,6 +290,7 @@ conPatHelper con (InfixCon x y) =
 conPatHelper con (PrefixCon tyargs xs) = do
   f <- lift $ mkLocatedHsVar con
   as <- mapM patToExpr xs
+  -- lift $ lift $ liftIO $ debugPrint Loud "conPatHelper:f="  [showAst f]
   lift $ mkApps f as
 conPatHelper _ _ = error "conPatHelper RecCon"
 

@@ -9,8 +9,9 @@
 {-# LANGUAGE RecordWildCards #-}
 module Retrie.Rewrites.Patterns (patternSynonymsToRewrites) where
 
-import Control.Monad.State (StateT(runStateT))
+import Control.Monad.State (StateT(runStateT), lift)
 import Control.Monad
+import Control.Monad.IO.Class
 import Data.Maybe
 import Data.Void
 
@@ -113,6 +114,7 @@ mkExpRewrite
   -> TransformT IO [Rewrite (LHsExpr GhcPs)]
 mkExpRewrite dir imports patName params rhs patDir = do
   fe <- mkLocatedHsVar patName
+  -- lift $ debugPrint Loud "mkExpRewrite:fe="  [showAst fe]
   let altsFromParams = case params of
         PrefixCon _tyargs names -> buildMatch names rhs
         InfixCon a1 a2 -> buildMatch [a1, a2] rhs
@@ -124,7 +126,7 @@ mkExpRewrite dir imports patName params rhs patDir = do
   fmap concat $ forM alts $ matchToRewrites fe imports dir
 
 buildMatch
-  :: Monad m
+  :: MonadIO m
   => [LocatedN RdrName]
   -> LPat GhcPs
   -> TransformT m [LMatch GhcPs (LHsExpr GhcPs)]

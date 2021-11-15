@@ -107,13 +107,13 @@ fixOneExpr
   -> TransformT m (LHsExpr GhcPs)
 fixOneExpr env (L l2 (OpApp x2 ap1@(L l1 (OpApp x1 x op1 y)) op2 z))
   | associatesRight (lookupOp op1 env) (lookupOp op2 env) = do
-    lift $ liftIO $ debugPrint Loud "fixOneExpr:(l1,l2)="  [showAst (l1,l2)] 
-    let ap2' = L l2 $ OpApp x2 y op2 z
+    -- lift $ liftIO $ debugPrint Loud "fixOneExpr:(l1,l2)="  [showAst (l1,l2)]
+    let ap2' = L (stripComments l2) $ OpApp x2 y op2 z
     (ap1_0, ap2'_0) <- swapEntryDPT ap1 ap2'
     ap1_1 <- transferAnnsT isComma ap2'_0 ap1_0
-    lift $ liftIO $ debugPrint Loud "fixOneExpr:recursing"  [] 
+    -- lift $ liftIO $ debugPrint Loud "fixOneExpr:recursing"  []
     rhs <- fixOneExpr env ap2'_0
-    lift $ liftIO $ debugPrint Loud "fixOneExpr:returning"  [showAst (L l1 $ OpApp x1 x op1 rhs)] 
+    -- lift $ liftIO $ debugPrint Loud "fixOneExpr:returning"  [showAst (L l2 $ OpApp x1 x op1 rhs)]
     -- return $ L l1 $ OpApp x1 x op1 rhs
     return $ L l2 $ OpApp x1 x op1 rhs
 fixOneExpr _ e = return e
@@ -128,17 +128,23 @@ fixOnePat env (dLPat -> Just (L l2 (ConPat ext2 op2 (InfixCon (dLPat -> Just ap1
     return $ cLPat $ L l1 (ConPat ext1 op1 (InfixCon x rhs))
 fixOnePat _ e = return e
 
+-- TODO: move to ghc-exactprint
+stripComments :: SrcAnn an -> SrcAnn an
+stripComments (SrcSpanAnn EpAnnNotUsed l) = SrcSpanAnn EpAnnNotUsed l
+stripComments (SrcSpanAnn (EpAnn anc an _) l) = SrcSpanAnn (EpAnn anc an emptyComments) l
+
 -- Move leading whitespace from the left child of an operator application
 -- to the application itself. We need this so we have correct offsets when
 -- substituting into patterns and don't end up with extra leading spaces.
 -- We can assume it is run bottom-up, and that precedence is already fixed.
 fixOneEntry
-  :: (Monad m, Data a)
+  :: (MonadIO m, Data a)
   => LocatedA a -- ^ Overall application
   -> LocatedA a -- ^ Left child
   -> TransformT m (LocatedA a, LocatedA a)
 fixOneEntry e x = do
-  -- anns <- getAnnsT
+  -- lift $ liftIO $ debugPrint Loud "fixOneEntry:(e,x)="  [showAst (e,x)]
+  -- -- anns <- getAnnsT
   -- let
   --   zeros = SameLine 0
   --   (xdp, ard) =
@@ -167,6 +173,10 @@ fixOneEntry e x = do
   let ec = deltaColumn edp
   case xdp of
     SameLine n -> do
+      -- lift $ liftIO $ debugPrint Loud "fixOneEntry:(xdp,edp)="  [showAst (xdp,edp)]
+      -- lift $ liftIO $ debugPrint Loud "fixOneEntry:(dpx,dpe)="  [showAst ((deltaPos er (xc + ec)),(deltaPos xr 0))]
+      -- lift $ liftIO $ debugPrint Loud "fixOneEntry:e'="  [showAst e]
+      -- lift $ liftIO $ debugPrint Loud "fixOneEntry:e'="  [showAst (setEntryDP e (deltaPos er (xc + ec)))]
       return ( setEntryDP e (deltaPos er (xc + ec))
              , setEntryDP x (deltaPos xr 0))
     _ -> return (e,x)
@@ -194,13 +204,16 @@ entryDP (L (SrcSpanAnn (EpAnn anc _ _) _) _)
       MovedAnchor dp -> dp
 
 
-fixOneEntryExpr :: Monad m => LHsExpr GhcPs -> TransformT m (LHsExpr GhcPs)
+fixOneEntryExpr :: MonadIO m => LHsExpr GhcPs -> TransformT m (LHsExpr GhcPs)
 fixOneEntryExpr e@(L l (OpApp a x b c)) = do
+  -- lift $ liftIO $ debugPrint Loud "fixOneEntryExpr:(e,x)="  [showAst (e,x)]
   (e',x') <- fixOneEntry e x
+  -- lift $ liftIO $ debugPrint Loud "fixOneEntryExpr:(e',x')="  [showAst (e',x')]
+  -- lift $ liftIO $ debugPrint Loud "fixOneEntryExpr:returning="  [showAst (L (getLoc e') (OpApp a x' b c))]
   return (L (getLoc e') (OpApp a x' b c))
 fixOneEntryExpr e = return e
 
-fixOneEntryPat :: Monad m => LPat GhcPs -> TransformT m (LPat GhcPs)
+fixOneEntryPat :: MonadIO m => LPat GhcPs -> TransformT m (LPat GhcPs)
 fixOneEntryPat pat
 #if __GLASGOW_HASKELL__ < 900
   | Just p@(L l (ConPatIn a (InfixCon x b))) <- dLPat pat = do
@@ -380,7 +393,7 @@ addAllAnnsT
 addAllAnnsT a b = do
   -- AZ: to start with, just transfer the entry DP from a to b
   transferEntryDP a b
-  
+
 
 -- addAllAnnsT
 --   :: (HasCallStack, Data a, Data b, Monad m)
@@ -405,7 +418,7 @@ addAllAnnsT a b = do
 
 transferAnchor :: LocatedA a -> LocatedA b -> LocatedA b
 transferAnchor (L (SrcSpanAnn EpAnnNotUsed l)    _) lb = setAnchorAn lb (spanAsAnchor l) emptyComments
-transferAnchor (L (SrcSpanAnn (EpAnn anc _ _) _) _) lb = setAnchorAn lb anc              emptyComments 
+transferAnchor (L (SrcSpanAnn (EpAnn anc _ _) _) _) lb = setAnchorAn lb anc              emptyComments
 
 
 isComma :: TrailingAnn -> Bool
