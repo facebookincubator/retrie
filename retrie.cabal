@@ -23,7 +23,7 @@ extra-source-files:
   README.md
   tests/inputs/*.custom
   tests/inputs/*.test
-tested-with: GHC ==9.0.1 || ==8.10.4 || ==8.8.4
+tested-with: GHC ==9.2.1
 
 description:
   Retrie is a tool for codemodding Haskell. Key goals include:
