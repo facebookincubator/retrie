@@ -27,21 +27,21 @@ import Ignore
 import ParseQualified
 import Targets
 
-allTests :: Verbosity -> IO Test
-allTests rtVerbosity = do
+allTests :: LibDir -> Verbosity -> IO Test
+allTests libdir rtVerbosity = do
   p <- getOptionsParser defaultFixityEnv
   rtDir <-
     fromMaybe (dropFileName __FILE__ </> "inputs")
       <$> lookupEnv "RETRIEINPUTSDIR"
   testFiles <- listDir rtDir
-  focusTests <- getFocusTests
+  focusTests <- getFocusTests libdir
   return $ TestList
     [ annotatedTest
     , cppTest
-    , dependentStmtTest rtDir p rtVerbosity
+    , dependentStmtTest libdir rtDir p rtVerbosity
     , excludeTest rtVerbosity
     , TestLabel "golden" $ TestList
-      [ TestLabel rtName $ TestCase $ runTest p RetrieTest{..}
+      [ TestLabel rtName $ TestCase $ runTest libdir p RetrieTest{..}
       | testFile <- testFiles
       , takeExtension testFile == ".test"
       , let
@@ -50,11 +50,11 @@ allTests rtVerbosity = do
           rtRetrie = return . apply . rewrites
       ]
     , TestLabel "custom Retrie" $ TestCase $
-        runTest p RetrieTest
+        runTest libdir p RetrieTest
           { rtName = "custom Retrie"
           , rtTest = "Adhoc2.custom"
           , rtRetrie = \opts -> do
-              rrs' <- parseRewrites opts
+              rrs' <- parseRewrites libdir opts
                 [ Adhoc "forall f g xs. map f (map g xs) = map (f . g) xs"
                 , Adhoc "forall p xs. length (filter p xs) = count p xs"
                 ]
@@ -62,21 +62,21 @@ allTests rtVerbosity = do
           , ..
           }
     , TestLabel "README advanced rewrite demo" $ TestCase $
-        runTest p RetrieTest
+        runTest libdir p RetrieTest
           { rtName = "README advanced rewrite demo"
           , rtTest = "Readme.custom"
           , rtRetrie = \opts -> do
               [rewrite] <-
-                parseRewrites opts [Adhoc "forall arg. fooOld arg = fooNew arg"]
-              return $ apply [setRewriteTransformer Demo.stringToFooArg rewrite]
+                parseRewrites libdir opts [Adhoc "forall arg. fooOld arg = fooNew arg"]
+              return $ apply [setRewriteTransformer (Demo.stringToFooArg libdir) rewrite]
           , ..
           }
     , TestLabel "query test" $ TestCase $ do
-        is <- runQueryTest p RetrieTest
+        is <- runQueryTest libdir p RetrieTest
           { rtName = "query test"
           , rtTest = "Query.custom"
           , rtRetrie = \opts -> do
-              qs <- parseQueries opts [(["x"], QExpr "succ x", 1::Int)]
+              qs <- parseQueries libdir opts [(["x"], QExpr "succ x", 1::Int)]
               return $ do
                 matches <- query qs
                 return [ v | (_,_,v) <- matches ]
@@ -84,7 +84,7 @@ allTests rtVerbosity = do
           }
         assertEqual "found three succs" 3 (sum is)
     , TestLabel "groundterms can be found" $ TestList focusTests
-    , groundTermsTest
+    , groundTermsTest libdir
     , ignoreTest
     , parseQualifiedTest
     , basicTargetTest

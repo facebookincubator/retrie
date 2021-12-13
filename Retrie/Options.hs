@@ -60,20 +60,20 @@ import Retrie.Util
 type Options = Options_ [Rewrite Universe] AnnotatedImports
 
 -- | Parse options using the given 'FixityEnv'.
-parseOptions :: FixityEnv -> IO Options
-parseOptions fixityEnv = do
+parseOptions :: LibDir -> FixityEnv -> IO Options
+parseOptions libdir fixityEnv = do
   p <- getOptionsParser fixityEnv
   opts <- execParser (info (p <**> helper) fullDesc)
-  resolveOptions opts
+  resolveOptions libdir opts
 
 -- | Create 'Rewrite's from string specifications of rewrites.
 -- We expose this from "Retrie" with a nicer type signature as
 -- 'Retrie.Options.parseRewrites'. We have it here so we can use it with
 -- 'ProtoOptions'.
-parseRewritesInternal :: Options_ a b -> [RewriteSpec] -> IO [Rewrite Universe]
-parseRewritesInternal Options{..} = parseRewriteSpecs parser fixityEnv
+parseRewritesInternal :: LibDir -> Options_ a b -> [RewriteSpec] -> IO [Rewrite Universe]
+parseRewritesInternal libdir Options{..} = parseRewriteSpecs libdir parser fixityEnv
   where
-    parser fp = parseCPPFile (parseContent fixityEnv) (targetDir </> fp)
+    parser fp = parseCPPFile (parseContent libdir fixityEnv) (targetDir </> fp)
 
 -- | Controls the ultimate action taken by 'apply'. The default action is
 -- 'ExecRewrite'.
@@ -350,18 +350,18 @@ type ProtoOptions = Options_ [RewriteSpec] [String]
 -- | Resolve 'ProtoOptions' into 'Options'. Parses rewrites into 'Rewrite's,
 -- parses imports, validates options, and extends 'fixityEnv' with any
 -- declared fixities in the target directory.
-resolveOptions :: ProtoOptions -> IO Options
-resolveOptions protoOpts = do
+resolveOptions :: LibDir -> ProtoOptions -> IO Options
+resolveOptions libdir protoOpts = do
   absoluteTargetDir <- makeAbsolute (targetDir protoOpts)
   opts@Options{..} <-
-    addLocalFixities protoOpts { targetDir = absoluteTargetDir }
-  parsedImports <- parseImports additionalImports
+    addLocalFixities libdir protoOpts { targetDir = absoluteTargetDir }
+  parsedImports <- parseImports libdir additionalImports
   debugPrint verbosity "Imports:" $
     runIdentity $ fmap astA $ transformA parsedImports $ \ imps -> do
-      anns <- getAnnsT
-      return $ map (`exactPrint` anns) imps
-  rrs <- parseRewritesInternal opts rewrites
-  es <- parseRewritesInternal opts $
+      -- anns <- getAnnsT
+      return $ map exactPrint imps
+  rrs <- parseRewritesInternal libdir opts rewrites
+  es <- parseRewritesInternal libdir opts $
     (if noDefaultElaborations then [] else defaultElaborations) ++
     elaborations
   elaborated <- elaborateRewritesInternal fixityEnv es rrs
@@ -374,15 +374,15 @@ resolveOptions protoOpts = do
     }
 
 -- | Find all fixity declarations in targetDir and add them to fixity env.
-addLocalFixities :: Options_ a b -> IO (Options_ a b)
-addLocalFixities opts = do
+addLocalFixities :: LibDir -> Options_ a b -> IO (Options_ a b)
+addLocalFixities libdir opts = do
   -- do not limit search for infix decls to only targetFiles
   let opts' = opts { targetFiles = [] }
   -- "infix" will find infixl and infixr as well
   files <- getTargetFiles opts' [HashSet.singleton "infix"]
 
   fixFns <- forFn opts files $ \ fp -> do
-    ms <- toList <$> parseCPPFile parseContentNoFixity fp
+    ms <- toList <$> parseCPPFile (parseContentNoFixity libdir) fp
     return $ extendFixityEnv
       [ (rdrFS nm, fixity)
       | m <- ms

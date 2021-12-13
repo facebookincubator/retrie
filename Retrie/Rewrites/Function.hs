@@ -22,23 +22,22 @@ import Retrie.Expr
 import Retrie.GHC
 import Retrie.Quantifiers
 import Retrie.Types
+import Retrie.Util
 
 dfnsToRewrites
-  :: [(FastString, Direction)]
+  :: LibDir
+  -> [(FastString, Direction)]
   -> AnnotatedModule
-#if __GLASGOW_HASKELL__ < 900
-  -> IO (UniqFM [Rewrite (LHsExpr GhcPs)])
-#else
   -> IO (UniqFM FastString [Rewrite (LHsExpr GhcPs)])
-#endif
-dfnsToRewrites specs am = fmap astA $ transformA am $ \ (L _ m) -> do
+dfnsToRewrites libdir specs am = fmap astA $ transformA am $ \ (L _ m) -> do
   let
     fsMap = uniqBag specs
 
   rrs <- sequence
     [ do
         fe <- mkLocatedHsVar fRdrName
-        imps <- getImports dir (hsmodName m)
+        -- lift $ debugPrint Loud "dfnsToRewrites:ef="  [showAst fe]
+        imps <- getImports libdir dir (hsmodName m)
         (fName,) . concat <$>
           forM (unLoc $ mg_alts $ fun_matches f) (matchToRewrites fe imps dir)
     | L _ (ValD _ f@FunBind{}) <- hsmodDecls m
@@ -52,10 +51,10 @@ dfnsToRewrites specs am = fmap astA $ transformA am $ \ (L _ m) -> do
 ------------------------------------------------------------------------
 
 getImports
-  :: Direction -> Maybe (Located ModuleName) -> TransformT IO AnnotatedImports
-getImports RightToLeft (Just (L _ mn)) = -- See Note [fold only]
-  lift $ liftIO $ parseImports ["import " ++ moduleNameString mn]
-getImports _ _ = return mempty
+  :: LibDir -> Direction -> Maybe (LocatedA ModuleName) -> TransformT IO AnnotatedImports
+getImports libdir RightToLeft (Just (L _ mn)) = -- See Note [fold only]
+  lift $ liftIO $ parseImports libdir ["import " ++ moduleNameString mn]
+getImports _ _ _ = return mempty
 
 matchToRewrites
   :: LHsExpr GhcPs
@@ -64,6 +63,7 @@ matchToRewrites
   -> LMatch GhcPs (LHsExpr GhcPs)
   -> TransformT IO [Rewrite (LHsExpr GhcPs)]
 matchToRewrites e imps dir (L _ alt) = do
+  -- lift $ debugPrint Loud "matchToRewrites:e="  [showAst e]
   let
     pats = m_pats alt
     grhss = m_grhss alt
@@ -99,12 +99,13 @@ makeFunctionQuery e imps dir grhss mkAppFn (argpats, bndpats)
   | otherwise = do
     let
       GRHSs _ rhss lbs = grhss
-      bs = collectPatsBinders argpats
+      bs = collectPatsBinders CollNoDictBinders argpats
     -- See Note [Wildcards]
     (es,(_,bs')) <- runStateT (mapM patToExpr argpats) (wildSupply bs, bs)
+    -- lift $ debugPrint Loud "makeFunctionQuery:e="  [showAst e]
     lhs <- mkAppFn e es
     for rhss $ \ grhs -> do
-      le <- mkLet (unLoc lbs) (grhsToExpr grhs)
+      le <- mkLet lbs (grhsToExpr grhs)
       rhs <- mkLams bndpats le
       let
         (pat, temp) =
@@ -125,13 +126,13 @@ backtickRules
 backtickRules e imps dir@LeftToRight grhss ps@[p1, p2] = do
   let
     both, left, right :: AppBuilder
-    both op [l, r] = mkLoc (OpApp noExtField l op r)
+    both op [l, r] = mkLocA (SameLine 1) (OpApp noAnn l op r)
     both _ _ = fail "backtickRules - both: impossible!"
 
-    left op [l] = mkLoc (SectionL noExtField l op)
+    left op [l] = mkLocA (SameLine 1) (SectionL noAnn l op)
     left _ _ = fail "backtickRules - left: impossible!"
 
-    right op [r] = mkLoc (SectionR noExtField op r)
+    right op [r] = mkLocA (SameLine 1) (SectionR noAnn op r)
     right _ _ = fail "backtickRules - right: impossible!"
   qs <- makeFunctionQuery e imps dir grhss both (ps, [])
   qsl <- makeFunctionQuery e imps dir grhss left ([p1], [p2])

@@ -36,7 +36,7 @@ import Data.Foldable
 
 import Retrie.Context
 import Retrie.CPP
-import Retrie.ExactPrint
+import Retrie.ExactPrint hiding (rs)
 import Retrie.Fixity
 import Retrie.GroundTerms
 import Retrie.Query

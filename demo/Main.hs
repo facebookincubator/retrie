@@ -6,6 +6,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Main where
 
+import qualified GHC.Paths as GHC.Paths
 import Retrie
 
 -- | A script for rewriting calls to a function that takes a string to be
@@ -22,9 +23,10 @@ import Retrie
 -- -quux = fooOld "quux"
 -- +quux = fooNew (error "invalid argument: quux")
 --
+
 main :: IO ()
-main = runScript $ \opts -> do
-  [rewrite] <- parseRewrites opts [Adhoc "forall arg. fooOld arg = fooNew arg"]
+main = runScript GHC.Paths.libdir $ \opts -> do
+  [rewrite] <- parseRewrites GHC.Paths.libdir opts [Adhoc "forall arg. fooOld arg = fooNew arg"]
   return $ apply [setRewriteTransformer stringToFooArg rewrite]
 
 argMapping :: [(FastString, String)]
@@ -42,8 +44,8 @@ stringToFooArg _ctxt match
   , L _ (HsLit _ (HsString _ str)) <- astA expr = do
     newExpr <- case lookup str argMapping of
       Nothing ->
-        parseExpr $ "error \"invalid argument: " ++ unpackFS str ++ "\""
-      Just constructor -> parseExpr constructor
+        parseExpr GHC.Paths.libdir $ "error \"invalid argument: " ++ unpackFS str ++ "\""
+      Just constructor -> parseExpr GHC.Paths.libdir constructor
     return $
       MatchResult (extendSubst substitution "arg" (HoleExpr newExpr)) template
   | otherwise = return NoMatch

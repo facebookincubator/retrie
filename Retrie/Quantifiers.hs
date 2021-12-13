@@ -3,6 +3,7 @@
 -- This source code is licensed under the MIT license found in the
 -- LICENSE file in the root directory of this source tree.
 --
+{-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TypeFamilies #-}
 module Retrie.Quantifiers
   ( Quantifiers
@@ -43,6 +44,8 @@ newtype Quantifiers = Quantifiers
   { qSet :: UniqSet FastString
     -- ^ Convert to a 'UniqSet'.
   }
+instance Show Quantifiers where
+  show qs = "Quantifiers " ++ show (qList qs)
 
 -- | Construct from GHC's 'RdrName's.
 mkQs :: [RdrName] -> Quantifiers

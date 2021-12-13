@@ -29,11 +29,11 @@ parseRoundtrips = concat <$> traverse many
       <> help "Roundtrip file through ghc-exactprint only.")
   ]
 
-doRoundtrips :: FixityEnv -> FilePath -> [RoundTrip] -> IO ()
-doRoundtrips fixities targetDir = mapM_ $ \ (RoundTrip doFix fp) -> do
+doRoundtrips :: LibDir -> FixityEnv -> FilePath -> [RoundTrip] -> IO ()
+doRoundtrips libdir fixities targetDir = mapM_ $ \ (RoundTrip doFix fp) -> do
   let path = targetDir </> fp
   cpp <-
     if doFix
-    then parseCPPFile (parseContent fixities) path
-    else parseCPPFile parseContentNoFixity path
+    then parseCPPFile (parseContent libdir fixities) path
+    else parseCPPFile (parseContentNoFixity libdir) path
   writeFile path $ printCPP [] cpp

@@ -1,3 +1,13 @@
+
+1.2.0.0 (December 12, 2021)
+
+* Early support for GHC 9.2.1 (thanks to Alan Zimmerman) 
+* Dropped support for GHC <9.2 (might readd it later)
+
+1.1.0.0 (November 13, 2021)
+* Remove dependency on xargs (#31)
+* Allow rewrite elaboration
+
 1.0.0.0 (April 9, 2021)
 
 * Added --adhoc-type flag (#13)

@@ -68,6 +68,7 @@ module Retrie
     -- >   expr <- parseExpr "f <$> x <*> y"
     -- >   e <- transformA expr (fix (fixityEnv opts))
     --
+  , LibDir
   , parseDecl
   , parseExpr
   , parsePattern
@@ -140,13 +141,13 @@ import Retrie.Universe
 import Retrie.Util
 
 -- | Create 'Rewrite's from string specifications of rewrites.
-parseRewrites :: Options -> [RewriteSpec] -> IO [Rewrite Universe]
+parseRewrites :: LibDir -> Options -> [RewriteSpec] -> IO [Rewrite Universe]
 parseRewrites = parseRewritesInternal
 
 -- | Create 'Query's from string specifications of expressions/types/statements.
 parseQueries
-  :: Options -> [(Quantifiers, QuerySpec, v)] -> IO [Query Universe v]
-parseQueries Options{..} = parseQuerySpecs fixityEnv
+  :: LibDir -> Options -> [(Quantifiers, QuerySpec, v)] -> IO [Query Universe v]
+parseQueries libdir Options{..} = parseQuerySpecs libdir fixityEnv
 
 -- $advanced
 -- For advanced rewriting, Retrie provides the notion of a

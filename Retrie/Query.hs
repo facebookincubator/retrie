@@ -28,20 +28,21 @@ data QuerySpec
   | QStmt String
 
 parseQuerySpecs
-  :: FixityEnv
+  :: LibDir
+  -> FixityEnv
   -> [(Quantifiers, QuerySpec, v)]
   -> IO [Query Universe v]
-parseQuerySpecs fixityEnv =
+parseQuerySpecs libdir' fixityEnv =
   mapM $ \(qQuantifiers, querySpec, qResult) -> do
-    qPattern <- parse querySpec
+    qPattern <- parse libdir' querySpec
     return Query{..}
   where
-    parse (QExpr s) = do
-      e <- parseExpr s
+    parse libdir (QExpr s) = do
+      e <- parseExpr libdir s
       fmap inject <$> transformA e (fix fixityEnv)
-    parse (QType s) = fmap inject <$> parseType s
-    parse (QStmt s) = do
-      stmt <- parseStmt s
+    parse libdir (QType s) = fmap inject <$> parseType libdir s
+    parse libdir (QStmt s) = do
+      stmt <- parseStmt libdir s
       fmap inject <$> transformA stmt (fix fixityEnv)
 
 genericQ

@@ -18,11 +18,7 @@ import Retrie.ExactPrint
 import Retrie.GHC
 
 -- | A 'Substitution' is essentially a map from variable name to 'HoleVal'.
-#if __GLASGOW_HASKELL__ < 900
-newtype Substitution = Substitution (UniqFM (FastString, HoleVal))
-#else
 newtype Substitution = Substitution (UniqFM FastString (FastString, HoleVal))
-#endif
 -- See Note [Why not RdrNames?] for explanation of use of FastString
 
 instance Show Substitution where

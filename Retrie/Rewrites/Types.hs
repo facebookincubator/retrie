@@ -44,21 +44,17 @@ typeSynonymsToRewrites specs am = fmap astA $ transformA am $ \ m -> do
 -- | Compile a list of RULES into a list of rewrites.
 mkTypeRewrite
   :: Direction
-#if __GLASGOW_HASKELL__ < 900
-  -> (Located RdrName, [LHsTyVarBndr GhcPs], LHsType GhcPs)
-#else
-  -> (Located RdrName, [LHsTyVarBndr () GhcPs], LHsType GhcPs)
-#endif
+  -> (LocatedN RdrName, [LHsTyVarBndr () GhcPs], LHsType GhcPs)
   -> TransformT IO (Rewrite (LHsType GhcPs))
 mkTypeRewrite d (lhsName, vars, rhs) = do
-  setEntryDPT lhsName $ DP (0,0)
-  tc <- mkTyVar lhsName
+  let lhsName' = setEntryDP lhsName (SameLine 0)
+  tc <- mkTyVar lhsName'
   let
     lvs = tyBindersToLocatedRdrNames vars
   args <- forM lvs $ \ lv -> do
     tv <- mkTyVar lv
-    setEntryDPT tv (DP (0,1))
-    return tv
+    let tv' = setEntryDP tv (SameLine 1)
+    return tv'
   lhsApps <- mkHsAppsTy (tc:args)
   let
     (pat, tmp) = case d of

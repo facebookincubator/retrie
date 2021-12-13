@@ -16,11 +16,15 @@ module Golden
 import Control.DeepSeq (force)
 import Control.Exception (evaluate)
 import Control.Monad
+import qualified Control.Monad.Catch as MC
+import Control.Monad.IO.Class
 import Data.Bifunctor (second)
 import Data.Char (isSpace)
 import Data.List (intersperse)
 import Options.Applicative
 import Retrie
+import Retrie.CPP
+import Retrie.ExactPrint.Annotated
 import Retrie.Options hiding (parseOptions)
 import Retrie.Run
 import System.Directory
@@ -38,17 +42,18 @@ data RetrieTest a = RetrieTest
   }
 
 parseOptions
-  :: Parser ProtoOptions
+  :: LibDir
+  -> Parser ProtoOptions
   -> FilePath
   -> RetrieTest a
   -> IO Options
-parseOptions p dir RetrieTest{..} = do
+parseOptions libdir p dir RetrieTest{..} = do
   flags <- takeFlags <$> readFileNoComments (rtDir </> rtTest)
   case runParserOnString p flags of
     Nothing   ->
       fail $ unwords [rtName, " options did not parse: ", flags]
     Just opts -> do
-      resolveOptions opts { targetDir = dir, verbosity = rtVerbosity }
+      resolveOptions libdir opts { targetDir = dir, verbosity = rtVerbosity }
 
 runParserOnString :: Parser a -> String -> Maybe a
 runParserOnString p args = getParseResult $
@@ -63,44 +68,59 @@ runParserOnString p args = getParseResult $
         s' -> recurse $ break isSpace s'
 
 runTestWrapper
-  :: Parser ProtoOptions
+  :: LibDir
+  -> Parser ProtoOptions
   -> RetrieTest a
   -> (Options -> IO b)
   -> IO b
-runTestWrapper p t@RetrieTest{..} f =
-  withTmpCopyOfInputs rtDir $ \dir -> do
+runTestWrapper libdir p t@RetrieTest{..} f =
+  withTmpCopyOfInputs KeepDir rtDir $ \dir -> do
     -- Make the Rewrites from the temp file, to get correct SrcSpan's
-    opts <- parseOptions p dir t
+    opts <- parseOptions libdir p dir t
     f opts { targetFiles = [dir </> replaceExtension rtTest ".hs"] }
 
 runQueryTest
   :: Monoid a
-  => Parser ProtoOptions
+  => LibDir
+  -> Parser ProtoOptions
   -> RetrieTest a
   -> IO a
-runQueryTest p t@RetrieTest{..} =
-  runTestWrapper p t $ \opts -> do
-    let writeFn _fp _locs _res = return
+runQueryTest libdir p t@RetrieTest{..} =
+  runTestWrapper libdir p t $ \opts -> do
+    let writeFn _fp _locs _cpp _res = return
     retrie <- rtRetrie opts
     -- A 'writeFn' is only executed if the module changes, so add empty imports
     -- to trip the Changed flag.
-    fmap mconcat $ run writeFn id opts $ do
+    fmap mconcat $ run libdir writeFn id opts $ do
       r <- retrie
       addImports mempty
       return r
 
-runTest :: Parser ProtoOptions -> RetrieTest () -> IO ()
-runTest p t@RetrieTest{..} =
-  runTestWrapper p t $ \opts@Options{..} -> do
+runTest :: LibDir -> Parser ProtoOptions -> RetrieTest () -> IO ()
+runTest libdir p t@RetrieTest{..} =
+  runTestWrapper libdir p t $ \opts@Options{..} -> do
     let
-      writeFn fp _locs res _ = writeFile fp res
+      writeFn fp _locs res _ _ = writeFile fp res
       [tmpFile] = targetFiles
     before <- evaluate . force =<< readFile tmpFile
     retrie <- rtRetrie opts
-    void $ run writeFn id opts $ iterateR iterateN retrie
+    -- void $ run libdir writeFn id opts $ iterateR iterateN retrie
+    void $ run libdir writeFileDumpAst id opts $ iterateR iterateN retrie
     res <- readFile tmpFile
     expected <- readFile $ targetDir </> replaceExtension rtTest ".expected"
     displayAndAssertEqual before expected res
+
+writeFileDumpAst :: FilePath -> WriteFn a ()
+writeFileDumpAst fp _locs res cpp _ = do
+  case cpp of
+    NoCPP m -> do
+      let outname = fp <.> "out"
+      writeFile outname res
+      appendFile outname "\n===============================================\n"
+      appendFile outname (showAstA m)
+    _ -> return ()
+  writeFile fp res
+
 
 displayAndAssertEqual :: String -> String -> String -> IO ()
 displayAndAssertEqual before expected res
@@ -128,18 +148,34 @@ diff s1 s2 = withSystemTempDirectory "diff" $ \dir -> do
   (_ec, so, _) <- readProcessWithExitCode "diff" [aFile, bFile] ""
   return so
 
+data KeepDir = KeepDir | DeleteDir deriving Eq
+
 -- Copies input dir, mapping *.test to *.hs,
 -- and provides a filepath to the root
 -- of the copy. Deletes the copy when done.
-withTmpCopyOfInputs :: FilePath -> (FilePath -> IO a) -> IO a
-withTmpCopyOfInputs inputsDir comp = do
+withTmpCopyOfInputs :: KeepDir -> FilePath -> (FilePath -> IO a) -> IO a
+withTmpCopyOfInputs keep inputsDir comp = do
   fs <- listDir inputsDir
-  withSystemTempDirectory "inputs" $ \dir -> do
+  withSystemTempDirectory' keep "inputs" $ \dir -> do
     forM_ fs $ \f -> do
       if takeExtension f `elem` [".test", ".custom"]
         then splitAndCopyTest inputsDir f dir
         else copyFile (inputsDir </> f) (dir </> f)
     comp dir
+
+withSystemTempDirectory' :: (MonadIO m, MC.MonadMask m)
+                        => KeepDir -- ^ Keep the contents when done
+                        -> String   -- ^ Directory name template
+                        -> (FilePath -> m a) -- ^ Callback that can use the directory
+                        -> m a
+withSystemTempDirectory' keep template act
+  = case keep of
+      DeleteDir -> withSystemTempDirectory template act
+      KeepDir -> do
+        tmpDir <- liftIO getCanonicalTemporaryDirectory
+        dir <- liftIO $ createTempDirectory tmpDir template
+        act dir
+
 
 splitAndCopyTest :: FilePath -> FilePath -> FilePath -> IO ()
 splitAndCopyTest inputsDir testFile dstDir = do

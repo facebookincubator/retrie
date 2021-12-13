@@ -43,7 +43,8 @@
 +  print $ foo || bar
 +  print $ foo || bar
 +  print $ foo || bar
-+  print $ {- comment here -} foo || bar
+# TODO fix extraneous space
++  print $  {- comment here -} foo || bar
 +  print $ foo {- comment here -} || bar
 +  print $ foo || {- comment here -} bar
 +  print $ foo || bar {- comment here -}

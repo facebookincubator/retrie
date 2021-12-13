@@ -25,6 +25,7 @@ import Retrie.GHC
 import Retrie.Subst
 import Retrie.Types
 import Retrie.Universe
+import Retrie.Util
 
 ------------------------------------------------------------------------
 
@@ -48,8 +49,8 @@ replacePat c p
 -- 'Rewriter' carried by the context, instantiates templates, handles parens
 -- and other whitespace bookkeeping, and emits resulting 'Replacement's.
 replaceImpl
-  :: forall ast m. (Annotate ast, Matchable (Located ast), MonadIO m)
-  => Context -> Located ast -> TransformT (WriterT Change m) (Located ast)
+  :: forall ast m. (Data ast, ExactPrint ast, Matchable (LocatedA ast), MonadIO m)
+  => Context -> LocatedA ast -> TransformT (WriterT Change m) (LocatedA ast)
 replaceImpl c e = do
   let
     -- Prevent rewriting source of the rewrite itself by refusing to
@@ -59,7 +60,7 @@ replaceImpl c e = do
           fmap (fmap (check rrOrigin rrQuantifiers)) <$> rrTransformer
       }
     check origin quantifiers match
-      | getLoc e `overlaps` origin = NoMatch
+      | getLocA e `overlaps` origin = NoMatch
       | MatchResult _ Template{..} <- match
       , fvs <- freeVars quantifiers (astA tTemplate)
       , any (`elemFVs` fvs) (ctxtBinders c) = NoMatch
@@ -80,16 +81,36 @@ replaceImpl c e = do
       -- substitute for quantifiers in grafted template
       r <- subst sub c t'
       -- copy appropriate annotations from old expression to template
-      addAllAnnsT e r
+      r0 <- addAllAnnsT e r
       -- add parens to template if needed
-      res <- (mkM (parenify c) `extM` parenifyT c `extM` parenifyP c) r
+      res' <- (mkM (parenify c) `extM` parenifyT c `extM` parenifyP c) r0
+      -- Make sure the replacement has the same anchor as the thing
+      -- being replaced
+      let res = transferAnchor e res'
+
       -- prune the resulting expression and log it with location
       orig <- printNoLeadingSpaces <$> pruneA e
+      -- orig <- printA' <$> pruneA e
+
       repl <- printNoLeadingSpaces <$> pruneA res
-      let replacement = Replacement (getLoc e) orig repl
+      -- repl <- printA' <$> pruneA r
+      -- repl <- printA' <$> pruneA res
+      -- repl <- return $ showAst t'
+
+      -- lift $ liftIO $ debugPrint Loud "replaceImpl:orig="  [orig]
+      -- lift $ liftIO $ debugPrint Loud "replaceImpl:repl="  [repl]
+
+      -- lift $ liftIO $ debugPrint Loud "replaceImpl:e="  [showAst e]
+      -- lift $ liftIO $ debugPrint Loud "replaceImpl:r="  [showAst r]
+      -- lift $ liftIO $ debugPrint Loud "replaceImpl:r0="  [showAst r0]
+      -- lift $ liftIO $ debugPrint Loud "replaceImpl:t'=" [showAst t']
+      -- lift $ liftIO $ debugPrint Loud "replaceImpl:res=" [showAst res]
+
+      let replacement = Replacement (getLocA e) orig repl
       TransformT $ lift $ tell $ Change [replacement] [tImports]
       -- make the actual replacement
-      return res
+      return res'
+
 
 -- | Records a replacement made. In cases where we cannot use ghc-exactprint
 -- to print the resulting AST (e.g. CPP modules), we fall back on splicing
@@ -98,7 +119,7 @@ data Replacement = Replacement
   { replLocation :: SrcSpan
   , replOriginal :: String
   , replReplacement :: String
-  }
+  } deriving Show
 
 -- | Used as the writer type during matching to indicate whether any change
 -- to the module should be made.
@@ -121,5 +142,5 @@ instance Monoid Change where
 -- Unfortunately, its hard to find the right annEntryDelta (it may not be the
 -- top of the redex) and zero it out. As janky as it seems, its easier to just
 -- drop leading spaces like this.
-printNoLeadingSpaces :: Annotate k => Annotated (Located k) -> String
+printNoLeadingSpaces :: (Data k, ExactPrint k) => Annotated k -> String
 printNoLeadingSpaces = dropWhile isSpace . printA
