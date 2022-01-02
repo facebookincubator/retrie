@@ -148,7 +148,7 @@ trimA = runIdentity . transformA nil . const . graftA
     nil :: Annotated ()
     nil = mempty
 
-setEntryDPA :: (Monoid an)
+setEntryDPA :: (Default an)
             => Annotated (LocatedAn an ast) -> DeltaPos -> Annotated (LocatedAn an ast)
 setEntryDPA (Annotated ast s) dp = Annotated (setEntryDP ast dp) s
 
