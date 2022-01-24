@@ -465,13 +465,17 @@ buildGrepChain targetDir gts filesGiven = GrepCommands {initialFileSet=filesGive
 
     hsExtension = "\"*.hs\""
 
-    esc s = "'" ++ intercalate "[[:space:]]\\+" (words $ escChars s) ++ "'"
+    esc s = osquote $ intercalate "[[:space:]]\\+" (words $ escChars s)
     escChars = concatMap escChar
     escChar c
       | c `elem` magicChars = "\\" <> [c]
       | otherwise  = [c]
     magicChars :: [Char]
     magicChars = "*?[#˜=%\\"
+
+    osquote s = "'" ++ concatMap escapeQuote s ++ "'"
+      where escapeQuote '\'' = "'\"'\"'"
+            escapeQuote c = [c]
 
 
 type CommandLine = String
