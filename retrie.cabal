@@ -91,7 +91,7 @@ library
     process >= 1.6.3 && < 1.7,
     random-shuffle >= 0.0.4 && < 0.1,
     syb >= 0.7.1 && < 0.8,
-    text >= 1.2.3 && < 2.0,
+    text >= 1.2.3 && < 3.0,
     transformers >= 0.5.5 && < 0.6,
     unordered-containers >= 0.2.10 && < 0.3
   default-language: Haskell2010
@@ -157,7 +157,7 @@ test-suite test
   build-depends:
     retrie,
     HUnit,
-    base, 
+    base,
     containers,
     data-default,
     deepseq,
