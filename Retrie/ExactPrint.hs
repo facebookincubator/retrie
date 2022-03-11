@@ -51,7 +51,7 @@ module Retrie.ExactPrint
 import Control.Exception
 import Control.Monad.State.Lazy hiding (fix)
 -- import Data.Function (on)
-import Data.List (transpose)
+import Data.List (transpose, foldl')
 -- import Data.Maybe
 -- import qualified Data.Map as M
 import Text.Printf
@@ -68,6 +68,8 @@ import Language.Haskell.GHC.ExactPrint.Types
   ( showGhc
   )
 import Language.Haskell.GHC.ExactPrint.Transform
+import GHC.LanguageExtensions (Extension(..))
+import GHC.Driver.Session (xopt_set)
 
 import Retrie.ExactPrint.Annotated
 import Retrie.Fixity
@@ -256,9 +258,9 @@ swapEntryDPT a b = do
 
 -- Compatibility module with ghc-exactprint
 
-parseContentNoFixity :: Parsers.LibDir -> FilePath -> String -> IO AnnotatedModule
-parseContentNoFixity libdir fp str = do
-  r <- Parsers.parseModuleFromString libdir fp str
+parseContentNoFixity :: [Extension] -> Parsers.LibDir -> FilePath -> String -> IO AnnotatedModule
+parseContentNoFixity exts libdir fp str = do
+  r <- parseModuleFromStringWithExtensions exts libdir fp str
   case r of
     Left msg -> do
 #if __GLASGOW_HASKELL__ < 810
@@ -267,18 +269,26 @@ parseContentNoFixity libdir fp str = do
       fail $ show $ bagToList msg
 #endif
     Right m -> return $ unsafeMkA (makeDeltaAst m) 0
+  where
+    parseModuleFromStringWithExtensions e l f s = do
+        -- inlined from ghc-exactprint
+        Parsers.ghcWrapper l $ do
+            initDflags <- Parsers.initDynFlagsPure f s
+            let dflags = foldl' xopt_set initDflags e
+            pure $ Parsers.parseModuleFromStringInternal dflags f s
 
-parseContent :: Parsers.LibDir -> FixityEnv -> FilePath -> String -> IO AnnotatedModule
-parseContent libdir fixities fp =
-  parseContentNoFixity libdir fp >=> (`transformA` fix fixities)
+
+parseContent :: [Extension] -> Parsers.LibDir -> FixityEnv -> FilePath -> String -> IO AnnotatedModule
+parseContent exts libdir fixities fp =
+  parseContentNoFixity exts libdir fp >=> (`transformA` fix fixities)
 
 -- | Parse import statements. Each string must be a full import statement,
 -- including the keyword 'import'. Supports full import syntax.
-parseImports :: Parsers.LibDir -> [String] -> IO AnnotatedImports
-parseImports _      []      = return mempty
-parseImports libdir imports = do
+parseImports :: [Extension] -> Parsers.LibDir -> [String] -> IO AnnotatedImports
+parseImports _    _      []      = return mempty
+parseImports exts libdir imports = do
   -- imports start on second line, so delta offsets are correct
-  am <- parseContentNoFixity libdir "parseImports" $ "\n" ++ unlines imports
+  am <- parseContentNoFixity exts libdir "parseImports" $ "\n" ++ unlines imports
   ais <- transformA am $ pure . hsmodImports . unLoc
   return $ trimA ais
 

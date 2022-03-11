@@ -45,6 +45,7 @@ module Retrie.Types
   , RewriterResult(..)
   , ParentPrec(..)
   , Context(..)
+  , Extension(..)
   ) where
 
 import Control.Monad.IO.Class
@@ -53,6 +54,7 @@ import Data.Bifunctor
 import qualified Data.IntMap.Strict as I
 import Data.Data hiding (Fixity)
 import Data.Maybe
+import GHC.LanguageExtensions (Extension(..))
 
 import Retrie.AlphaEnv
 import Retrie.ExactPrint

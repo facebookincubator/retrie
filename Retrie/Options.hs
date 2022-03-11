@@ -10,6 +10,7 @@
 {-# language StandaloneDeriving #-}
 {-# language DerivingStrategies #-}
 
+-- PR up to add the instance directly: https://gitlab.haskell.org/ghc/ghc/-/merge_requests/7768
 {-# options_ghc -fno-warn-orphans #-} -- used for the Read Extension instance
 
 module Retrie.Options
@@ -47,7 +48,6 @@ import System.Directory
 import System.FilePath
 import System.Process
 import System.Random.Shuffle
-import GHC.LanguageExtensions (Extension(..))
 
 import Retrie.CPP
 import Retrie.Debug
@@ -76,10 +76,10 @@ parseOptions libdir fixityEnv = do
 -- We expose this from "Retrie" with a nicer type signature as
 -- 'Retrie.Options.parseRewrites'. We have it here so we can use it with
 -- 'ProtoOptions'.
-parseRewritesInternal :: LibDir -> Options_ a b -> [RewriteSpec] -> IO [Rewrite Universe]
-parseRewritesInternal libdir Options{..} = parseRewriteSpecs libdir parser fixityEnv
+parseRewritesInternal ::  LibDir -> Options_ a b -> [RewriteSpec] -> IO [Rewrite Universe]
+parseRewritesInternal libdir Options{..} = parseRewriteSpecs defaultExtensions libdir parser fixityEnv
   where
-    parser fp = parseCPPFile (parseContent libdir fixityEnv) (targetDir </> fp)
+    parser fp = parseCPPFile (parseContent defaultExtensions libdir fixityEnv) (targetDir </> fp)
 
 -- | Controls the ultimate action taken by 'apply'. The default action is
 -- 'ExecRewrite'.
@@ -376,7 +376,7 @@ resolveOptions libdir protoOpts = do
   absoluteTargetDir <- makeAbsolute (targetDir protoOpts)
   opts@Options{..} <-
     addLocalFixities libdir protoOpts { targetDir = absoluteTargetDir }
-  parsedImports <- parseImports libdir additionalImports
+  parsedImports <- parseImports defaultExtensions libdir additionalImports
   debugPrint verbosity "Imports:" $
     runIdentity $ fmap astA $ transformA parsedImports $ \ imps -> do
       -- anns <- getAnnsT
@@ -403,7 +403,7 @@ addLocalFixities libdir opts = do
   files <- getTargetFiles opts' [HashSet.singleton "infix"]
 
   fixFns <- forFn opts files $ \ fp -> do
-    ms <- toList <$> parseCPPFile (parseContentNoFixity libdir) fp
+    ms <- toList <$> parseCPPFile (parseContentNoFixity (defaultExtensions opts) libdir) fp
     return $ extendFixityEnv
       [ (rdrFS nm, fixity)
       | m <- ms

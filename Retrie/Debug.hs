@@ -13,6 +13,7 @@ module Retrie.Debug
 import Options.Applicative
 import System.FilePath
 
+import Retrie.Types (Extension)
 import Retrie.CPP
 import Retrie.ExactPrint
 import Retrie.Fixity
@@ -29,11 +30,11 @@ parseRoundtrips = concat <$> traverse many
       <> help "Roundtrip file through ghc-exactprint only.")
   ]
 
-doRoundtrips :: LibDir -> FixityEnv -> FilePath -> [RoundTrip] -> IO ()
-doRoundtrips libdir fixities targetDir = mapM_ $ \ (RoundTrip doFix fp) -> do
+doRoundtrips :: [Extension] -> LibDir -> FixityEnv -> FilePath -> [RoundTrip] -> IO ()
+doRoundtrips exts libdir fixities targetDir = mapM_ $ \ (RoundTrip doFix fp) -> do
   let path = targetDir </> fp
   cpp <-
     if doFix
-    then parseCPPFile (parseContent libdir fixities) path
-    else parseCPPFile (parseContentNoFixity libdir) path
+    then parseCPPFile (parseContent exts libdir fixities) path
+    else parseCPPFile (parseContentNoFixity exts libdir) path
   writeFile path $ printCPP [] cpp

@@ -25,11 +25,12 @@ import Retrie.Types
 import Retrie.Util
 
 dfnsToRewrites
-  :: LibDir
+  :: [Extension]
+  -> LibDir
   -> [(FastString, Direction)]
   -> AnnotatedModule
   -> IO (UniqFM FastString [Rewrite (LHsExpr GhcPs)])
-dfnsToRewrites libdir specs am = fmap astA $ transformA am $ \ (L _ m) -> do
+dfnsToRewrites exts libdir specs am = fmap astA $ transformA am $ \ (L _ m) -> do
   let
     fsMap = uniqBag specs
 
@@ -37,7 +38,7 @@ dfnsToRewrites libdir specs am = fmap astA $ transformA am $ \ (L _ m) -> do
     [ do
         fe <- mkLocatedHsVar fRdrName
         -- lift $ debugPrint Loud "dfnsToRewrites:ef="  [showAst fe]
-        imps <- getImports libdir dir (hsmodName m)
+        imps <- getImports exts libdir dir (hsmodName m)
         (fName,) . concat <$>
           forM (unLoc $ mg_alts $ fun_matches f) (matchToRewrites fe imps dir)
     | L _ (ValD _ f@FunBind{}) <- hsmodDecls m
@@ -51,10 +52,10 @@ dfnsToRewrites libdir specs am = fmap astA $ transformA am $ \ (L _ m) -> do
 ------------------------------------------------------------------------
 
 getImports
-  :: LibDir -> Direction -> Maybe (LocatedA ModuleName) -> TransformT IO AnnotatedImports
-getImports libdir RightToLeft (Just (L _ mn)) = -- See Note [fold only]
-  lift $ liftIO $ parseImports libdir ["import " ++ moduleNameString mn]
-getImports _ _ _ = return mempty
+  :: [Extension] -> LibDir -> Direction -> Maybe (LocatedA ModuleName) -> TransformT IO AnnotatedImports
+getImports exts libdir RightToLeft (Just (L _ mn)) = -- See Note [fold only]
+  lift $ liftIO $ parseImports exts libdir ["import " ++ moduleNameString mn]
+getImports _ _ _ _ = return mempty
 
 matchToRewrites
   :: LHsExpr GhcPs

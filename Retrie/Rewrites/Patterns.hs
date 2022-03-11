@@ -25,14 +25,15 @@ import Retrie.Universe
 import Retrie.Util
 
 patternSynonymsToRewrites
-  :: LibDir
+  :: [Extension]
+  -> LibDir
   -> [(FastString, Direction)]
   -> AnnotatedModule
   -> IO (UniqFM FastString [Rewrite Universe])
-patternSynonymsToRewrites libdir specs am = fmap astA $ transformA am $ \(L _ m) -> do
+patternSynonymsToRewrites exts libdir specs am = fmap astA $ transformA am $ \(L _ m) -> do
   let
     fsMap = uniqBag specs
-  imports <- getImports libdir RightToLeft (hsmodName m)
+  imports <- getImports exts libdir RightToLeft (hsmodName m)
   rrs <- sequence
       [ do
           patRewrite <- mkPatRewrite dir imports nm params lrhs
