@@ -18,7 +18,7 @@ main :: IO ()
 main = do
   let libdir = GHC.Paths.libdir
   opts@Options{..} <- parseOptions libdir defaultFixityEnv
-  doRoundtrips libdir fixityEnv targetDir roundtrips
+  doRoundtrips defaultExtensions libdir fixityEnv targetDir roundtrips
   unless (null rewrites) $ do
     when (verbosity > Silent) $ do
       putStrLn "Adding:"

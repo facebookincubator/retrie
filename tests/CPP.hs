@@ -254,7 +254,7 @@ cppForkTest CPPTest{..} = TestLabel ("cpp fork: " ++ name) $ TestCase $ do
 
 roundTripTest :: CPPTest -> Test
 roundTripTest CPPTest{..} = TestLabel ("roundtrip: " ++ name) $ TestCase $ do
-  r <- trySync $ parseCPP (parseContentNoFixity GHC.Paths.libdir "roundTripTest") code
+  r <- trySync $ parseCPP (parseContentNoFixity [] GHC.Paths.libdir "roundTripTest") code
   case r of
     Left msg -> assertFailure (show msg)
     Right cpp -> assertEqual "cpp did not roundtrip correctly"

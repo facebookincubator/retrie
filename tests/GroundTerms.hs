@@ -72,8 +72,8 @@ gtTest libdir lbl contents targFiles specs expected expectedCmds =
       (length expectedCmds)
 
     rrs <-
-      parseRewriteSpecs libdir
-        (\_ -> parseCPP (parseContent libdir defaultFixityEnv "Test") contents)
+      parseRewriteSpecs [] libdir
+        (\_ -> parseCPP (parseContent [] libdir defaultFixityEnv "Test") contents)
         defaultFixityEnv
         specs
     let gtss = map groundTerms rrs
@@ -89,8 +89,8 @@ gtTest libdir lbl contents targFiles specs expected expectedCmds =
 
 getFocusTests :: LibDir -> IO [Test]
 getFocusTests libdir = do
-  rrs1 <- parseAdhocs libdir defaultFixityEnv ["forall xs. or (map isSpace xs) = any isSpace xs"]
-  rrs2 <- parseAdhocs libdir defaultFixityEnv ["forall f g xs. map f (map g xs) = map (f . g) xs"]
+  rrs1 <- parseAdhocs [] libdir defaultFixityEnv ["forall xs. or (map isSpace xs) = any isSpace xs"]
+  rrs2 <- parseAdhocs [] libdir defaultFixityEnv ["forall f g xs. map f (map g xs) = map (f . g) xs"]
   let
     -- compare hashsets to avoid ordering issues
     terms = HashSet.fromList $ map groundTerms rrs1
