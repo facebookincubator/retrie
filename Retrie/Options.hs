@@ -7,6 +7,11 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TupleSections #-}
+{-# language StandaloneDeriving #-}
+{-# language DerivingStrategies #-}
+
+{-# options_ghc -fno-warn-orphans #-} -- used for the Read Extension instance
+
 module Retrie.Options
   ( -- * Options
     Options
@@ -42,6 +47,7 @@ import System.Directory
 import System.FilePath
 import System.Process
 import System.Random.Shuffle
+import GHC.LanguageExtensions (Extension(..))
 
 import Retrie.CPP
 import Retrie.Debug
@@ -122,6 +128,8 @@ data Options_ rewrites imports = Options
     -- specific files. Paths should be relative to 'targetDir'.
   , verbosity :: Verbosity
     -- ^ How much should be output on 'stdout'.
+  , defaultExtensions :: [Extension]
+    -- ^ Which extensions are enabled by default in parsed files.
   }
 
 -- | Construct default options for the given target directory.
@@ -144,6 +152,7 @@ defaultOptions fp = Options
   , targetDir = fp
   , targetFiles = []
   , verbosity = Normal
+  , defaultExtensions = []
   }
 
 -- | Get the options parser. The returned 'ProtoOptions' should be passed
@@ -213,7 +222,19 @@ buildParser dOpts = do
   rewrites <- parseRewriteSpecOptions
   elaborations <- parseElaborations
   roundtrips <- parseRoundtrips
+  defaultExtensions <- parseExtensions
   return Options{ fixityEnv = fixityEnv dOpts, ..}
+
+-- ugh
+deriving stock instance Read Extension
+
+parseExtensions :: Parser [Extension]
+parseExtensions =
+  some $ option auto $ mconcat
+    [ long "extension"
+    , metavar "EXTENSION"
+    , help "A default language extension to enable"
+    ]
 
 parseElaborations :: Parser [RewriteSpec]
 parseElaborations = concat <$> traverse many
