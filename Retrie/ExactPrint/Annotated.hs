@@ -87,13 +87,12 @@ instance Default ast => Default (Annotated ast) where
   def = Annotated D.def 0
 
 instance (Data ast, Monoid ast) => Semigroup (Annotated ast) where
-  (<>) = mappend
+  a1 <> (Annotated ast2 _) =
+    runIdentity $ transformA a1 $ \ ast1 ->
+      mappend ast1 <$> return ast2
 
 instance (Data ast, Monoid ast) => Monoid (Annotated ast) where
   mempty = Annotated mempty 0
-  mappend a1 (Annotated ast2 _) =
-    runIdentity $ transformA a1 $ \ ast1 ->
-      mappend ast1 <$> return ast2
 
 -- | Construct an 'Annotated'.
 -- This should really only be used in the parsing functions, hence the scary name.
