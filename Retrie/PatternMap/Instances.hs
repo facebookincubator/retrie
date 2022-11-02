@@ -13,6 +13,7 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE RankNTypes #-}
 module Retrie.PatternMap.Instances where
 
 import Control.Monad
@@ -335,7 +336,7 @@ instance PatternMap EMap where
     , emExprWithTySig = unionOn emExprWithTySig m1 m2
     }
 
-  mAlter :: AlphaEnv -> Quantifiers -> Key EMap -> A a -> EMap a -> EMap a
+  mAlter :: forall a. AlphaEnv -> Quantifiers -> Key EMap -> A a -> EMap a -> EMap a
   mAlter env vs e f EMEmpty = mAlter env vs e f emptyEMapWrapper
   mAlter env vs e f m@EM{} = go (unLoc e)
     where
@@ -370,14 +371,23 @@ instance PatternMap EMap where
 #endif
       go (OpApp _ l o r) =
         m { emOpApp = mAlter env vs o (toA (mAlter env vs l (toA (mAlter env vs r f)))) (emOpApp m) }
-      go (RecordCon _ v fs) =
 #if MIN_VERSION_ghc(9, 4, 0)
-        m { emRecordCon = mAlter env vs (unLoc v) (toA (mAlter env vs (fieldsToRdrNames $ rec_flds fs) f)) (emRecordCon m) }
+      go (RecordCon _ v fs) =
+       let a :: A (ListMap RFMap a)
+           a = toA (mAlter env vs undefined f) -- (fieldsToRdrNames $ rec_flds fs)
+        in
+         m { emRecordCon = mAlter env vs (unLoc v) a (emRecordCon m) }
+      go (RecordUpd _ e' fs) =
+       let a :: A Double
+           a = toA undefined -- (toA (mAlter env vs (fieldsToRdrNamesUpd fs) f))
+        in
+         m { emRecordUpd = mAlter env vs e' a (emRecordUpd m) }
 #else
+      go (RecordCon _ v fs) =
         m { emRecordCon = mAlter env vs (unLoc v) (toA (mAlter env vs (fieldsToRdrNames $ rec_flds fs) f)) (emRecordCon m) }
-#endif
       go (RecordUpd _ e' fs) =
         m { emRecordUpd = mAlter env vs e' (toA (mAlter env vs (fieldsToRdrNamesUpd fs) f)) (emRecordUpd m) }
+#endif
       go (SectionL _ lhs o) =
         m { emSecL = mAlter env vs o (toA (mAlter env vs lhs f)) (emSecL m) }
       go (SectionR _ o rhs) =
@@ -473,10 +483,13 @@ instance PatternMap EMap where
       go (OpApp _ l o r) =
         mapFor emOpApp >=> mMatch env o >=> mMatch env l >=> mMatch env r
       go (NegApp _ e' _) = mapFor emNegApp >=> mMatch env e'
+#if MIN_VERSION_ghc(9, 4, 0)
+#else
       go (RecordCon _ v fs) =
         mapFor emRecordCon >=> mMatch env (unLoc v) >=> mMatch env (fieldsToRdrNames $ rec_flds fs)
       go (RecordUpd _ e' fs) =
         mapFor emRecordUpd >=> mMatch env e' >=> mMatch env (fieldsToRdrNamesUpd fs)
+#endif
       go (SectionL _ lhs o) = mapFor emSecL >=> mMatch env o >=> mMatch env lhs
       go (SectionR _ o rhs) = mapFor emSecR >=> mMatch env o >=> mMatch env rhs
 #if MIN_VERSION_ghc(9, 4, 0)
@@ -1286,6 +1299,7 @@ instance PatternMap RFMap where
 #else
   type Key RFMap = LocatedA (HsRecField RdrName (LocatedA (HsExpr GhcPs)))
 #endif
+
   mEmpty :: RFMap a
   mEmpty = RFM mEmpty
 
@@ -1295,15 +1309,27 @@ instance PatternMap RFMap where
   mAlter :: AlphaEnv -> Quantifiers -> Key RFMap -> A a -> RFMap a -> RFMap a
   mAlter env vs lf f m = go (unLoc lf)
     where
+      -- foLabel
+#if MIN_VERSION_ghc(9, 4, 0)
+      go (HsFieldBind _ lbl arg _pun) =
+        m { rfmField = mAlter env vs (unLoc (foLabel (unLoc lbl)) :: RdrName) (toA (mAlter env vs arg f)) (rfmField m) }
+#else
       go (HsFieldBind _ lbl arg _pun) =
         m { rfmField = mAlter env vs (unLoc lbl) (toA (mAlter env vs arg f)) (rfmField m) }
+#endif
 
   mMatch :: MatchEnv -> Key RFMap -> (Substitution, RFMap a) -> [(Substitution, a)]
   mMatch env lf (hs,m) = go (unLoc lf) (hs,m)
     where
       go (HsFieldBind _ lbl arg _pun) =
+#if MIN_VERSION_ghc(9, 4, 0)
+        mapFor rfmField >=> mMatch env (unLoc (foLabel (unLoc lbl))) >=> mMatch env arg
+#else
         mapFor rfmField >=> mMatch env (unLoc lbl) >=> mMatch env arg
+#endif
 
+#if MIN_VERSION_ghc(9, 4, 0)
+#else
 -- Helper class to collapse the complex encoding of record fields into RdrNames.
 -- (The complexity is to support punning/duplicate/overlapping fields, which
 -- all happens well after parsing, so is not needed here.)
@@ -1337,6 +1363,7 @@ fieldsToRdrNames = map go
   where
     go (L l (HsFieldBind a (L l2 f) arg pun)) =
       L l (HsFieldBind a (L l2 (recordFieldToRdrName f)) arg pun)
+#endif
 
 ------------------------------------------------------------------------
 
