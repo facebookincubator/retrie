@@ -375,10 +375,21 @@ instance PatternMap EMap where
       go (RecordCon _ v fs) =
         m { emRecordCon = mAlter env vs (unLoc v :: RdrName) (toA (mAlter env vs (rec_flds fs) f)) (emRecordCon m) }
       go (RecordUpd _ e' fs) =
-       let fieldsToRdrNamesUpd (Left xs) =
-             error "abc"
-           fieldsToRdrNamesUpd (Right x) = error "abc"
-           -- a = (toA (mAlter env vs (fieldsToRdrNamesUpd fs) f))
+       let fieldsToRdrNamesUpd (Left xs) = map go xs
+             where
+               go (L l (HsFieldBind a (L l2 f) arg pun)) =
+                 let lrdrName = case f of
+                       Unambiguous _ n -> n
+                       Ambiguous _ n -> n
+                       XAmbiguousFieldOcc{} -> error "XAmbiguousFieldOcc"
+                     f' = FieldOcc NoExtField lrdrName
+                  in L l (HsFieldBind a (L l2 f') arg pun)
+           fieldsToRdrNamesUpd (Right xs) = map go xs
+             where
+               go (L l (HsFieldBind a (L l2 f) arg pun)) =
+                 let lrdrName = error "TBD" -- same as GHC 9.2
+                     f' = FieldOcc NoExtField lrdrName
+                  in L l (HsFieldBind a (L l2 f') arg pun)
            a = toA (mAlter env vs (fieldsToRdrNamesUpd fs) f)
         in
          m { emRecordUpd = mAlter env vs e' a (emRecordUpd m) }
