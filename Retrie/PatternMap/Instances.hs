@@ -363,18 +363,30 @@ instance PatternMap EMap where
       go (HsLam _ mg) = m { emLam   = mAlter env vs mg f (emLam m) }
       go (HsOverLit _ ol) = m { emOverLit = mAlter env vs (ol_val ol) f (emOverLit m) }
       go (NegApp _ e' _) = m { emNegApp = mAlter env vs e' f (emNegApp m) }
+#if MIN_VERSION_ghc(9, 4, 0)
+      go (HsPar _ _ e' _) = m { emPar  = mAlter env vs e' f (emPar m) }
+#else
       go (HsPar _ e') = m { emPar  = mAlter env vs e' f (emPar m) }
+#endif
       go (OpApp _ l o r) =
         m { emOpApp = mAlter env vs o (toA (mAlter env vs l (toA (mAlter env vs r f)))) (emOpApp m) }
       go (RecordCon _ v fs) =
+#if MIN_VERSION_ghc(9, 4, 0)
         m { emRecordCon = mAlter env vs (unLoc v) (toA (mAlter env vs (fieldsToRdrNames $ rec_flds fs) f)) (emRecordCon m) }
+#else
+        m { emRecordCon = mAlter env vs (unLoc v) (toA (mAlter env vs (fieldsToRdrNames $ rec_flds fs) f)) (emRecordCon m) }
+#endif
       go (RecordUpd _ e' fs) =
         m { emRecordUpd = mAlter env vs e' (toA (mAlter env vs (fieldsToRdrNamesUpd fs) f)) (emRecordUpd m) }
       go (SectionL _ lhs o) =
         m { emSecL = mAlter env vs o (toA (mAlter env vs lhs f)) (emSecL m) }
       go (SectionR _ o rhs) =
         m { emSecR = mAlter env vs o (toA (mAlter env vs rhs f)) (emSecR m) }
+#if MIN_VERSION_ghc(9, 4, 0)
+      go (HsLet _ _ lbs _ e') =
+#else
       go (HsLet _ lbs e') =
+#endif
         let
           bs = collectLocalBinders CollNoDictBinders lbs
           env' = foldr extendAlphaEnvInternal env bs
@@ -396,15 +408,17 @@ instance PatternMap EMap where
 #else
       go HsPragE{} = missingSyntax "HsPragE"
 #endif
-#if __GLASGOW_HASKELL__ < 904
+#if MIN_VERSION_ghc(9, 4, 0)
+      go HsTypedBracket{} = missingSyntax "HsTypedBracket"
+      go HsUntypedBracket{} = missingSyntax "HsUntypedBracket"
+      go HsSpliceE{} = missingSyntax "HsSpliceE"
+#else
       go HsBracket{} = missingSyntax "HsBracket"
       go HsRnBracketOut{} = missingSyntax "HsRnBracketOut"
       go HsTcBracketOut{} = missingSyntax "HsTcBracketOut"
       go HsSpliceE{} = missingSyntax "HsSpliceE"
       go HsProc{} = missingSyntax "HsProc"
       go HsStatic{} = missingSyntax "HsStatic"
-#else
-      go HsBracketTc{} = missingSyntax "HsBracket"
 #endif
 #if __GLASGOW_HASKELL__ < 810
       go HsArrApp{} = missingSyntax "HsArrApp"
@@ -414,8 +428,11 @@ instance PatternMap EMap where
       go EViewPat{} = missingSyntax "EViewPat"
       go ELazyPat{} = missingSyntax "ELazyPat"
 #endif
+#if MIN_VERSION_ghc(9, 4, 0)
+#else
       go HsTick{} = missingSyntax "HsTick"
       go HsBinTick{} = missingSyntax "HsBinTick"
+#endif
       go HsUnboundVar{} = missingSyntax "HsUnboundVar"
 #if __GLASGOW_HASKELL__ < 904
       go HsRecFld{} = missingSyntax "HsRecFld"
@@ -447,7 +464,11 @@ instance PatternMap EMap where
       go (HsLam _ mg) = mapFor emLam >=> mMatch env mg
       go (HsLit _ l) = mapFor emLit >=> mMatch env l
       go (HsOverLit _ ol) = mapFor emOverLit >=> mMatch env (ol_val ol)
+#if MIN_VERSION_ghc(9, 4, 0)
+      go (HsPar _ _ e' _) = mapFor emPar >=> mMatch env e'
+#else
       go (HsPar _ e') = mapFor emPar >=> mMatch env e'
+#endif
       go (HsVar _ v) = mapFor emVar >=> mMatch env (unLoc v)
       go (OpApp _ l o r) =
         mapFor emOpApp >=> mMatch env o >=> mMatch env l >=> mMatch env r
@@ -458,7 +479,11 @@ instance PatternMap EMap where
         mapFor emRecordUpd >=> mMatch env e' >=> mMatch env (fieldsToRdrNamesUpd fs)
       go (SectionL _ lhs o) = mapFor emSecL >=> mMatch env o >=> mMatch env lhs
       go (SectionR _ o rhs) = mapFor emSecR >=> mMatch env o >=> mMatch env rhs
+#if MIN_VERSION_ghc(9, 4, 0)
+      go (HsLet _ _ lbs _ e') =
+#else
       go (HsLet _ lbs e') =
+#endif
         let
           bs = collectLocalBinders CollNoDictBinders lbs
           env' = extendMatchEnv env bs
@@ -516,12 +541,14 @@ emptySCMapWrapper :: SCMap a
 emptySCMapWrapper = SCM mEmpty mEmpty mEmpty
 
 instance PatternMap SCMap where
-#if __GLASGOW_HASKELL__ < 900
-  type Key SCMap = HsStmtContext Name -- see comment on HsDo in GHC
-#elif __GLASGOW_HASKELL__ < 920
+#if MIN_VERSION_ghc(9, 4, 0)
+  type Key SCMap = HsDoFlavour
+#elif MIN_VERSION_ghc(9, 2, 0)
+  type Key SCMap = HsStmtContext (HsDoRn GhcPs)
+#elif MIN_VERSION_ghc(9, 0, 0)
   type Key SCMap = HsStmtContext GhcRn
 #else
-  type Key SCMap = HsStmtContext (HsDoRn GhcPs)
+  type Key SCMap = HsStmtContext Name -- see comment on HsDo in GHC
 #endif
 
   mEmpty :: SCMap a
@@ -542,17 +569,20 @@ instance PatternMap SCMap where
     where
       go ListComp = m { scmListComp = mAlter env vs () f (scmListComp m) }
       go MonadComp = m { scmMonadComp = mAlter env vs () f (scmMonadComp m) }
-#if __GLASGOW_HASKELL__ < 900
-      go DoExpr = m { scmDoExpr = mAlter env vs () f (scmDoExpr m) }
-#else
+#if MIN_VERSION_ghc(9, 0, 0)
       go (DoExpr mname) = m { scmDoExpr = mAlter env vs (maybe "" moduleNameFS mname) f (scmDoExpr m) }
+#else
+      go DoExpr = m { scmDoExpr = mAlter env vs () f (scmDoExpr m) }
 #endif
       go MDoExpr{} = missingSyntax "MDoExpr"
+#if MIN_VERSION_ghc(9, 4, 0)
+#else
       go ArrowExpr = missingSyntax "ArrowExpr"
-      go GhciStmtCtxt = missingSyntax "GhciStmtCtxt"
       go (PatGuard _) = missingSyntax "PatGuard"
       go (ParStmtCtxt _) = missingSyntax "ParStmtCtxt"
       go (TransStmtCtxt _) = missingSyntax "TransStmtCtxt"
+#endif
+      go GhciStmtCtxt = missingSyntax "GhciStmtCtxt"
 
   mMatch :: MatchEnv -> Key SCMap -> (Substitution, SCMap a) -> [(Substitution, a)]
   mMatch _   _  (_,SCEmpty)  = []
@@ -745,7 +775,11 @@ instance PatternMap PatMap where
       go LitPat{} = missingSyntax "LitPat"
       go NPat{} = missingSyntax "NPat"
       go NPlusKPat{} = missingSyntax "NPlusKPat"
+#if MIN_VERSION_ghc(9, 4, 0)
+      go (ParPat _ _ p _) = m { pmParPat = mAlter env vs p f (pmParPat m) }
+#else
       go (ParPat _ p) = m { pmParPat = mAlter env vs p f (pmParPat m) }
+#endif
       go (TuplePat _ ps b) =
         m { pmTuplePat = mAlter env vs b (toA (mAlter env vs ps f)) (pmTuplePat m) }
       go SigPat{} = missingSyntax "SigPat"
@@ -760,7 +794,11 @@ instance PatternMap PatMap where
       hss lp = extendResult (pmHole m) (HolePat $ mePruneA env lp) hs
 
       go (WildPat _) = mapFor pmWild >=> mMatch env ()
+#if MIN_VERSION_ghc(9, 4, 0)
+      go (ParPat _ _ p _) = mapFor pmParPat >=> mMatch env p
+#else
       go (ParPat _ p) = mapFor pmParPat >=> mMatch env p
+#endif
       go (TuplePat _ ps b) = mapFor pmTuplePat >=> mMatch env b >=> mMatch env ps
       go (VarPat _ _) = mapFor pmVar >=> mMatch env ()
 #if __GLASGOW_HASKELL__ < 900
@@ -996,7 +1034,10 @@ instance PatternMap BMap where
       go (PatBind _ lhs rhs _) =
         m { bmPatBind = mAlter env vs lhs
               (toA $ mAlter env vs rhs f) (bmPatBind m) }
+#if MIN_VERSION_ghc(9, 4, 0)
+#else
       go AbsBinds{} = missingSyntax "AbsBinds"
+#endif
       go PatSynBind{} = missingSyntax "PatSynBind"
 
   mMatch :: MatchEnv -> Key BMap -> (Substitution, BMap a) -> [(Substitution, a)]
@@ -1164,7 +1205,11 @@ instance PatternMap TyMap where
       go (HsListTy _ ty') = m { tyHsListTy = mAlter env vs ty' f (tyHsListTy m) }
       go (HsParTy _ ty') = m { tyHsParTy = mAlter env vs ty' f (tyHsParTy m) }
       go (HsQualTy _ cons ty') =
+#if MIN_VERSION_ghc(9, 4, 0)
+        m { tyHsQualTy = mAlter env vs ty' (toA (mAlter env vs (fromMaybeContext (Just cons)) f)) (tyHsQualTy m) }
+#else
         m { tyHsQualTy = mAlter env vs ty' (toA (mAlter env vs (fromMaybeContext cons) f)) (tyHsQualTy m) }
+#endif
       go HsStarTy{} = missingSyntax "HsStarTy"
       go (HsSumTy _ tys) = m { tyHsSumTy = mAlter env vs tys f (tyHsSumTy m) }
       go (HsTupleTy _ ts tys) =
@@ -1200,7 +1245,11 @@ instance PatternMap TyMap where
 #endif
       go (HsListTy _ ty') = mapFor tyHsListTy >=> mMatch env ty'
       go (HsParTy _ ty') = mapFor tyHsParTy >=> mMatch env ty'
+#if MIN_VERSION_ghc(9, 4, 0)
+      go (HsQualTy _ cons ty') = mapFor tyHsQualTy >=> mMatch env ty' >=> mMatch env (fromMaybeContext (Just cons))
+#else
       go (HsQualTy _ cons ty') = mapFor tyHsQualTy >=> mMatch env ty' >=> mMatch env (fromMaybeContext cons)
+#endif
       go (HsSumTy _ tys) = mapFor tyHsSumTy >=> mMatch env tys
       go (HsTupleTy _ ts tys) = mapFor tyHsTupleTy >=> mMatch env ts >=> mMatch env tys
       go (HsTyVar _ _ v) = mapFor tyHsTyVar >=> mMatch env (unLoc v)
@@ -1232,8 +1281,11 @@ newtype RFMap a = RFM { rfmField :: VMap (EMap a) }
   deriving (Functor)
 
 instance PatternMap RFMap where
+#if MIN_VERSION_ghc(9, 4, 0)
+  type Key RFMap = LocatedA (HsRecField GhcPs (LocatedA (HsExpr GhcPs)))
+#else
   type Key RFMap = LocatedA (HsRecField RdrName (LocatedA (HsExpr GhcPs)))
-
+#endif
   mEmpty :: RFMap a
   mEmpty = RFM mEmpty
 
