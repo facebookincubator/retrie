@@ -373,13 +373,13 @@ instance PatternMap EMap where
         m { emOpApp = mAlter env vs o (toA (mAlter env vs l (toA (mAlter env vs r f)))) (emOpApp m) }
 #if MIN_VERSION_ghc(9, 4, 0)
       go (RecordCon _ v fs) =
-       let a :: A (ListMap RFMap a)
-           a = toA (mAlter env vs undefined f) -- (fieldsToRdrNames $ rec_flds fs)
-        in
-         m { emRecordCon = mAlter env vs (unLoc v) a (emRecordCon m) }
+        m { emRecordCon = mAlter env vs (unLoc v :: RdrName) (toA (mAlter env vs (rec_flds fs) f)) (emRecordCon m) }
       go (RecordUpd _ e' fs) =
-       let a :: A Double
-           a = toA undefined -- (toA (mAlter env vs (fieldsToRdrNamesUpd fs) f))
+       let fieldsToRdrNamesUpd (Left xs) =
+             error "abc"
+           fieldsToRdrNamesUpd (Right x) = error "abc"
+           -- a = (toA (mAlter env vs (fieldsToRdrNamesUpd fs) f))
+           a = toA (mAlter env vs (fieldsToRdrNamesUpd fs) f)
         in
          m { emRecordUpd = mAlter env vs e' a (emRecordUpd m) }
 #else
