@@ -43,7 +43,7 @@ extendFixityEnv l (FixityEnv env) =
   FixityEnv $ extendFsEnvList env [ (fs, p) | p@(fs,_) <- l ]
 
 ppFixityEnv :: FixityEnv -> String
-ppFixityEnv = unlines . map ppFixity . eltsUFM . unFixityEnv
+ppFixityEnv = unlines . map ppFixity . nonDetEltsUFM . unFixityEnv
   where
     ppFixity (fs, Fixity _ p d) = unwords
       [ case d of

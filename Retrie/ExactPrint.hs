@@ -261,10 +261,12 @@ parseContentNoFixity libdir fp str = do
   r <- Parsers.parseModuleFromString libdir fp str
   case r of
     Left msg -> do
-#if __GLASGOW_HASKELL__ < 810
+#if MIN_VERSION_ghc(9, 4, 0)
       fail $ show msg
-#else
+#elif MIN_VERSION_ghc(9, 0, 0)
       fail $ show $ bagToList msg
+#else
+      fail $ show msg
 #endif
     Right m -> return $ unsafeMkA (makeDeltaAst m) 0
 
@@ -314,10 +316,12 @@ parseHelper :: (ExactPrint a)
   => Parsers.LibDir -> FilePath -> Parsers.Parser a -> String -> IO (Annotated a)
 parseHelper libdir fp parser str = join $ Parsers.withDynFlags libdir $ \dflags ->
   case parser dflags fp str of
-#if __GLASGOW_HASKELL__ < 810
-    Left (_, msg) -> throwIO $ ErrorCall msg
-#else
+#if MIN_VERSION_ghc(9, 4, 0)
+    Left msg -> throwIO $ ErrorCall (show msg)
+#elif MIN_VERSION_ghc(9, 0, 0)
     Left errBag -> throwIO $ ErrorCall (show $ bagToList errBag)
+#else
+    Left (_, msg) -> throwIO $ ErrorCall msg
 #endif
     Right x -> return $ unsafeMkA (makeDeltaAst x) 0
 
