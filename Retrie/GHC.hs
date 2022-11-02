@@ -15,6 +15,7 @@ module Retrie.GHC
   , module GHC.Hs.Expr
   , module GHC.Parser.Annotation
   , module GHC.Parser.Errors.Ppr
+  , module GHC.Plugins
   , module GHC.Types.Basic
   , module GHC.Types.Error
   , module GHC.Types.Fixity
@@ -27,6 +28,7 @@ module Retrie.GHC
   , module GHC.Types.Unique.FM
   , module GHC.Types.Unique.Set
   , module GHC.Unit.Module.Name
+  , module GHC.Utils.Outputable
   ) where
 
 import GHC
@@ -39,6 +41,7 @@ import GHC.Hs
 import GHC.Hs.Expr
 import GHC.Parser.Annotation
 import GHC.Parser.Errors.Ppr
+import GHC.Plugins (showSDoc)
 import GHC.Types.Basic hiding (EP)
 import GHC.Types.Error
 import GHC.Types.Fixity
@@ -51,6 +54,7 @@ import GHC.Types.Unique
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.Set
 import GHC.Unit.Module.Name
+import GHC.Utils.Outputable (Outputable (ppr))
 
 import Data.Bifunctor (second)
 import Data.Maybe

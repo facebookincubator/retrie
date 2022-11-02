@@ -257,12 +257,12 @@ swapEntryDPT a b = do
 -- Compatibility module with ghc-exactprint
 
 parseContentNoFixity :: Parsers.LibDir -> FilePath -> String -> IO AnnotatedModule
-parseContentNoFixity libdir fp str = do
+parseContentNoFixity libdir fp str = join $ Parsers.withDynFlags libdir $ \dflags -> do
   r <- Parsers.parseModuleFromString libdir fp str
   case r of
     Left msg -> do
 #if MIN_VERSION_ghc(9, 4, 0)
-      fail $ show msg
+      fail $ showSDoc dflags $ ppr msg
 #elif MIN_VERSION_ghc(9, 0, 0)
       fail $ show $ bagToList msg
 #else
@@ -317,7 +317,7 @@ parseHelper :: (ExactPrint a)
 parseHelper libdir fp parser str = join $ Parsers.withDynFlags libdir $ \dflags ->
   case parser dflags fp str of
 #if MIN_VERSION_ghc(9, 4, 0)
-    Left msg -> throwIO $ ErrorCall (show msg)
+    Left msg -> throwIO $ ErrorCall (showSDoc dflags $ ppr msg)
 #elif MIN_VERSION_ghc(9, 0, 0)
     Left errBag -> throwIO $ ErrorCall (show $ bagToList errBag)
 #else

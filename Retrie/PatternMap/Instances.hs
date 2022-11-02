@@ -12,6 +12,7 @@
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE UndecidableInstances #-}
 module Retrie.PatternMap.Instances where
 
 import Control.Monad
@@ -395,12 +396,16 @@ instance PatternMap EMap where
 #else
       go HsPragE{} = missingSyntax "HsPragE"
 #endif
+#if __GLASGOW_HASKELL__ < 904
       go HsBracket{} = missingSyntax "HsBracket"
       go HsRnBracketOut{} = missingSyntax "HsRnBracketOut"
       go HsTcBracketOut{} = missingSyntax "HsTcBracketOut"
       go HsSpliceE{} = missingSyntax "HsSpliceE"
       go HsProc{} = missingSyntax "HsProc"
       go HsStatic{} = missingSyntax "HsStatic"
+#else
+      go HsBracketTc{} = missingSyntax "HsBracket"
+#endif
 #if __GLASGOW_HASKELL__ < 810
       go HsArrApp{} = missingSyntax "HsArrApp"
       go HsArrForm{} = missingSyntax "HsArrForm"
@@ -412,10 +417,14 @@ instance PatternMap EMap where
       go HsTick{} = missingSyntax "HsTick"
       go HsBinTick{} = missingSyntax "HsBinTick"
       go HsUnboundVar{} = missingSyntax "HsUnboundVar"
+#if __GLASGOW_HASKELL__ < 904
       go HsRecFld{} = missingSyntax "HsRecFld"
+#endif
       go HsOverLabel{} = missingSyntax "HsOverLabel"
       go HsAppType{} = missingSyntax "HsAppType"
+#if __GLASGOW_HASKELL__ < 904
       go HsConLikeOut{} = missingSyntax "HsConLikeOut"
+#endif
       go ExplicitSum{} = missingSyntax "ExplicitSum"
 
   mMatch :: MatchEnv -> Key EMap -> (Substitution, EMap a) -> [(Substitution, a)]
@@ -1223,7 +1232,7 @@ newtype RFMap a = RFM { rfmField :: VMap (EMap a) }
   deriving (Functor)
 
 instance PatternMap RFMap where
-  type Key RFMap = LocatedA (HsRecField' RdrName (LocatedA (HsExpr GhcPs)))
+  type Key RFMap = LocatedA (HsRecField RdrName (LocatedA (HsExpr GhcPs)))
 
   mEmpty :: RFMap a
   mEmpty = RFM mEmpty
@@ -1234,13 +1243,13 @@ instance PatternMap RFMap where
   mAlter :: AlphaEnv -> Quantifiers -> Key RFMap -> A a -> RFMap a -> RFMap a
   mAlter env vs lf f m = go (unLoc lf)
     where
-      go (HsRecField _ lbl arg _pun) =
+      go (HsFieldBind _ lbl arg _pun) =
         m { rfmField = mAlter env vs (unLoc lbl) (toA (mAlter env vs arg f)) (rfmField m) }
 
   mMatch :: MatchEnv -> Key RFMap -> (Substitution, RFMap a) -> [(Substitution, a)]
   mMatch env lf (hs,m) = go (unLoc lf) (hs,m)
     where
-      go (HsRecField _ lbl arg _pun) =
+      go (HsFieldBind _ lbl arg _pun) =
         mapFor rfmField >=> mMatch env (unLoc lbl) >=> mMatch env arg
 
 -- Helper class to collapse the complex encoding of record fields into RdrNames.
@@ -1261,24 +1270,21 @@ instance RecordFieldToRdrName (FieldLabelStrings GhcPs) where
 -- Either [LHsRecUpdField GhcPs] [LHsRecUpdProj GhcPs]
 fieldsToRdrNamesUpd
   :: Either [LHsRecUpdField GhcPs] [LHsRecUpdProj GhcPs]
-  -> [LHsRecField' GhcPs RdrName (LHsExpr GhcPs)]
+  -> [LHsRecField GhcPs (LHsExpr GhcPs)]
 fieldsToRdrNamesUpd (Left fs) = map go fs
   where
-    go (L l (HsRecField a (L l2 f) arg pun)) =
-      L l (HsRecField a (L l2 (recordFieldToRdrName f)) arg pun)
+    go (L l (HsFieldBind a (L l2 f) arg pun)) =
+      L l (HsFieldBind a (L l2 (recordFieldToRdrName f)) arg pun)
 fieldsToRdrNamesUpd (Right fs) = map go fs
   where
-    go (L l (HsRecField a (L l2 f) arg pun)) =
-      L l (HsRecField a (L l2 (recordFieldToRdrName f)) arg pun)
+    go (L l (HsFieldBind a (L l2 f) arg pun)) =
+      L l (HsFieldBind a (L l2 (recordFieldToRdrName f)) arg pun)
 
-fieldsToRdrNames
-  :: RecordFieldToRdrName f
-  => [LHsRecField' GhcPs f arg]
-  -> [LHsRecField' GhcPs RdrName arg]
+fieldsToRdrNames :: [LHsRecField GhcPs arg] -> [LHsRecField GhcPs arg]
 fieldsToRdrNames = map go
   where
-    go (L l (HsRecField a (L l2 f) arg pun)) =
-      L l (HsRecField a (L l2 (recordFieldToRdrName f)) arg pun)
+    go (L l (HsFieldBind a (L l2 f) arg pun)) =
+      L l (HsFieldBind a (L l2 (recordFieldToRdrName f)) arg pun)
 
 ------------------------------------------------------------------------
 
