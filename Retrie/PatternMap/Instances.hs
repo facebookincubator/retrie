@@ -1291,7 +1291,7 @@ instance PatternMap RFMap where
 #if MIN_VERSION_ghc(9, 4, 0)
   type Key RFMap = LocatedA (HsRecField GhcPs (LocatedA (HsExpr GhcPs)))
 #else
-  type Key RFMap = LocatedA (HsRecField RdrName (LocatedA (HsExpr GhcPs)))
+  type Key RFMap = LocatedA (HsRecField' RdrName (LocatedA (HsExpr GhcPs)))
 #endif
 
   mEmpty :: RFMap a
@@ -1308,17 +1308,18 @@ instance PatternMap RFMap where
       go (HsFieldBind _ lbl arg _pun) =
         m { rfmField = mAlter env vs (unLoc (foLabel (unLoc lbl)) :: RdrName) (toA (mAlter env vs arg f)) (rfmField m) }
 #else
-      go (HsFieldBind _ lbl arg _pun) =
+      go (HsRecField _ lbl arg _pun) =
         m { rfmField = mAlter env vs (unLoc lbl) (toA (mAlter env vs arg f)) (rfmField m) }
 #endif
 
   mMatch :: MatchEnv -> Key RFMap -> (Substitution, RFMap a) -> [(Substitution, a)]
   mMatch env lf (hs,m) = go (unLoc lf) (hs,m)
     where
-      go (HsFieldBind _ lbl arg _pun) =
 #if MIN_VERSION_ghc(9, 4, 0)
+      go (HsFieldBind _ lbl arg _pun) =
         mapFor rfmField >=> mMatch env (unLoc (foLabel (unLoc lbl))) >=> mMatch env arg
 #else
+      go (HsRecField _ lbl arg _pun) =
         mapFor rfmField >=> mMatch env (unLoc lbl) >=> mMatch env arg
 #endif
 
@@ -1359,21 +1360,24 @@ instance RecordFieldToRdrName (FieldLabelStrings GhcPs) where
 -- Either [LHsRecUpdField GhcPs] [LHsRecUpdProj GhcPs]
 fieldsToRdrNamesUpd
   :: Either [LHsRecUpdField GhcPs] [LHsRecUpdProj GhcPs]
-  -> [LHsRecField GhcPs (LHsExpr GhcPs)]
+  -> [LHsRecField' GhcPs RdrName (LHsExpr GhcPs)]
 fieldsToRdrNamesUpd (Left fs) = map go fs
   where
-    go (L l (HsFieldBind a (L l2 f) arg pun)) =
-      L l (HsFieldBind a (L l2 (recordFieldToRdrName f)) arg pun)
+    go (L l (HsRecField a (L l2 f) arg pun)) =
+      L l (HsRecField a (L l2 (recordFieldToRdrName f)) arg pun)
 fieldsToRdrNamesUpd (Right fs) = map go fs
   where
-    go (L l (HsFieldBind a (L l2 f) arg pun)) =
-      L l (HsFieldBind a (L l2 (recordFieldToRdrName f)) arg pun)
+    go (L l (HsRecField a (L l2 f) arg pun)) =
+      L l (HsRecField a (L l2 (recordFieldToRdrName f)) arg pun)
 
-fieldsToRdrNames :: [LHsRecField GhcPs arg] -> [LHsRecField GhcPs arg]
+fieldsToRdrNames
+  :: RecordFieldToRdrName f
+  => [LHsRecField' GhcPs f arg]
+  -> [LHsRecField' GhcPs RdrName arg]
 fieldsToRdrNames = map go
   where
-    go (L l (HsFieldBind a (L l2 f) arg pun)) =
-      L l (HsFieldBind a (L l2 (recordFieldToRdrName f)) arg pun)
+    go (L l (HsRecField a (L l2 f) arg pun)) =
+      L l (HsRecField a (L l2 (recordFieldToRdrName f)) arg pun)
 #endif
 
 ------------------------------------------------------------------------
