@@ -374,31 +374,12 @@ instance PatternMap EMap where
 #if MIN_VERSION_ghc(9, 4, 0)
       go (RecordCon _ v fs) =
         m { emRecordCon = mAlter env vs (unLoc v :: RdrName) (toA (mAlter env vs (rec_flds fs) f)) (emRecordCon m) }
-      go (RecordUpd _ e' fs) =
-       let fieldsToRdrNamesUpd (Left xs) = map go xs
-             where
-               go (L l (HsFieldBind a (L l2 f) arg pun)) =
-                 let lrdrName = case f of
-                       Unambiguous _ n -> n
-                       Ambiguous _ n -> n
-                       XAmbiguousFieldOcc{} -> error "XAmbiguousFieldOcc"
-                     f' = FieldOcc NoExtField lrdrName
-                  in L l (HsFieldBind a (L l2 f') arg pun)
-           fieldsToRdrNamesUpd (Right xs) = map go xs
-             where
-               go (L l (HsFieldBind a (L l2 f) arg pun)) =
-                 let lrdrName = error "TBD" -- same as GHC 9.2
-                     f' = FieldOcc NoExtField lrdrName
-                  in L l (HsFieldBind a (L l2 f') arg pun)
-           a = toA (mAlter env vs (fieldsToRdrNamesUpd fs) f)
-        in
-         m { emRecordUpd = mAlter env vs e' a (emRecordUpd m) }
 #else
       go (RecordCon _ v fs) =
         m { emRecordCon = mAlter env vs (unLoc v) (toA (mAlter env vs (fieldsToRdrNames $ rec_flds fs) f)) (emRecordCon m) }
+#endif
       go (RecordUpd _ e' fs) =
         m { emRecordUpd = mAlter env vs e' (toA (mAlter env vs (fieldsToRdrNamesUpd fs) f)) (emRecordUpd m) }
-#endif
       go (SectionL _ lhs o) =
         m { emSecL = mAlter env vs o (toA (mAlter env vs lhs f)) (emSecL m) }
       go (SectionR _ o rhs) =
@@ -495,12 +476,14 @@ instance PatternMap EMap where
         mapFor emOpApp >=> mMatch env o >=> mMatch env l >=> mMatch env r
       go (NegApp _ e' _) = mapFor emNegApp >=> mMatch env e'
 #if MIN_VERSION_ghc(9, 4, 0)
+      go (RecordCon _ v fs) =
+        mapFor emRecordCon >=> mMatch env (unLoc v) >=> mMatch env (rec_flds fs)
 #else
       go (RecordCon _ v fs) =
         mapFor emRecordCon >=> mMatch env (unLoc v) >=> mMatch env (fieldsToRdrNames $ rec_flds fs)
+#endif
       go (RecordUpd _ e' fs) =
         mapFor emRecordUpd >=> mMatch env e' >=> mMatch env (fieldsToRdrNamesUpd fs)
-#endif
       go (SectionL _ lhs o) = mapFor emSecL >=> mMatch env o >=> mMatch env lhs
       go (SectionR _ o rhs) = mapFor emSecR >=> mMatch env o >=> mMatch env rhs
 #if MIN_VERSION_ghc(9, 4, 0)
@@ -1340,6 +1323,23 @@ instance PatternMap RFMap where
 #endif
 
 #if MIN_VERSION_ghc(9, 4, 0)
+fieldsToRdrNamesUpd :: Either [LHsRecUpdField GhcPs] [LHsRecUpdProj GhcPs]
+  -> [LHsRecField GhcPs (LHsExpr GhcPs)]
+fieldsToRdrNamesUpd (Left xs) = map go xs
+  where
+    go (L l (HsFieldBind a (L l2 f) arg pun)) =
+      let lrdrName = case f of
+            Unambiguous _ n -> n
+            Ambiguous _ n -> n
+            XAmbiguousFieldOcc{} -> error "XAmbiguousFieldOcc"
+          f' = FieldOcc NoExtField lrdrName
+       in L l (HsFieldBind a (L l2 f') arg pun)
+fieldsToRdrNamesUpd (Right xs) = map go xs
+  where
+    go (L l (HsFieldBind a (L l2 f) arg pun)) =
+      let lrdrName = error "TBD" -- same as GHC 9.2
+          f' = FieldOcc NoExtField lrdrName
+       in L l (HsFieldBind a (L l2 f') arg pun)
 #else
 -- Helper class to collapse the complex encoding of record fields into RdrNames.
 -- (The complexity is to support punning/duplicate/overlapping fields, which
