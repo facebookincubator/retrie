@@ -272,8 +272,8 @@ patToExpr orig = case dLPat orig of
 #if MIN_VERSION_ghc(9, 4, 0)
     go (ParPat an _ p' _) = do
       p <- patToExpr p'
-      let tokLP = L NoTokenLoc HsTok
-          tokRP = L NoTokenLoc HsTok
+      let tokLP = L (TokenLoc (EpaDelta (SameLine 0) [])) HsTok
+          tokRP = L (TokenLoc (EpaDelta (SameLine 0) [])) HsTok
       lift $ mkLocA (SameLine 1) (HsPar an tokLP p tokRP)
 #else
     go (ParPat an p') = do
@@ -409,8 +409,8 @@ parenifyP Context{..} p@(L _ pat)
   | IsLhs <- ctxtParentPrec
   , needed pat =
 #if MIN_VERSION_ghc(9, 4, 0)
-    let tokLP = L NoTokenLoc HsTok
-        tokRP = L NoTokenLoc HsTok
+    let tokLP = L (TokenLoc (EpaDelta (SameLine 0) [])) HsTok
+        tokRP = L (TokenLoc (EpaDelta (SameLine 0) [])) HsTok
      in mkParen' (getEntryDP p) (\an -> ParPat an tokLP (setEntryDP p (SameLine 0)) tokRP)
 #else
     mkParen' (getEntryDP p) (\an -> ParPat an (setEntryDP p (SameLine 0)))
