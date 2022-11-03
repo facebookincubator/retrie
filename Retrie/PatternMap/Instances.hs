@@ -1319,7 +1319,6 @@ instance PatternMap RFMap where
         mapFor rfmField >=> mMatch env (unLoc (foLabel (unLoc lbl))) >=> mMatch env arg
 #endif
 
-#if __GLASGOW_HASKELL__ < 904
 -- Helper class to collapse the complex encoding of record fields into RdrNames.
 -- (The complexity is to support punning/duplicate/overlapping fields, which
 -- all happens well after parsing, so is not needed here.)
@@ -1329,12 +1328,18 @@ class RecordFieldToRdrName f where
 instance RecordFieldToRdrName (AmbiguousFieldOcc GhcPs) where
   recordFieldToRdrName = rdrNameAmbiguousFieldOcc
 
+#if __GLASGOW_HASKELL__ < 904
 instance RecordFieldToRdrName (FieldOcc p) where
   recordFieldToRdrName = unLoc . rdrNameFieldOcc
+#else
+instance RecordFieldToRdrName (FieldOcc GhcPs) where
+  recordFieldToRdrName = unLoc . foLabel
+#endif
 
 instance RecordFieldToRdrName (FieldLabelStrings GhcPs) where
   recordFieldToRdrName = error "TBD"
 
+#if __GLASGOW_HASKELL__ < 904
 -- Either [LHsRecUpdField GhcPs] [LHsRecUpdProj GhcPs]
 fieldsToRdrNamesUpd
   :: Either [LHsRecUpdField GhcPs] [LHsRecUpdProj GhcPs]
@@ -1344,15 +1349,6 @@ fieldsToRdrNamesUpd (Left fs) = map go fs
     go (L l (HsRecField a (L l2 f) arg pun)) =
       L l (HsRecField a (L l2 (recordFieldToRdrName f)) arg pun)
 fieldsToRdrNamesUpd (Right fs) = map go fs
-  where
-    go (L l (HsRecField a (L l2 f) arg pun)) =
-      L l (HsRecField a (L l2 (recordFieldToRdrName f)) arg pun)
-
-fieldsToRdrNames
-  :: RecordFieldToRdrName f
-  => [LHsRecField' GhcPs f arg]
-  -> [LHsRecField' GhcPs RdrName arg]
-fieldsToRdrNames = map go
   where
     go (L l (HsRecField a (L l2 f) arg pun)) =
       L l (HsRecField a (L l2 (recordFieldToRdrName f)) arg pun)
@@ -1370,11 +1366,21 @@ fieldsToRdrNamesUpd (Left xs) = map go xs
        in L l (HsFieldBind a (L l2 f') arg pun)
 fieldsToRdrNamesUpd (Right xs) = map go xs
   where
-    go (L l (HsFieldBind a (L l2 f) arg pun)) =
+    go (L l (HsFieldBind a (L l2 _f) arg pun)) =
       let lrdrName = error "TBD" -- same as GHC 9.2
           f' = FieldOcc NoExtField lrdrName
        in L l (HsFieldBind a (L l2 f') arg pun)
+#endif
 
+#if __GLASGOW_HASKELL__ < 904
+fieldsToRdrNames
+  :: RecordFieldToRdrName f
+  => [LHsRecField' GhcPs f arg]
+  -> [LHsRecField' GhcPs RdrName arg]
+fieldsToRdrNames = map go
+  where
+    go (L l (HsRecField a (L l2 f) arg pun)) =
+      L l (HsRecField a (L l2 (recordFieldToRdrName f)) arg pun)
 #endif
 
 ------------------------------------------------------------------------
