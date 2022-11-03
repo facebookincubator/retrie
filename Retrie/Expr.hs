@@ -1,4 +1,4 @@
--- Copyright (c) Facebook, Inc. and its affiliates.
+-- CopAAyright (c) Facebook, Inc. and its affiliates.
 --
 -- This source code is licensed under the MIT license found in the
 -- LICENSE file in the root directory of this source tree.
@@ -138,6 +138,13 @@ mkLams vs e = do
 mkLet :: Monad m => HsLocalBinds GhcPs -> LHsExpr GhcPs -> TransformT m (LHsExpr GhcPs)
 mkLet EmptyLocalBinds{} e = return e
 mkLet lbs e = do
+#if MIN_VERSION_ghc(9, 4, 0)
+  an <- mkEpAnn (DifferentLine 1 5) NoEpAnns
+  let tokLet = L (TokenLoc (EpaDelta (SameLine 0) [])) HsTok
+      tokIn = L (TokenLoc (EpaDelta (DifferentLine 1 1) [])) HsTok
+  le <- mkLocA (SameLine 1) $ HsLet an tokLet lbs tokIn e
+  return le
+#else
   an <- mkEpAnn (DifferentLine 1 5)
                 (AnnsLet {
                    alLet = EpaDelta (SameLine 0) [],
@@ -145,7 +152,7 @@ mkLet lbs e = do
                  })
   le <- mkLocA (SameLine 1) $ HsLet an lbs e
   return le
-
+#endif
 
 
 mkApps :: MonadIO m => LHsExpr GhcPs -> [LHsExpr GhcPs] -> TransformT m (LHsExpr GhcPs)
