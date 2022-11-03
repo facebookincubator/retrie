@@ -327,12 +327,13 @@ precedence _        _                = Nothing
 parenify
   :: Monad m => Context -> LHsExpr GhcPs -> TransformT m (LHsExpr GhcPs)
 parenify Context{..} le@(L _ e)
-  | needed ctxtParentPrec (precedence ctxtFixityEnv e) && needsParens e =
 #if MIN_VERSION_ghc(9, 4, 0)
-    let tokLP = L NoTokenLoc HsTok
-        tokRP = L NoTokenLoc HsTok
+  | needed ctxtParentPrec (precedence ctxtFixityEnv e) && needsParens e = do
+    let tokLP = L (TokenLoc (EpaDelta (SameLine 0) [])) HsTok
+        tokRP = L (TokenLoc (EpaDelta (SameLine 0) [])) HsTok
      in mkParen' (getEntryDP le) (\an -> HsPar an tokLP (setEntryDP le (SameLine 0)) tokRP)
 #else
+  | needed ctxtParentPrec (precedence ctxtFixityEnv e) && needsParens e =
     mkParen' (getEntryDP le) (\an -> HsPar an (setEntryDP le (SameLine 0)))
 #endif
   | otherwise = return le
