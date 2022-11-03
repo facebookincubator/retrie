@@ -268,9 +268,17 @@ patToExpr orig = case dLPat orig of
       negE <- maybe (return e) (mkLocA (SameLine 0) . NegApp noAnn e) mbNeg
       -- addAllAnnsT llit negE
       return negE
+#if MIN_VERSION_ghc(9, 4, 0)
+    go (ParPat an _ p' _) = do
+      p <- patToExpr p'
+      let tokLP = L NoTokenLoc HsTok
+          tokRP = L NoTokenLoc HsTok
+      lift $ mkLocA (SameLine 1) (HsPar an tokLP p tokRP)
+#else
     go (ParPat an p') = do
       p <- patToExpr p'
       lift $ mkLocA (SameLine 1) (HsPar an p)
+#endif
     go SigPat{} = error "patToExpr SigPat"
     go (TuplePat an ps boxity) = do
       es <- forM ps $ \pat -> do
@@ -319,7 +327,13 @@ parenify
   :: Monad m => Context -> LHsExpr GhcPs -> TransformT m (LHsExpr GhcPs)
 parenify Context{..} le@(L _ e)
   | needed ctxtParentPrec (precedence ctxtFixityEnv e) && needsParens e =
+#if MIN_VERSION_ghc(9, 4, 0)
+    let tokLP = L NoTokenLoc HsTok
+        tokRP = L NoTokenLoc HsTok
+     in mkParen' (getEntryDP le) (\an -> HsPar an tokLP (setEntryDP le (SameLine 0)) tokRP)
+#else
     mkParen' (getEntryDP le) (\an -> HsPar an (setEntryDP le (SameLine 0)))
+#endif
   | otherwise = return le
   where
            {- parent -}               {- child -}
@@ -349,6 +363,16 @@ mkParen k e = do
   (e0,pe0) <- swapEntryDPT e pe
   return pe0
 
+#if MIN_VERSION_ghc(9, 4, 0)
+mkParen' :: (Data x, Monad m, Monoid an)
+         => DeltaPos -> (EpAnn NoEpAnns -> x) -> TransformT m (LocatedAn an x)
+mkParen' dp k = do
+  let an = NoEpAnns
+  l <- uniqueSrcSpanT
+  let anc = Anchor (realSrcSpan l) (MovedAnchor (SameLine 0))
+  pe <- mkLocA dp (k (EpAnn anc an emptyComments))
+  return pe
+#else
 mkParen' :: (Data x, Monad m, Monoid an)
          => DeltaPos -> (EpAnn AnnParen -> x) -> TransformT m (LocatedAn an x)
 mkParen' dp k = do
@@ -357,6 +381,7 @@ mkParen' dp k = do
   let anc = Anchor (realSrcSpan l) (MovedAnchor (SameLine 0))
   pe <- mkLocA dp (k (EpAnn anc an emptyComments))
   return pe
+#endif
 
 -- This explicitly operates on 'Located (Pat GhcPs)' instead of 'LPat GhcPs'
 -- because it is applied at that type by SYB.
