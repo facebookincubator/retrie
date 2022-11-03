@@ -348,7 +348,11 @@ getUnparened = mkT unparen `extT` unparenT `extT` unparenP
 
 -- TODO: what about comments?
 unparen :: LHsExpr GhcPs -> LHsExpr GhcPs
+#if MIN_VERSION_ghc(9, 4, 0)
+unparen (L _ (HsPar _ _ e _)) = e
+#else
 unparen (L _ (HsPar _ e)) = e
+#endif
 unparen e = e
 
 -- | hsExprNeedsParens is not always up-to-date, so this allows us to override
@@ -368,6 +372,15 @@ mkParen' :: (Data x, Monad m, Monoid an)
          => DeltaPos -> (EpAnn NoEpAnns -> x) -> TransformT m (LocatedAn an x)
 mkParen' dp k = do
   let an = NoEpAnns
+  l <- uniqueSrcSpanT
+  let anc = Anchor (realSrcSpan l) (MovedAnchor (SameLine 0))
+  pe <- mkLocA dp (k (EpAnn anc an emptyComments))
+  return pe
+
+mkParenTy :: (Data x, Monad m, Monoid an)
+         => DeltaPos -> (EpAnn AnnParen -> x) -> TransformT m (LocatedAn an x)
+mkParenTy dp k = do
+  let an = AnnParen AnnParens d0 d0
   l <- uniqueSrcSpanT
   let anc = Anchor (realSrcSpan l) (MovedAnchor (SameLine 0))
   pe <- mkLocA dp (k (EpAnn anc an emptyComments))
@@ -393,7 +406,13 @@ parenifyP
 parenifyP Context{..} p@(L _ pat)
   | IsLhs <- ctxtParentPrec
   , needed pat =
+#if MIN_VERSION_ghc(9, 4, 0)
+    let tokLP = L NoTokenLoc HsTok
+        tokRP = L NoTokenLoc HsTok
+     in mkParen' (getEntryDP p) (\an -> ParPat an tokLP (setEntryDP p (SameLine 0)) tokRP)
+#else
     mkParen' (getEntryDP p) (\an -> ParPat an (setEntryDP p (SameLine 0)))
+#endif
   | otherwise = return p
   where
     needed BangPat{}                          = False
@@ -416,7 +435,12 @@ parenifyP Context{..} p@(L _ pat)
 parenifyT
   :: Monad m => Context -> LHsType GhcPs -> TransformT m (LHsType GhcPs)
 parenifyT Context{..} lty@(L _ ty)
-  | needed ty = mkParen' (getEntryDP lty) (\an -> HsParTy an (setEntryDP lty (SameLine 0)))
+  | needed ty =
+#if MIN_VERSION_ghc(9, 4, 0)
+      mkParenTy (getEntryDP lty) (\an -> HsParTy an (setEntryDP lty (SameLine 0)))
+#else
+      mkParen' (getEntryDP lty) (\an -> HsParTy an (setEntryDP lty (SameLine 0)))
+#endif
   | otherwise = return lty
   where
     needed HsAppTy{}
@@ -429,7 +453,11 @@ unparenT (L _ (HsParTy _ ty)) = ty
 unparenT ty = ty
 
 unparenP :: LPat GhcPs -> LPat GhcPs
+#if MIN_VERSION_ghc(9, 4, 0)
+unparenP (L _ (ParPat _ _ p _)) = p
+#else
 unparenP (L _ (ParPat _ p)) = p
+#endif
 unparenP p = p
 
 --------------------------------------------------------------------
