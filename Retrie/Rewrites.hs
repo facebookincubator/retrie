@@ -25,10 +25,10 @@ import System.FilePath
 import Retrie.CPP
 import Retrie.ExactPrint
 import Retrie.Fixity
-#if MIN_VERSION_ghc(9, 4, 0)
-import Retrie.GHC hiding (Pattern)
-#else
+#if __GLASGOW_HASKELL__ < 904
 import Retrie.GHC
+#else
+import Retrie.GHC hiding (Pattern)
 #endif
 import Retrie.Rewrites.Function
 import Retrie.Rewrites.Patterns

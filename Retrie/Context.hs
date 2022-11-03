@@ -61,10 +61,10 @@ updateContext c i =
     -- In left child, prec is 10, so HsApp child will NOT get paren'd
     -- In right child, prec is 11, so every child gets paren'd (unless atomic)
     updExp (OpApp _ _ op _) = c { ctxtParentPrec = HasPrec $ lookupOp op (ctxtFixityEnv c) }
-#if MIN_VERSION_ghc(9, 4, 0)
-    updExp (HsLet _ _ lbs _ _) = addInScope neverParen $ collectLocalBinders CollNoDictBinders lbs
-#else
+#if __GLASGOW_HASKELL__ < 904
     updExp (HsLet _ lbs _) = addInScope neverParen $ collectLocalBinders CollNoDictBinders lbs
+#else
+    updExp (HsLet _ _ lbs _ _) = addInScope neverParen $ collectLocalBinders CollNoDictBinders lbs
 #endif
     updExp _ = neverParen
 

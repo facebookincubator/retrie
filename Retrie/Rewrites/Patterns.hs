@@ -97,7 +97,13 @@ asPat patName params = do
     convertField :: (Monad m) => RecordPatSynField GhcPs
                       -> TransformT m (LHsRecField GhcPs (LPat GhcPs))
     convertField RecordPatSynField{..} = do
-#if MIN_VERSION_ghc(9, 4, 0)
+#if __GLASGOW_HASKELL__ < 904
+      hsRecFieldLbl <- mkLoc $ recordPatSynField
+      hsRecFieldArg <- mkVarPat recordPatSynPatVar
+      let hsRecPun = False
+      let hsRecFieldAnn = noAnn
+      mkLocA (SameLine 0) HsRecField{..}
+#else
       s <- uniqueSrcSpanT
       an <- mkEpAnn (SameLine 0) NoEpAnns
       let srcspan = SrcSpanAnn an s
@@ -106,12 +112,6 @@ asPat patName params = do
       let hfbPun = False
           hfbAnn = noAnn
       mkLocA (SameLine 0) HsFieldBind{..}
-#else
-      hsRecFieldLbl <- mkLoc $ recordPatSynField
-      hsRecFieldArg <- mkVarPat recordPatSynPatVar
-      let hsRecPun = False
-      let hsRecFieldAnn = noAnn
-      mkLocA (SameLine 0) HsRecField{..}
 #endif
 
 mkExpRewrite

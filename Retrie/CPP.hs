@@ -27,7 +27,8 @@ import Debug.Trace
 import Retrie.ExactPrint
 import Retrie.GHC
 import Retrie.Replace
-#if MIN_VERSION_ghc(9, 4, 0)
+#if __GLASGOW_HASKELL__ < 904
+#else
 import GHC.Types.PkgQual
 #endif
 
@@ -346,16 +347,17 @@ eqImportDecl x y =
   && ((==) `on` ideclQualified) x y
   && ((==) `on` ideclAs) x y
   && ((==) `on` ideclHiding) x y
-#if MIN_VERSION_ghc(9, 4, 0)
-  && (eqRawPkgQual `on` ideclPkgQual) x y
-#else
+#if __GLASGOW_HASKELL__ < 904
   && ((==) `on` ideclPkgQual) x y
+#else
+  && (eqRawPkgQual `on` ideclPkgQual) x y
 #endif
   && ((==) `on` ideclSource) x y
   && ((==) `on` ideclSafe) x y
   -- intentionally leave out ideclImplicit and ideclSourceSrc
   -- former doesn't matter for this check, latter is prone to whitespace issues
-#if MIN_VERSION_ghc(9, 4, 0)
+#if __GLASGOW_HASKELL__ < 904
+#else
   where
     eqRawPkgQual NoRawPkgQual NoRawPkgQual = True
     eqRawPkgQual NoRawPkgQual (RawPkgQual _) = False
