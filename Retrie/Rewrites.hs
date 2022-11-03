@@ -25,7 +25,11 @@ import System.FilePath
 import Retrie.CPP
 import Retrie.ExactPrint
 import Retrie.Fixity
+#if MIN_VERSION_ghc(9, 4, 0)
+import Retrie.GHC hiding (Pattern)
+#else
 import Retrie.GHC
+#endif
 import Retrie.Rewrites.Function
 import Retrie.Rewrites.Patterns
 import Retrie.Rewrites.Rules
