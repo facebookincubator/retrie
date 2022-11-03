@@ -14,6 +14,7 @@ module Retrie.Expr
   , grhsToExpr
   , mkApps
   , mkConPatIn
+  , mkEpAnn
   , mkHsAppsTy
   , mkLams
   , mkLet
