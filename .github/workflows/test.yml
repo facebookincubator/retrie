@@ -9,11 +9,11 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest]
-        ghc: ['9.4.2', '9.2.4']
+        ghc: ['9.4.1', '9.2.4']
 
     steps:
     - uses: actions/checkout@v2
-    - uses: haskell/actions/setup@v1
+    - uses: haskell/actions/setup@v2.0.1
       with:
         ghc-version: ${{ matrix.ghc }}
 
