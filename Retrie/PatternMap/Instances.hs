@@ -8,12 +8,14 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns #-}
+-- NOTE: This was needed for GHC 9.4 due to
+-- type Key RFMap = LocatedA (HsRecField GhcPS (LocatedA (HsExpr GhcPs)))
 {-# LANGUAGE UndecidableInstances #-}
-{-# LANGUAGE RankNTypes #-}
 module Retrie.PatternMap.Instances where
 
 import Control.Monad
