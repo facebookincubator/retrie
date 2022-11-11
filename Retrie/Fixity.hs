@@ -22,12 +22,10 @@ newtype FixityEnv = FixityEnv
 
 instance Semigroup FixityEnv where
   -- | 'mappend' for 'FixityEnv' is right-biased
-  (<>) = mappend
+  (FixityEnv e1) <> (FixityEnv e2) = FixityEnv (plusFsEnv e1 e2)
 
 instance Monoid FixityEnv where
   mempty = mkFixityEnv []
-  -- | 'mappend' for 'FixityEnv' is right-biased
-  mappend (FixityEnv e1) (FixityEnv e2) = FixityEnv (plusFsEnv e1 e2)
 
 lookupOp :: LHsExpr GhcPs -> FixityEnv -> Fixity
 lookupOp (L _ e) | Just n <- varRdrName e = lookupOpRdrName n
@@ -45,7 +43,7 @@ extendFixityEnv l (FixityEnv env) =
   FixityEnv $ extendFsEnvList env [ (fs, p) | p@(fs,_) <- l ]
 
 ppFixityEnv :: FixityEnv -> String
-ppFixityEnv = unlines . map ppFixity . eltsUFM . unFixityEnv
+ppFixityEnv = unlines . map ppFixity . nonDetEltsUFM . unFixityEnv
   where
     ppFixity (fs, Fixity _ p d) = unwords
       [ case d of

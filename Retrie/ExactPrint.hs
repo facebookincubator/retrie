@@ -257,14 +257,16 @@ swapEntryDPT a b = do
 -- Compatibility module with ghc-exactprint
 
 parseContentNoFixity :: Parsers.LibDir -> FilePath -> String -> IO AnnotatedModule
-parseContentNoFixity libdir fp str = do
+parseContentNoFixity libdir fp str = join $ Parsers.withDynFlags libdir $ \dflags -> do
   r <- Parsers.parseModuleFromString libdir fp str
   case r of
     Left msg -> do
-#if __GLASGOW_HASKELL__ < 810
+#if __GLASGOW_HASKELL__ < 900
       fail $ show msg
-#else
+#elif __GLASGOW_HASKELL__ < 904
       fail $ show $ bagToList msg
+#else
+      fail $ showSDoc dflags $ ppr msg
 #endif
     Right m -> return $ unsafeMkA (makeDeltaAst m) 0
 
@@ -314,10 +316,12 @@ parseHelper :: (ExactPrint a)
   => Parsers.LibDir -> FilePath -> Parsers.Parser a -> String -> IO (Annotated a)
 parseHelper libdir fp parser str = join $ Parsers.withDynFlags libdir $ \dflags ->
   case parser dflags fp str of
-#if __GLASGOW_HASKELL__ < 810
+#if __GLASGOW_HASKELL__ < 900
     Left (_, msg) -> throwIO $ ErrorCall msg
-#else
+#elif __GLASGOW_HASKELL__ < 904
     Left errBag -> throwIO $ ErrorCall (show $ bagToList errBag)
+#else
+    Left msg -> throwIO $ ErrorCall (showSDoc dflags $ ppr msg)
 #endif
     Right x -> return $ unsafeMkA (makeDeltaAst x) 0
 

@@ -22,7 +22,7 @@ newtype Substitution = Substitution (UniqFM FastString (FastString, HoleVal))
 -- See Note [Why not RdrNames?] for explanation of use of FastString
 
 instance Show Substitution where
-  show (Substitution m) = show (eltsUFM m)
+  show (Substitution m) = show (nonDetEltsUFM m)
 
 -- | Sum type of possible substitution values.
 data HoleVal

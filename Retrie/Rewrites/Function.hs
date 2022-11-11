@@ -82,7 +82,11 @@ irrefutablePat = go . unLoc
     go VarPat{} = True
     go (LazyPat _ p) = irrefutablePat p
     go (AsPat _ _ p) = irrefutablePat p
+#if __GLASGOW_HASKELL__ < 904
     go (ParPat _ p) = irrefutablePat p
+#else
+    go (ParPat _ _ p _) = irrefutablePat p
+#endif
     go (BangPat _ p) = irrefutablePat p
     go _ = False
 
