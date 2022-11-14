@@ -92,14 +92,17 @@ library
     text >= 1.2.3 && < 2.1,
     transformers >= 0.5.5 && < 0.6,
     unordered-containers >= 0.2.10 && < 0.3
-  if impl (ghc >= 9.4) && (impl (ghc < 9.5))
+  if impl (ghc >= 9.4) && impl (ghc < 9.5)
     build-depends:
-       ghc == 9.4.*,
-       ghc-exactprint >= 1.6.0 && < 1.7
-  if impl (ghc >= 9.2) && (impl (ghc < 9.3))
-    build-depends:
-      ghc == 9.2.*,
-      ghc-exactprint < 1.6.0 && > 1.4.0
+      ghc == 9.4.*,
+      ghc-exactprint >= 1.6.0 && < 1.7
+  else
+    if impl (ghc >= 9.2) && impl (ghc < 9.3)
+      build-depends:
+        ghc == 9.2.*,
+        ghc-exactprint < 1.6.0 && > 1.4.0
+    else
+      buildable: false
   default-language: Haskell2010
 
 Flag BuildExecutable
