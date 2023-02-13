@@ -53,7 +53,11 @@ import GHC.Types.SrcLoc
 import GHC.Types.Unique
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.Set
+#if __GLASGOW_HASKELL__ >= 906
+import Language.Haskell.Syntax.Basic as GHC.Unit.Module.Name
+#else
 import GHC.Unit.Module.Name
+#endif
 import GHC.Utils.Outputable (Outputable (ppr))
 
 import Data.Bifunctor (second)
@@ -92,7 +96,11 @@ tyvarRdrName (HsTyVar _ _ n) = Just n
 tyvarRdrName _ = Nothing
 
 -- fixityDecls :: HsModule -> [(LIdP p, Fixity)]
+#if __GLASGOW_HASKELL__ >= 906
+fixityDecls :: HsModule GhcPs -> [(LocatedN RdrName, Fixity)]
+#else
 fixityDecls :: HsModule -> [(LocatedN RdrName, Fixity)]
+#endif
 fixityDecls m =
   [ (nm, fixity)
   | L _ (SigD _ (FixSig _ (FixitySig _ nms fixity))) <- hsmodDecls m
@@ -100,7 +108,11 @@ fixityDecls m =
   ]
 
 ruleInfo :: RuleDecl GhcPs -> [RuleInfo]
+#if __GLASGOW_HASKELL__ >= 906
+ruleInfo (HsRule _ (L _ riName) _ tyBs valBs riLHS riRHS) =
+#else
 ruleInfo (HsRule _ (L _ (_, riName)) _ tyBs valBs riLHS riRHS) =
+#endif
   let
     riQuantifiers =
       map unLoc (tyBindersToLocatedRdrNames (fromMaybe [] tyBs)) ++
