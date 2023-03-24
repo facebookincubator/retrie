@@ -4,7 +4,7 @@
 -- LICENSE file in the root directory of this source tree.
 --
 name: retrie
-version: 1.2.1.1
+version: 1.2.2
 synopsis: A powerful, easy-to-use codemodding tool for Haskell.
 homepage: https://github.com/facebookincubator/retrie
 bug-reports: https://github.com/facebookincubator/retrie/issues
@@ -23,7 +23,7 @@ extra-source-files:
   README.md
   tests/inputs/*.custom
   tests/inputs/*.test
-tested-with: GHC ==9.2.1, GHC ==9.4.1
+tested-with: GHC ==9.2.1, GHC ==9.4.1, GHC ==9.6.1
 
 description:
   Retrie is a tool for codemodding Haskell. Key goals include:
