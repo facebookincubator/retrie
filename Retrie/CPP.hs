@@ -351,7 +351,7 @@ eqImportDecl x y =
   ((==) `on` unLoc . ideclName) x y
   && ((==) `on` ideclQualified) x y
   && ((==) `on` ideclAs) x y
-#if __GLASGOW_HASKELL__ < 904
+#if __GLASGOW_HASKELL__ <= 904
   && ((==) `on` ideclHiding) x y
 #else
   && ((==) `on` ideclImportList) x y
