@@ -53,7 +53,7 @@ dfnsToRewrites libdir specs am = fmap astA $ transformA am $ \ (L _ m) -> do
 getImports
   :: LibDir -> Direction -> Maybe (LocatedA ModuleName) -> TransformT IO AnnotatedImports
 getImports libdir RightToLeft (Just (L _ mn)) = -- See Note [fold only]
-  lift $ liftIO $ parseImports libdir ["import " ++ moduleNameString mn]
+  TransformT $ lift $ liftIO $ parseImports libdir ["import " ++ moduleNameString mn]
 getImports _ _ _ = return mempty
 
 matchToRewrites
@@ -81,7 +81,11 @@ irrefutablePat = go . unLoc
     go WildPat{} = True
     go VarPat{} = True
     go (LazyPat _ p) = irrefutablePat p
+#if __GLASGOW_HASKELL__ <= 904
     go (AsPat _ _ p) = irrefutablePat p
+#else
+    go (AsPat _ _ _ p) = irrefutablePat p
+#endif
 #if __GLASGOW_HASKELL__ < 904
     go (ParPat _ p) = irrefutablePat p
 #else

@@ -47,6 +47,7 @@ module Retrie.Types
   , Context(..)
   ) where
 
+import Control.Monad
 import Control.Monad.IO.Class
 import Control.Monad.State
 import Data.Bifunctor
@@ -328,7 +329,7 @@ firstMatch _ [] = return NoMatch
 firstMatch ctxt ((sub, RewriterResult{..}):matchResults) = do
   -- 'firstMatch' is lazy in 'rrTransformer', only running it enough
   -- times to get the first valid MatchResult.
-  matchResult <- lift $ liftIO $ rrTransformer ctxt (MatchResult sub rrTemplate)
+  matchResult <- TransformT $ lift $ liftIO $ rrTransformer ctxt (MatchResult sub rrTemplate)
   case matchResult of
     MatchResult sub' _
       -- Check that all quantifiers from the original rewrite have mappings

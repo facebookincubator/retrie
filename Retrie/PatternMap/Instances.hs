@@ -422,7 +422,9 @@ instance PatternMap EMap where
 #else
       go HsTypedBracket{} = missingSyntax "HsTypedBracket"
       go HsUntypedBracket{} = missingSyntax "HsUntypedBracket"
+#if __GLASGOW_HASKELL__ < 906
       go HsSpliceE{} = missingSyntax "HsSpliceE"
+#endif
 #endif
 #if __GLASGOW_HASKELL__ < 810
       go HsArrApp{} = missingSyntax "HsArrApp"
@@ -676,11 +678,12 @@ emptyCDMapWrapper = CDMap mEmpty mEmpty
 instance PatternMap CDMap where
 #if __GLASGOW_HASKELL__ < 810
   type Key CDMap = HsConDetails (LPat GhcPs) (HsRecFields GhcPs (LPat GhcPs))
-#else
+#elif __GLASGOW_HASKELL__ < 906
   -- We must manually expand 'LPat' to avoid UndecidableInstances in GHC 8.10+
   type Key CDMap = HsConDetails (HsPatSigType GhcPs) (LocatedA (Pat GhcPs)) (HsRecFields GhcPs (LocatedA (Pat GhcPs)))
   -- type HsConPatDetails p = HsConDetails (HsPatSigType (NoGhcTc p)) (LPat p) (HsRecFields p (LPat p))
-
+#else
+  type Key CDMap = HsConDetails (HsConPatTyArg GhcPs) (LocatedA (Pat GhcPs)) (HsRecFields GhcPs (LocatedA (Pat GhcPs)))
 #endif
 
   mEmpty :: CDMap a
@@ -1035,10 +1038,10 @@ instance PatternMap BMap where
       go (FunBind _ _ mg _ _) = m { bmFunBind = mAlter env vs mg f (bmFunBind m) }
       go (VarBind _ _ e _) = m { bmVarBind = mAlter env vs e f (bmVarBind m) }
 #else
-      go (FunBind _ _ mg _) = m { bmFunBind = mAlter env vs mg f (bmFunBind m) }
+      go (FunBind{fun_matches = mg}) = m { bmFunBind = mAlter env vs mg f (bmFunBind m) }
       go (VarBind _ _ e) = m { bmVarBind = mAlter env vs e f (bmVarBind m) }
 #endif
-      go (PatBind _ lhs rhs _) =
+      go (PatBind{pat_lhs=lhs, pat_rhs=rhs}) =
         m { bmPatBind = mAlter env vs lhs
               (toA $ mAlter env vs rhs f) (bmPatBind m) }
 #if __GLASGOW_HASKELL__ < 904
@@ -1054,10 +1057,10 @@ instance PatternMap BMap where
       go (FunBind _ _ mg _ _) = mapFor bmFunBind >=> mMatch env mg
       go (VarBind _ _ e _) = mapFor bmVarBind >=> mMatch env e
 #else
-      go (FunBind _ _ mg _) = mapFor bmFunBind >=> mMatch env mg
+      go (FunBind{fun_matches = mg}) = mapFor bmFunBind >=> mMatch env mg
       go (VarBind _ _ e) = mapFor bmVarBind >=> mMatch env e
 #endif
-      go (PatBind _ lhs rhs _)
+      go (PatBind{pat_lhs=lhs, pat_rhs=rhs})
         = mapFor bmPatBind >=> mMatch env lhs >=> mMatch env rhs
       go _ = const [] -- TODO
 

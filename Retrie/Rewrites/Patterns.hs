@@ -86,7 +86,11 @@ asPat patName params = do
   mkConPatIn patName params'
   where
 
+#if __GLASGOW_HASKELL__ <= 904
     convertTyVars :: (Monad m) => [Void] -> TransformT m [HsPatSigType GhcPs]
+#else
+    convertTyVars :: (Monad m) => [Void] -> TransformT m [HsConPatTyArg GhcPs]
+#endif
     convertTyVars _ = return []
 
     convertFields :: (Monad m) => [RecordPatSynField GhcPs]

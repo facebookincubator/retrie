@@ -103,7 +103,7 @@ allMatches _ [] = return []
 allMatches ctxt matchResults = do
   results <-
     forM matchResults $ \(sub, RewriterResult{..}) -> do
-      result <- lift $ liftIO $ rrTransformer ctxt $ MatchResult sub rrTemplate
+      result <- TransformT $ lift $ liftIO $ rrTransformer ctxt $ MatchResult sub rrTemplate
       return (rrQuantifiers, result)
   return
     [ project <$> result

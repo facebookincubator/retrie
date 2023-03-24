@@ -35,6 +35,7 @@ module Retrie.Expr
   , wildSupply
   ) where
 
+import Control.Monad
 import Control.Monad.State.Lazy
 import Data.Functor.Identity
 -- import qualified Data.Map as M

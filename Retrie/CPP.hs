@@ -325,8 +325,13 @@ isPragma = Text.isPrefixOf "{-#"
 insertImports
   :: Monad m
   => [AnnotatedImports]   -- ^ imports and their annotations
+#if __GLASGOW_HASKELL__ < 906
   -> Located HsModule     -- ^ target module
   -> TransformT m (Located HsModule)
+#else
+  -> Located (HsModule GhcPs)     -- ^ target module
+  -> TransformT m (Located (HsModule GhcPs))
+#endif
 insertImports is (L l m) = do
   imps <- graftA $ filterAndFlatten (unLoc <$> hsmodName m) is
   let
@@ -346,7 +351,11 @@ eqImportDecl x y =
   ((==) `on` unLoc . ideclName) x y
   && ((==) `on` ideclQualified) x y
   && ((==) `on` ideclAs) x y
+#if __GLASGOW_HASKELL__ <= 904
   && ((==) `on` ideclHiding) x y
+#else
+  && ((==) `on` ideclImportList) x y
+#endif
 #if __GLASGOW_HASKELL__ < 904
   && ((==) `on` ideclPkgQual) x y
 #else

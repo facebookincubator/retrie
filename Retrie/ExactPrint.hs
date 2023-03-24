@@ -49,6 +49,7 @@ module Retrie.ExactPrint
   ) where
 
 import Control.Exception
+import Control.Monad
 import Control.Monad.State.Lazy hiding (fix)
 -- import Data.Function (on)
 import Data.List (transpose)

@@ -8,6 +8,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE CPP #-}
 module Retrie.ExactPrint.Annotated
   ( -- * Annotated
     Annotated
@@ -37,6 +38,7 @@ module Retrie.ExactPrint.Annotated
 
 import Control.Monad.State.Lazy hiding (fix)
 import Data.Default as D
+
 import Data.Functor.Identity
 
 import Language.Haskell.GHC.ExactPrint hiding
@@ -59,7 +61,11 @@ type AnnotatedHsExpr = Annotated (LHsExpr GhcPs)
 type AnnotatedHsType = Annotated (LHsType GhcPs)
 type AnnotatedImport = Annotated (LImportDecl GhcPs)
 type AnnotatedImports = Annotated [LImportDecl GhcPs]
+#if __GLASGOW_HASKELL__ >= 906
+type AnnotatedModule = Annotated (Located (HsModule GhcPs))
+#else
 type AnnotatedModule = Annotated (Located HsModule)
+#endif
 type AnnotatedPat = Annotated (LPat GhcPs)
 type AnnotatedStmt = Annotated (LStmt GhcPs (LHsExpr GhcPs))
 
