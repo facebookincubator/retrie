@@ -246,12 +246,13 @@ Retrie provides a small monadic DSL for scripting the application of rewrites. I
 ```haskell
 {-# LANGUAGE OverloadedStrings #-}
 module Main where
-  
+
+import qualified GHC.Paths as GHC.Paths
 import Retrie
   
 main :: IO ()
-main = runScript $ \opts ->
-  [rewrite] <- parseRewrites opts [Adhoc "forall arg. fooOld arg = fooNew arg"]
+main = runScript GHC.Paths.libdir $ \opts -> do
+  [rewrite] <- parseRewrites GHC.Paths.libdir opts [Adhoc "forall arg. fooOld arg = fooNew arg"]
   return $ apply [setRewriteTransformer stringToFooArg rewrite]
   
 argMapping :: [(FastString, String)]
@@ -264,8 +265,8 @@ stringToFooArg _ctxt match
   , L _ (HsLit _ (HsString _ str)) <- astA expr = do
     newExpr <- case lookup str argMapping of
       Nothing ->
-        parseExpr $ "error \"invalid argument: " ++ unpackFS str ++ "\""
-      Just constructor -> parseExpr constructor
+        parseExpr GHC.Paths.libdir $ "error \"invalid argument: " ++ unpackFS str ++ "\""
+      Just constructor -> parseExpr GHC.Paths.libdir constructor
     return $
       MatchResult (extendSubst substitution "arg" (HoleExpr newExpr)) template
   | otherwise = return NoMatch
