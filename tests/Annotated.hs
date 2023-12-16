@@ -9,6 +9,9 @@
 module Annotated (annotatedTest) where
 
 import Control.Monad.State.Lazy
+#if MIN_VERSION_mtl(2, 3, 0)
+import Control.Monad ((>=>))
+#endif
 import Data.Data
 import Data.Generics
 -- import qualified Data.Map as M
