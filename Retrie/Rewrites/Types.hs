@@ -44,7 +44,11 @@ typeSynonymsToRewrites specs am = fmap astA $ transformA am $ \ m -> do
 -- | Compile a list of RULES into a list of rewrites.
 mkTypeRewrite
   :: Direction
+#if __GLASGOW_HASKELL__ < 908
   -> (LocatedN RdrName, [LHsTyVarBndr () GhcPs], LHsType GhcPs)
+#else
+  -> (LocatedN RdrName, [LHsTyVarBndr (HsBndrVis GhcPs) GhcPs], LHsType GhcPs)
+#endif
   -> TransformT IO (Rewrite (LHsType GhcPs))
 mkTypeRewrite d (lhsName, vars, rhs) = do
   let lhsName' = setEntryDP lhsName (SameLine 0)

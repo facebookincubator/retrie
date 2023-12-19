@@ -3,6 +3,7 @@
 -- This source code is licensed under the MIT license found in the
 -- LICENSE file in the root directory of this source tree.
 --
+{-# LANGUAGE CPP #-}
 module Fixity
   ( defaultFixityEnv
   , hseToGHC
@@ -30,7 +31,12 @@ defaultFixityEnv = mkFixityEnv $ map hseToGHC HSE.baseFixities
 
 hseToGHC :: HSE.Fixity -> (FastString, (FastString, Fixity))
 hseToGHC (HSE.Fixity assoc p nm) =
+#if __GLASGOW_HASKELL__ < 908
   (fs, (fs, Fixity (SourceText nm') p (dir assoc)))
+#else
+  (fs, (fs, Fixity (SourceText (fsLit nm')) p (dir assoc)))
+#endif
+
   where
     dir (HSE.AssocNone _)  = InfixN
     dir (HSE.AssocLeft _)  = InfixL

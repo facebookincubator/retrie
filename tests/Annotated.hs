@@ -16,6 +16,9 @@ import Data.Generics
 -- import Data.Maybe
 import qualified GHC.Paths as GHC.Paths
 import Test.HUnit
+#if MIN_VERSION_mtl(2, 3, 0)
+import Control.Monad ((>=>))
+#endif
 
 import Retrie.ExactPrint
 import Retrie.GHC
