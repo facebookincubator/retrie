@@ -1331,7 +1331,11 @@ class RecordFieldToRdrName f where
   recordFieldToRdrName :: f -> RdrName
 
 instance RecordFieldToRdrName (AmbiguousFieldOcc GhcPs) where
+#if __GLASGOW_HASKELL__ < 908
   recordFieldToRdrName = rdrNameAmbiguousFieldOcc
+#else
+  recordFieldToRdrName = ambiguousFieldOccRdrName
+#endif
 
 #if __GLASGOW_HASKELL__ < 904
 instance RecordFieldToRdrName (FieldOcc p) where
@@ -1357,7 +1361,7 @@ fieldsToRdrNamesUpd (Right fs) = map go fs
   where
     go (L l (HsRecField a (L l2 f) arg pun)) =
       L l (HsRecField a (L l2 (recordFieldToRdrName f)) arg pun)
-#else
+#elif __GLASGOW_HASKELL__ < 908
 fieldsToRdrNamesUpd :: Either [LHsRecUpdField GhcPs] [LHsRecUpdProj GhcPs]
   -> [LHsRecField GhcPs (LHsExpr GhcPs)]
 fieldsToRdrNamesUpd (Left xs) = map go xs
@@ -1370,6 +1374,24 @@ fieldsToRdrNamesUpd (Left xs) = map go xs
           f' = FieldOcc NoExtField lrdrName
        in L l (HsFieldBind a (L l2 f') arg pun)
 fieldsToRdrNamesUpd (Right xs) = map go xs
+  where
+    go (L l (HsFieldBind a (L l2 _f) arg pun)) =
+      let lrdrName = error "TBD" -- same as GHC 9.2
+          f' = FieldOcc NoExtField lrdrName
+       in L l (HsFieldBind a (L l2 f') arg pun)
+#else
+fieldsToRdrNamesUpd :: LHsRecUpdFields GhcPs
+  -> [LHsRecField GhcPs (LHsExpr GhcPs)]
+fieldsToRdrNamesUpd (RegularRecUpdFields _ xs) = map go xs
+  where
+    go (L l (HsFieldBind a (L l2 f) arg pun)) =
+      let lrdrName = case f of
+            Unambiguous _ n -> n
+            Ambiguous _ n -> n
+            XAmbiguousFieldOcc{} -> error "XAmbiguousFieldOcc"
+          f' = FieldOcc NoExtField lrdrName
+       in L l (HsFieldBind a (L l2 f') arg pun)
+fieldsToRdrNamesUpd (OverloadedRecUpdFields _ xs) = map go xs
   where
     go (L l (HsFieldBind a (L l2 _f) arg pun)) =
       let lrdrName = error "TBD" -- same as GHC 9.2

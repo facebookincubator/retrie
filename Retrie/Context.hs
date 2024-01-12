@@ -56,7 +56,11 @@ updateContext c i =
 
     updExp :: HsExpr GhcPs -> Context
     updExp HsApp{} =
+#if __GLASGOW_HASKELL__ < 908
       c { ctxtParentPrec = HasPrec $ Fixity (SourceText "HsApp") (10 + i - firstChild) InfixL }
+#else
+      c { ctxtParentPrec = HasPrec $ Fixity (SourceText (fsLit "HsApp")) (10 + i - firstChild) InfixL }
+#endif
     -- Reason for 10 + i: (i is index of child, 0 = left, 1 = right)
     -- In left child, prec is 10, so HsApp child will NOT get paren'd
     -- In right child, prec is 11, so every child gets paren'd (unless atomic)

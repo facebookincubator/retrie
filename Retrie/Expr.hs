@@ -134,7 +134,11 @@ mkLams vs e = do
   matches <- mkLocA (SameLine 0) [L l (Match anm ctxt pats (GRHSs cs grhs' binds))]
   let
     mg =
+#if __GLASGOW_HASKELL__ < 908
       mkMatchGroup Generated matches
+#else
+      mkMatchGroup (Generated SkipPmc) matches
+#endif
   mkLocA (SameLine 1) $ HsLam noExtField mg
 
 mkLet :: Monad m => HsLocalBinds GhcPs -> LHsExpr GhcPs -> TransformT m (LHsExpr GhcPs)
@@ -320,7 +324,11 @@ grhsToExpr _ = error "grhsToExpr"
 -------------------------------------------------------------------------------
 
 precedence :: FixityEnv -> HsExpr GhcPs -> Maybe Fixity
+#if __GLASGOW_HASKELL__ < 908
 precedence _        (HsApp {})       = Just $ Fixity (SourceText "HsApp") 10 InfixL
+#else
+precedence _        (HsApp {})       = Just $ Fixity (SourceText (fsLit "HsApp")) 10 InfixL
+#endif
 precedence fixities (OpApp _ _ op _) = Just $ lookupOp op fixities
 precedence _        _                = Nothing
 

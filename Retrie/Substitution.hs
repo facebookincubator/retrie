@@ -55,4 +55,8 @@ deleteSubst (Substitution m) ks = Substitution (delListFromUFM m ks)
 
 -- | Fold over the substitution.
 foldSubst :: ((FastString, HoleVal) -> a -> a) -> a -> Substitution -> a
+#if __GLASGOW_HASKELL__ < 908
 foldSubst f x (Substitution m) = foldUFM f x m
+#else
+foldSubst f x (Substitution m) = nonDetFoldUFM f x m
+#endif
