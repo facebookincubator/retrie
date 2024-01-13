@@ -9,6 +9,7 @@
 --adhoc-type "MyMaybe a = Maybe a"
 --adhoc "MyNothing = Nothing"
 --adhoc "forall x. MyJust x = Just x"
+--adhoc "forall xs. 3 : xs = 42 : 3 : xs"
 ===
  module Adhoc where
  
@@ -34,3 +35,11 @@
 +baz Nothing = Nothing
 -baz (Just y) = MyJust y
 +baz (Just y) = Just y
+
+ consList :: [Int]
+-consList = 1 : 2 : 3 : 4 : []
++consList = 1 : 2 : 42 : 3 : 4 : []
+
+ sugarList :: [Int]
+-sugarList = [1, 2, 3, 4]
++sugarList = [1, 2, 42, 3, 4]
