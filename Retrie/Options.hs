@@ -5,6 +5,7 @@
 --
 {-# LANGUAGE ApplicativeDo #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE NumericUnderscores #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TupleSections #-}
 module Retrie.Options
@@ -487,13 +488,28 @@ runGrepChain targetDir verbosity GrepCommands{..} = foldM (commandStep targetDir
 
 -- | run a command with a list of files as quoted arguments
 commandStep :: FilePath -> Verbosity -> [FilePath]-> CommandLine -> IO [FilePath]
-commandStep targetDir verbosity files cmd = doCmd targetDir verbosity (cmd <> formatPaths files)
- where
-    formatPaths [] = ""
-    formatPaths xs = " " <> unwords (map quotePath xs)
+commandStep targetDir verbosity files cmd =
+  fmap concat $ forM (chunkifyArgs $ map quotePath files) $ \args ->
+    doCmd targetDir verbosity $ cmd <> " " <> unwords args
+
 quotePath :: FilePath -> FilePath
 quotePath x = "'" <> x <> "'"
 
+-- Split arguments into chunks whose size does not exceed 'argMax'.
+-- Note that @chunkifyArgs []@ returns @[[]]@ intentionally.
+chunkifyArgs :: [String] -> [[String]]
+chunkifyArgs = go 0 []
+  where
+    go _ acc [] = [reverse acc]
+    go n acc (arg: args)
+      | n <= 0 || n + len <= argMax = go (n + len) (arg: acc) args
+      | otherwise = reverse acc: go len [arg] args
+      where
+        len = length arg + 1
+
+-- | Hardcoded default @--max-args=max-args@ used by @xargs@.
+argMax :: Int
+argMax = 128 * 1024
 
 doCmd :: FilePath -> Verbosity -> String -> IO [FilePath]
 doCmd targetDir verbosity shellCmd = do
