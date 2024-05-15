@@ -117,9 +117,12 @@ substHsMatchContext
 #if __GLASGOW_HASKELL__ < 900
   -> HsMatchContext RdrName
   -> TransformT m (HsMatchContext RdrName)
-#else
+#elif__GLASGOW_HASKELL__ < 910
   -> HsMatchContext GhcPs
   -> TransformT m (HsMatchContext GhcPs)
+#else
+  -> HsMatchContext (LIdP GhcPs)
+  -> TransformT m (HsMatchContext (LIdP GhcPs))
 #endif
 substHsMatchContext ctxt (FunRhs (L l v) f s)
   | Just (HoleRdr rdr) <- lookupHoleVar v ctxt =

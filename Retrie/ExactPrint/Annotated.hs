@@ -153,8 +153,11 @@ trimA = runIdentity . transformA nil . const . graftA
     nil :: Annotated ()
     nil = mempty
 
-setEntryDPA :: (Default an)
-            => Annotated (LocatedAn an ast) -> DeltaPos -> Annotated (LocatedAn an ast)
+setEntryDPA :: 
+#if __GLASGOW_HASKELL__ < 910
+            (Default an) =>
+#endif
+            Annotated (LocatedAn an ast) -> DeltaPos -> Annotated (LocatedAn an ast)
 setEntryDPA (Annotated ast s) dp = Annotated (setEntryDP ast dp) s
 
 -- | Exactprint an 'Annotated' thing.

@@ -108,10 +108,14 @@ asPat patName params = do
       let hsRecFieldAnn = noAnn
       mkLocA (SameLine 0) HsRecField{..}
 #else
+#if __GLASGOW_HASKELL__ < 910
       s <- uniqueSrcSpanT
       an <- mkEpAnn (SameLine 0) NoEpAnns
       let srcspan = SrcSpanAnn an s
-          hfbLHS = L srcspan recordPatSynField
+#else
+      srcspan <- mkEpAnn (SameLine 0) noAnn
+#endif
+      let hfbLHS = L srcspan recordPatSynField
       hfbRHS <- mkVarPat recordPatSynPatVar
       let hfbPun = False
           hfbAnn = noAnn
