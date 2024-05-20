@@ -46,7 +46,7 @@
  
  baz2 :: Int
 -baz2 = foo * bar
-+baz2 = (3 + 4) * 5 * foo
++baz2 = (3 + 4) * 5 `quot` foo
  
  quux :: Int -> Int
 -quux x = foo * x
