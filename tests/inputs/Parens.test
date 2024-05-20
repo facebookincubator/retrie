@@ -7,23 +7,28 @@
 -u Parens.bar 
 -u Parens.quux 
 -u Parens.blarg
+-u Parens.shl1
+--type-forward Parens.Fn
+--type-forward Parens.MaybeInt
 ===
  module Parens where
+ 
+ import Data.Bits
  
  foo :: Int
  foo = 3 + 4
  
  bar :: Int
--bar = 5 * foo
-+bar = 5 * (3 + 4)
+-bar = 5 `quot` foo
++bar = 5 `quot` (3 + 4)
  
  baz :: Int
 -baz = quux bar
 +baz = foo * bar
  
  baz2 :: Int
--baz2 = foo * bar
-+baz2 = (3 + 4) * 5 * foo
+-baz2 = foo `quot` bar
++baz2 = (3 + 4) `quot` 5 `quot` foo
  
  quux :: Int -> Int
 -quux x = foo * x
@@ -56,3 +61,46 @@
 +jenk = return $ (case 54 of
 +    0 -> pred
 +    _ -> succ) 42
+ 
+ shl1 :: Int -> Int
+ shl1 n = n `shiftL` 1
+ 
+ shl3 :: Int -> Int
+-shl3 n = shl1 n `shiftL` 2
++shl3 n = n `shiftL` 1 `shiftL` 2
+ 
+ shl4 :: Int -> Int
+-shl4 n = n `shiftL` shl1 2
++shl4 n = n `shiftL` 2 `shiftL` 1
+ 
+ mixedDirs :: Int
+-mixedDirs = shl1 3 ^ shl1 4
++mixedDirs = (3 `shiftL` 1) ^ (4 `shiftL` 1)
+ 
+ type Fn a b = a -> b
+ type MaybeInt = Maybe Int
+ 
+-($!) :: Fn (a -> b) (a -> b)
++($!) :: ((a -> b) -> (a -> b))
+ f $! x = f (x)
+ 
+-(&!) :: a -> Fn (a -> b) b
++(&!) :: a -> ((a -> b) -> b)
+ (&!) x f = (f) x
+ 
+-konst :: b -> Fn a b
++konst :: b -> (a -> b)
+ konst x _ = x
+ 
+-noop :: Fn a a
++noop :: (a -> a)
+ noop x = x
+ 
+-idMaybeInt :: MaybeInt -> MaybeInt
++idMaybeInt :: Maybe Int -> Maybe Int
+ idMaybeInt x = x
+ 
+-swapEither :: (Either MaybeInt Int) -> Either Int MaybeInt
++swapEither :: (Either (Maybe Int) Int) -> Either Int (Maybe Int)
+ swapEither (Left x) = Right x
+ swapEither (Right x) = Left x
