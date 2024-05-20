@@ -29,7 +29,7 @@
  
  baz2 :: Int
 -baz2 = foo `quot` bar
-+baz2 = (3 + 4) `quot` 5 `quot` foo
++baz2 = (3 + 4) `quot` (5 `quot` foo)
  
  quux :: Int -> Int
 -quux x = foo * x
@@ -76,7 +76,7 @@
  
  shl4 :: Int -> Int
 -shl4 n = n `shiftL` shl1 2
-+shl4 n = n `shiftL` 2 `shiftL` 1
++shl4 n = n `shiftL` (2 `shiftL` 1)
  
  mixedDirs :: Int
 -mixedDirs = shl1 3 ^ shl1 4
@@ -86,19 +86,19 @@
  type MaybeInt = Maybe Int
  
 -($!) :: Fn (a -> b) (a -> b)
-+($!) :: ((a -> b) -> (a -> b))
++($!) :: (a -> b) -> a -> b
  f $! x = f (x)
  
 -(&!) :: a -> Fn (a -> b) b
-+(&!) :: a -> ((a -> b) -> b)
++(&!) :: a -> (a -> b) -> b
  (&!) x f = (f) x
  
 -konst :: b -> Fn a b
-+konst :: b -> (a -> b)
++konst :: b -> a -> b
  konst x _ = x
  
 -noop :: Fn a a
-+noop :: (a -> a)
++noop :: a -> a
  noop x = x
  
 -idMaybeInt :: MaybeInt -> MaybeInt

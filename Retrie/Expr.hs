@@ -458,10 +458,14 @@ parenifyT Context{..} lty@(L _ ty)
 #endif
   | otherwise = return lty
   where
-    needed HsAppTy{}
-      | IsHsAppsTy <- ctxtParentPrec = True
-      | otherwise = False
-    needed t = hsTypeNeedsParens (PprPrec 10) t
+    needed t = case ctxtParentPrec of
+      HasPrec (Fixity _ prec InfixN) -> hsTypeNeedsParens (PprPrec prec) t
+      -- We just assume we won't have mixed 'FixityDirection's for 'HsType',
+      -- this is not true for 'HsFunTy' (@infixr 2@) and 'HsOpTy' (@infixl 2@).
+      -- Currently, we will simply always add parens around 'HsOpTy'.
+      HasPrec (Fixity _ prec _) -> hsTypeNeedsParens (PprPrec $ prec - 1) t
+      IsLhs -> False
+      NeverParen -> False
 
 unparenT :: LHsType GhcPs -> LHsType GhcPs
 unparenT (L _ (HsParTy _ ty)) = ty
