@@ -8,6 +8,7 @@
 -u Parens.quux 
 -u Parens.blarg
 -u Parens.shl1
+--adhoc "forall a. a . id = a"
 --type-forward Parens.Fn
 --type-forward Parens.MaybeInt
 ===
@@ -64,6 +65,10 @@
  
  shl1 :: Int -> Int
  shl1 n = n `shiftL` 1
+ 
+ shl2 :: Int -> Int
+-shl2 = (`shiftL` 2) . id
++shl2 = (`shiftL` 2)
  
  shl3 :: Int -> Int
 -shl3 n = shl1 n `shiftL` 2
