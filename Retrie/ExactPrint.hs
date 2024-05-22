@@ -406,7 +406,11 @@ transferEntryDPT _a _b = error "transferEntryDPT"
 --                   maybeAnns
 
 addAllAnnsT
-  :: (HasCallStack, Data a, Data b, MonadIO m, Typeable an)
+  :: (HasCallStack
+#if __GLASGOW_HASKELL__ < 910
+     , Monoid an
+#endif
+     , Data a, Data b, MonadIO m, Typeable an)
   => LocatedAn an a -> LocatedAn an b -> TransformT m (LocatedAn an b)
 addAllAnnsT a b = do
   -- AZ: to start with, just transfer the entry DP from a to b

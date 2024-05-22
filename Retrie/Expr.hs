@@ -100,9 +100,21 @@ mkLoc e = do
   L <$> uniqueSrcSpanT <*> pure e
 
 -- ++AZ++:TODO: move to ghc-exactprint
-mkLocA :: (Data e, Monad m, NoAnn an)
+mkLocA :: (Data e, Monad m
+#if __GLASGOW_HASKELL__ >= 910
+          , NoAnn an
+#else
+          , Monoid an
+#endif
+          )
   => DeltaPos -> e -> TransformT m (LocatedAn an e)
-mkLocA dp e = mkLocAA dp noAnn e
+mkLocA dp e = mkLocAA dp
+#if __GLASGOW_HASKELL__ >= 910
+                      noAnn
+#else
+                      mempty
+#endif
+                      e
 
 -- ++AZ++:TODO: move to ghc-exactprint
 mkLocAA :: (Data e, Monad m) => DeltaPos -> an -> e -> TransformT m (LocatedAn an e)
@@ -209,7 +221,13 @@ mkApps :: MonadIO m => LHsExpr GhcPs -> [LHsExpr GhcPs] -> TransformT m (LHsExpr
 mkApps e []     = return e
 mkApps f (a:as) = do
   -- lift $ liftIO $ debugPrint Loud "mkApps:f="  [showAst f]
-  f' <- mkLocA (SameLine 0) (HsApp NoExtField f a)
+  f' <- mkLocA (SameLine 0) (HsApp
+#if __GLASGOW_HASKELL__ >= 910
+                              NoExtField
+#else
+                              noAnn
+#endif
+                              f a)
   mkApps f' as
 
 -- GHC never generates HsAppTy in the parser, using HsAppsTy to keep a list
@@ -315,10 +333,22 @@ patToExpr orig = case dLPat orig of
         return el
     go (LitPat _ lit) = lift $ do
       -- lit' <- cloneT lit
-      mkLocA (SameLine 1) $ HsLit NoExtField lit
+      mkLocA (SameLine 1) $ HsLit
+#if __GLASGOW_HASKELL__ >= 910
+                              NoExtField
+#else
+                              noAnn
+#endif
+                              lit
     go (NPat _ llit mbNeg _) = lift $ do
       -- L _ lit <- cloneT llit
-      e <- mkLocA (SameLine 1) $ HsOverLit NoExtField (unLoc llit)
+      e <- mkLocA (SameLine 1) $ HsOverLit
+#if __GLASGOW_HASKELL__ >= 910
+                                   NoExtField
+#else
+                                   noAnn
+#endif
+                                   (unLoc llit)
       negE <- maybe (return e) (mkLocA (SameLine 0) . NegApp noAnn e) mbNeg
       -- addAllAnnsT llit negE
       return negE
@@ -343,7 +373,13 @@ patToExpr orig = case dLPat orig of
     go (TuplePat an ps boxity) = do
       es <- forM ps $ \pat -> do
         e <- patToExpr pat
-        return $ Present NoExtField e
+        return $ Present
+#if __GLASGOW_HASKELL__ >= 910
+                   NoExtField
+#else
+                   noAnn
+#endif
+                   e
       lift $ mkLocA (SameLine 1) $ ExplicitTuple an es boxity
     go (VarPat _ i) = lift $ mkLocatedHsVar i
     go AsPat{} = error "patToExpr AsPat"
@@ -434,7 +470,13 @@ unparen expr = case expr of
 needsParens :: HsExpr GhcPs -> Bool
 needsParens = hsExprNeedsParens (PprPrec 10)
 
-mkParen :: (Data x, Monad m, NoAnn an, Typeable an)
+mkParen :: (Data x, Monad m
+#if __GLASGOW_HASKELL__ >= 910
+           , NoAnn an
+#else
+           , Monoid an
+#endif
+           , Typeable an)
   => (LocatedAn an x -> x) -> LocatedAn an x -> TransformT m (LocatedAn an x)
 mkParen k e = do
   pe <- mkLocA (SameLine 1) (k e)
@@ -452,7 +494,12 @@ mkParen' dp k = do
   pe <- mkLocA dp (k (EpAnn anc an emptyComments))
   return pe
 #else
-mkParen' :: (Data x, Monad m, NoAnn an)
+mkParen' :: (Data x, Monad m
+#if __GLASGOW_HASKELL__ >= 910
+            , NoAnn an)
+#else
+            , Monoid an)
+#endif
          => DeltaPos -> (EpAnn NoEpAnns -> x) -> TransformT m (LocatedAn an x)
 mkParen' dp k = do
   let an = NoEpAnns
@@ -465,7 +512,12 @@ mkParen' dp k = do
   pe <- mkLocA dp (k (EpAnn anc an emptyComments))
   return pe
 
-mkParenTy :: (Data x, Monad m, NoAnn an)
+mkParenTy :: (Data x, Monad m
+#if __GLASGOW_HASKELL__ >= 910
+             , NoAnn an)
+#else
+             , Monoid an)
+#endif
          => DeltaPos -> (EpAnn AnnParen -> x) -> TransformT m (LocatedAn an x)
 mkParenTy dp k = do
   let an = AnnParen AnnParens d0 d0

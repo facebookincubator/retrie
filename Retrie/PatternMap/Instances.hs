@@ -363,7 +363,11 @@ instance PatternMap EMap where
                           (toA (mAlter env vs fl f)))) (emIf m) }
       go (HsIPVar _ (HsIPName ip)) = m { emIPVar = mAlter env vs ip f (emIPVar m) }
       go (HsLit _ l) = m { emLit   = mAlter env vs l f (emLit m) }
+#if __GLASGOW_HASKELL__ >= 910
       go (HsLam _ variant mg) = m { emLam   = mAlter env vs mg f (emLam m) }
+#else
+      go (HsLam _ mg) = m { emLam   = mAlter env vs mg f (emLam m) }
+#endif
       go (HsOverLit _ ol) = m { emOverLit = mAlter env vs (ol_val ol) f (emOverLit m) }
       go (NegApp _ e' _) = m { emNegApp = mAlter env vs e' f (emNegApp m) }
 #if __GLASGOW_HASKELL__ < 904 || __GLASGOW_HASKELL__ >= 910
@@ -468,7 +472,11 @@ instance PatternMap EMap where
 #endif
         mapFor emIf >=> mMatch env c >=> mMatch env tr >=> mMatch env fl
       go (HsIPVar _ (HsIPName ip)) = mapFor emIPVar >=> mMatch env ip
+#if __GLASGOW_HASKELL__ >= 910
       go (HsLam _ variant mg) = mapFor emLam >=> mMatch env mg
+#else
+      go (HsLam _ mg) = mapFor emLam >=> mMatch env mg
+#endif
       go (HsLit _ l) = mapFor emLit >=> mMatch env l
       go (HsOverLit _ ol) = mapFor emOverLit >=> mMatch env (ol_val ol)
 #if __GLASGOW_HASKELL__ < 904 || __GLASGOW_HASKELL__ >= 910

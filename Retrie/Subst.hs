@@ -117,7 +117,7 @@ substHsMatchContext
 #if __GLASGOW_HASKELL__ < 900
   -> HsMatchContext RdrName
   -> TransformT m (HsMatchContext RdrName)
-#elif__GLASGOW_HASKELL__ < 910
+#elif __GLASGOW_HASKELL__ < 910
   -> HsMatchContext GhcPs
   -> TransformT m (HsMatchContext GhcPs)
 #else

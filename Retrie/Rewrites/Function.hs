@@ -81,12 +81,12 @@ irrefutablePat = go . unLoc
     go WildPat{} = True
     go VarPat{} = True
     go (LazyPat _ p) = irrefutablePat p
-#if __GLASGOW_HASKELL__ <= 904 || __GLASGOW_HASKELL__ <= 910
+#if __GLASGOW_HASKELL__ <= 904 || __GLASGOW_HASKELL__ >= 910
     go (AsPat _ _ p) = irrefutablePat p
 #else
     go (AsPat _ _ _ p) = irrefutablePat p
 #endif
-#if __GLASGOW_HASKELL__ < 904 || __GLASGOW_HASKELL__ <= 910
+#if __GLASGOW_HASKELL__ < 904 || __GLASGOW_HASKELL__ >= 910
     go (ParPat _ p) = irrefutablePat p
 #else
     go (ParPat _ _ p _) = irrefutablePat p
@@ -137,10 +137,22 @@ backtickRules e imps dir@LeftToRight grhss ps@[p1, p2] = do
     both op [l, r] = mkLocA (SameLine 1) (OpApp noAnn l op r)
     both _ _ = fail "backtickRules - both: impossible!"
 
-    left op [l] = mkLocA (SameLine 1) (SectionL NoExtField l op)
+    left op [l] = mkLocA (SameLine 1) (SectionL
+#if __GLASGOW_HASKELL__ >= 910
+                                         NoExtField
+#else
+                                         noAnn
+#endif
+                                         l op)
     left _ _ = fail "backtickRules - left: impossible!"
 
-    right op [r] = mkLocA (SameLine 1) (SectionR NoExtField op r)
+    right op [r] = mkLocA (SameLine 1) (SectionR
+#if __GLASGOW_HASKELL__ >= 910
+                                         NoExtField
+#else
+                                         noAnn
+#endif
+                                         op r)
     right _ _ = fail "backtickRules - right: impossible!"
   qs <- makeFunctionQuery e imps dir grhss both (ps, [])
   qsl <- makeFunctionQuery e imps dir grhss left ([p1], [p2])
