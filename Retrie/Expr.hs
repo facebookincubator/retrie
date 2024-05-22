@@ -358,12 +358,17 @@ getUnparened = mkT unparen `extT` unparenT `extT` unparenP
 
 -- TODO: what about comments?
 unparen :: LHsExpr GhcPs -> LHsExpr GhcPs
+unparen expr = case expr of
 #if __GLASGOW_HASKELL__ < 904
-unparen (L _ (HsPar _ e)) = e
+  L _ (HsPar _ e)
 #else
-unparen (L _ (HsPar _ _ e _)) = e
+  L _ (HsPar _ _ e _)
 #endif
-unparen e = e
+    -- see Note [Sections in HsSyn] in GHC.Hs.Expr
+    | L _ SectionL{} <- e -> expr
+    | L _ SectionR{} <- e -> expr
+    | otherwise -> e
+  _ -> expr
 
 -- | hsExprNeedsParens is not always up-to-date, so this allows us to override
 needsParens :: HsExpr GhcPs -> Bool
