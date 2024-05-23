@@ -26,12 +26,12 @@
  data Meh = Meh
 -  { entryKey :: Pointless (Int -> String)
 -  , entryVal :: Fn Int String
-+  { entryKey :: (Int -> String)
-+  , entryVal :: (Int -> String)
++  { entryKey :: Int -> String
++  , entryVal :: Int -> String
    }
  
 -getKey :: Meh -> Pointless (Int -> String)
-+getKey :: Meh -> (Int -> String)
++getKey :: Meh -> Int -> String
  getKey m x = entryKey m x
  
 -setKey :: Pointless (Int -> String) -> Meh -> Meh
@@ -39,7 +39,7 @@
  setKey m k = m{ entryKey = k }
  
 -errorKey :: Fn Int String
-+errorKey :: (Int -> String)
++errorKey :: Int -> String
  errorKey = getKey undefined
  
 -blah :: IO (Fn Int Bool)

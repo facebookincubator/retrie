@@ -4,6 +4,7 @@
 -- LICENSE file in the root directory of this source tree.
 --
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -55,16 +56,10 @@ updateContext c i =
     neverParen = c { ctxtParentPrec = NeverParen }
 
     updExp :: HsExpr GhcPs -> Context
-    updExp HsApp{} =
-#if __GLASGOW_HASKELL__ < 908
-      c { ctxtParentPrec = HasPrec $ Fixity (SourceText "HsApp") (10 + i - firstChild) InfixL }
-#else
-      c { ctxtParentPrec = HasPrec $ Fixity (SourceText (fsLit "HsApp")) (10 + i - firstChild) InfixL }
-#endif
-    -- Reason for 10 + i: (i is index of child, 0 = left, 1 = right)
-    -- In left child, prec is 10, so HsApp child will NOT get paren'd
-    -- In right child, prec is 11, so every child gets paren'd (unless atomic)
-    updExp (OpApp _ _ op _) = c { ctxtParentPrec = HasPrec $ lookupOp op (ctxtFixityEnv c) }
+    updExp HsApp{} = withPrec c (SourceText "HsApp") 10 InfixL i
+    updExp (OpApp _ _ op _)
+      | Fixity source prec dir <- lookupOp op $ ctxtFixityEnv c =
+          withPrec c source prec dir i
 #if __GLASGOW_HASKELL__ < 904
     updExp (HsLet _ lbs _) = addInScope neverParen $ collectLocalBinders CollNoDictBinders lbs
 #else
@@ -73,9 +68,9 @@ updateContext c i =
     updExp _ = neverParen
 
     updType :: HsType GhcPs -> Context
-    updType HsAppTy{}
-      | i > firstChild = c { ctxtParentPrec = IsHsAppsTy }
-    updType _ = neverParen
+    updType HsAppTy{} = withPrec c (SourceText "HsAppTy") (getPrec appPrec) InfixL i
+    updType HsFunTy{} = withPrec c (SourceText "HsFunTy") (getPrec funPrec) InfixR (i - 1)
+    updType _ = withPrec c (SourceText "HsType") (getPrec appPrec) InfixN i
 
     updMatch :: Match GhcPs (LHsExpr GhcPs) -> Context
     updMatch
@@ -127,6 +122,22 @@ updateContext c i =
 
     updPat :: Pat GhcPs -> Context
     updPat _ = neverParen
+
+getPrec :: PprPrec -> Int
+getPrec (PprPrec prec) = prec
+
+withPrec :: Context -> SourceText -> Int -> FixityDirection -> Int -> Context
+withPrec c source prec dir i = c{ ctxtParentPrec = HasPrec fixity }
+  where
+    fixity = Fixity source prec d
+    d = case dir of
+      InfixL
+        | i == firstChild -> InfixL
+        | otherwise -> InfixN
+      InfixR
+        | i == firstChild -> InfixN
+        | otherwise -> InfixR
+      InfixN -> InfixN
 
 -- | Create an empty 'Context' with given 'FixityEnv', rewriter, and dependent
 -- rewrite generator.
