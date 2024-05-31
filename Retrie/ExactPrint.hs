@@ -282,7 +282,13 @@ parseContentNoFixity libdir fp str = join $ Parsers.withDynFlags libdir $ \dflag
 #else
       fail $ showSDoc dflags $ ppr msg
 #endif
-    Right m -> return $ unsafeMkA (makeDeltaAst m) 0
+    Right m -> return $ unsafeMkA
+#if __GLASGOW_HASKELL__ < 910
+                          (makeDeltaAst m)
+#else
+                          m
+#endif
+                          0
 
 parseContent :: Parsers.LibDir -> FixityEnv -> FilePath -> String -> IO AnnotatedModule
 parseContent libdir fixities fp =
@@ -337,7 +343,7 @@ parseHelper libdir fp parser str = join $ Parsers.withDynFlags libdir $ \dflags 
 #else
     Left msg -> throwIO $ ErrorCall (showSDoc dflags $ ppr msg)
 #endif
-    Right x -> return $ unsafeMkA (makeDeltaAst x) 0
+    Right x -> return $ unsafeMkA x 0
 
 -- type Parser a = GHC.DynFlags -> FilePath -> String -> ParseResult a
 
