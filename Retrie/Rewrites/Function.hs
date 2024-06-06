@@ -22,7 +22,9 @@ import Retrie.Expr
 import Retrie.GHC
 import Retrie.Quantifiers
 import Retrie.Types
+#if __GLASGOW_HASKELL__ < 910
 import Retrie.Util
+#endif
 
 dfnsToRewrites
   :: LibDir

@@ -3,6 +3,7 @@
 -- This source code is licensed under the MIT license found in the
 -- LICENSE file in the root directory of this source tree.
 --
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -129,11 +130,17 @@ newtype Matcher a = Matcher (I.IntMap (UMap a))
 -- See Note [AlphaEnv Offset] for details.
 
 instance Semigroup (Matcher a) where
+#if __GLASGOW_HASKELL__ < 910
   (<>) = mappend
+#else
+  (Matcher m1) <> (Matcher m2) = Matcher (I.unionWith mUnion m1 m2)
+#endif
 
 instance Monoid (Matcher a) where
   mempty = Matcher I.empty
+#if __GLASGOW_HASKELL__ < 910
   mappend (Matcher m1) (Matcher m2) = Matcher (I.unionWith mUnion m1 m2)
+#endif
 
 -- | Compile a 'Query' into a 'Matcher'.
 mkMatcher :: Matchable ast => Query ast v -> Matcher v

@@ -3,6 +3,7 @@
 -- This source code is licensed under the MIT license found in the
 -- LICENSE file in the root directory of this source tree.
 --
+{-# LANGUAGE CPP #-}
 module Retrie.FreeVars
   ( FreeVars
   , elemFVs
@@ -25,11 +26,17 @@ emptyFVs :: FreeVars
 emptyFVs = FreeVars emptyUniqSet
 
 instance Semigroup FreeVars where
+#if __GLASGOW_HASKELL__ < 910
   (<>) = mappend
+#else
+  (FreeVars s1) <> (FreeVars s2) = FreeVars $ s1 <> s2
+#endif
 
 instance Monoid FreeVars where
   mempty = emptyFVs
+#if __GLASGOW_HASKELL__ < 910
   mappend (FreeVars s1) (FreeVars s2) = FreeVars $ s1 <> s2
+#endif
 
 instance Show FreeVars where
   show (FreeVars m) = show (nonDetEltsUniqSet m)

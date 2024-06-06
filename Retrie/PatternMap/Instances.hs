@@ -364,7 +364,7 @@ instance PatternMap EMap where
       go (HsIPVar _ (HsIPName ip)) = m { emIPVar = mAlter env vs ip f (emIPVar m) }
       go (HsLit _ l) = m { emLit   = mAlter env vs l f (emLit m) }
 #if __GLASGOW_HASKELL__ >= 910
-      go (HsLam _ variant mg) = m { emLam   = mAlter env vs mg f (emLam m) }
+      go (HsLam _ _variant mg) = m { emLam   = mAlter env vs mg f (emLam m) }
 #else
       go (HsLam _ mg) = m { emLam   = mAlter env vs mg f (emLam m) }
 #endif
@@ -473,7 +473,7 @@ instance PatternMap EMap where
         mapFor emIf >=> mMatch env c >=> mMatch env tr >=> mMatch env fl
       go (HsIPVar _ (HsIPName ip)) = mapFor emIPVar >=> mMatch env ip
 #if __GLASGOW_HASKELL__ >= 910
-      go (HsLam _ variant mg) = mapFor emLam >=> mMatch env mg
+      go (HsLam _ _variant mg) = mapFor emLam >=> mMatch env mg
 #else
       go (HsLam _ mg) = mapFor emLam >=> mMatch env mg
 #endif
@@ -711,7 +711,7 @@ instance PatternMap CDMap where
   mAlter env vs d f CDEmpty   = mAlter env vs d f emptyCDMapWrapper
   mAlter env vs d f m@CDMap{} = go d
     where
-      go (PrefixCon tyargs ps) = m { cdPrefixCon = mAlter env vs ps f (cdPrefixCon m) }
+      go (PrefixCon _tyargs ps) = m { cdPrefixCon = mAlter env vs ps f (cdPrefixCon m) }
       go (RecCon _) = missingSyntax "RecCon"
       go (InfixCon p1 p2) = m { cdInfixCon = mAlter env vs p1
                                               (toA (mAlter env vs p2 f))
@@ -721,7 +721,7 @@ instance PatternMap CDMap where
   mMatch _   _ (_ ,CDEmpty)   = []
   mMatch env d (hs,m@CDMap{}) = go d (hs,m)
     where
-      go (PrefixCon tyargs ps) = mapFor cdPrefixCon >=> mMatch env ps
+      go (PrefixCon _tyargs ps) = mapFor cdPrefixCon >=> mMatch env ps
       go (InfixCon p1 p2) = mapFor cdInfixCon >=> mMatch env p1 >=> mMatch env p2
       go _ = const [] -- TODO
 
@@ -1454,17 +1454,11 @@ instance PatternMap TupleSortMap where
   mAlter :: AlphaEnv -> Quantifiers -> Key TupleSortMap -> A a -> TupleSortMap a -> TupleSortMap a
   mAlter env vs HsUnboxedTuple f m =
     m { tsUnboxed = mAlter env vs () f (tsUnboxed m) }
-  -- mAlter env vs HsBoxedOrConstraintTuple f m =
-  --   m { tsBoxed = mAlter env vs () f (tsBoxed m) }
-  -- mAlter env vs HsConstraintTuple f m =
-  --   m { tsConstraint = mAlter env vs () f (tsConstraint m) }
   mAlter env vs HsBoxedOrConstraintTuple f m =
     m { tsBoxedOrConstraint = mAlter env vs () f (tsBoxedOrConstraint m) }
 
   mMatch :: MatchEnv -> Key TupleSortMap -> (Substitution, TupleSortMap a) -> [(Substitution, a)]
   mMatch env HsUnboxedTuple = mapFor tsUnboxed >=> mMatch env ()
-  -- mMatch env HsBoxedTuple = mapFor tsBoxed >=> mMatch env ()
-  -- mMatch env HsConstraintTuple = mapFor tsConstraint >=> mMatch env ()
   mMatch env HsBoxedOrConstraintTuple = mapFor tsBoxedOrConstraint >=> mMatch env ()
 
 ------------------------------------------------------------------------

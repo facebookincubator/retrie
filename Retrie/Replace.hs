@@ -3,6 +3,7 @@
 -- This source code is licensed under the MIT license found in the
 -- LICENSE file in the root directory of this source tree.
 --
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -25,7 +26,9 @@ import Retrie.GHC
 import Retrie.Subst
 import Retrie.Types
 import Retrie.Universe
+#if __GLASGOW_HASKELL__ < 910
 import Retrie.Util
+#endif
 
 ------------------------------------------------------------------------
 
@@ -71,7 +74,11 @@ replaceImpl c e = do
   -- resulting expression, but we need to know the entry location
   -- of the parens, not the inner expression, so we have to
   -- keep both expressions around.
+#if __GLASGOW_HASKELL__ < 910
   match <- runRewriter f c (ctxtRewriter c) (getUnparened $ makeDeltaAst e)
+#else
+  match <- runRewriter f c (ctxtRewriter c) (getUnparened e)
+#endif
 
   case match of
     NoMatch -> return e
@@ -126,14 +133,23 @@ data Replacement = Replacement
 data Change = NoChange | Change [Replacement] [AnnotatedImports]
 
 instance Semigroup Change where
+#if __GLASGOW_HASKELL__ < 910
   (<>) = mappend
+#else
+  NoChange         <> other            = other
+  other            <> NoChange         = other
+  (Change rs1 is1) <> (Change rs2 is2) =
+    Change (rs1 <> rs2) (is1 <> is2)
+#endif
 
 instance Monoid Change where
   mempty = NoChange
+#if __GLASGOW_HASKELL__ < 910
   mappend NoChange     other        = other
   mappend other        NoChange     = other
   mappend (Change rs1 is1) (Change rs2 is2) =
     Change (rs1 <> rs2) (is1 <> is2)
+#endif
 
 -- The location of 'e' accurately points to the first non-space character
 -- of 'e', but when we exactprint 'e', we might get some leading spaces (if

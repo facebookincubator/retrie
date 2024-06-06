@@ -27,8 +27,6 @@ module Retrie.Expr
   , parenifyT
   , parenifyP
   , patToExpr
-  -- , patToExprA
-  -- , setAnnsFor
   , unparen
   , unparenP
   , unparenT
@@ -37,23 +35,26 @@ module Retrie.Expr
 
 import Control.Monad
 import Control.Monad.State.Lazy
+#if __GLASGOW_HASKELL__ < 910
 import Data.Functor.Identity
--- import qualified Data.Map as M
 import Data.Maybe
--- import Data.Void
 
 import Retrie.AlphaEnv
-import Retrie.ExactPrint
+#endif
+
+import Retrie.ExactPrint hiding (d1)
 import Retrie.Fixity
 import Retrie.GHC
 import Retrie.SYB
 import Retrie.Types
+#if __GLASGOW_HASKELL__ < 910
 import Retrie.Util
+#endif
 
 -------------------------------------------------------------------------------
 
 mkLocatedHsVar :: Monad m => LocatedN RdrName -> TransformT m (LHsExpr GhcPs)
-mkLocatedHsVar ln@(L l n) = do
+mkLocatedHsVar (L l n) = do
   -- This special casing for [] is gross, but this is apparently how the
   -- annotations work.
   -- let anns =
@@ -87,14 +88,6 @@ setMoveAnchor dp (EpAnn (EpaDelta _ cs1) an cs)
 
 -------------------------------------------------------------------------------
 
--- setAnnsFor :: (Data e, Monad m)
---            => Located e -> [(KeywordId, DeltaPos)] -> TransformT m (Located e)
--- setAnnsFor e anns = modifyAnnsT (M.alter f (mkAnnKey e)) >> return e
---   where f Nothing  = Just annNone { annsDP = anns }
---         f (Just a) = Just a { annsDP = M.toList
---                                      $ M.union (M.fromList anns)
---                                                (M.fromList (annsDP a)) }
-
 mkLoc :: (Data e, Monad m) => e -> TransformT m (Located e)
 mkLoc e = do
   L <$> uniqueSrcSpanT <*> pure e
@@ -119,8 +112,8 @@ mkLocA dp e = mkLocAA dp
 -- ++AZ++:TODO: move to ghc-exactprint
 mkLocAA :: (Data e, Monad m) => DeltaPos -> an -> e -> TransformT m (LocatedAn an e)
 mkLocAA dp an e = do
-  l <- uniqueSrcSpanT
 #if __GLASGOW_HASKELL__ < 910
+  l <- uniqueSrcSpanT
   let anc = Anchor (realSrcSpan l) (MovedAnchor dp)
   return (L (SrcSpanAnn (EpAnn anc an emptyComments) l) e)
 #else
@@ -153,7 +146,9 @@ mkLams
 mkLams [] e = return e
 mkLams vs e = do
   ancg <- mkAnchor (SameLine 0)
+#if __GLASGOW_HASKELL__ < 910
   ancm <- mkAnchor (SameLine 0)
+#endif
   let
     ga = GrhsAnn Nothing (AddEpAnn AnnRarrow (EpaDelta (SameLine 1) []))
     ang = EpAnn ancg ga emptyComments
@@ -163,7 +158,7 @@ mkLams vs e = do
 #else
       [(AddEpAnn AnnLam (EpaDelta (SameLine 0) []))]
 #endif
-    L l (Match x ctxt pats (GRHSs cs grhs binds)) = mkMatch
+    L l (Match _x ctxt pats (GRHSs cs grhs binds)) = mkMatch
 #if __GLASGOW_HASKELL__ < 910
                                                       LambdaExpr
 #else
@@ -171,7 +166,7 @@ mkLams vs e = do
 #endif
                                                       vs e emptyLocalBinds
     grhs' = case grhs of
-      [L lg (GRHS an guards rhs)] -> [L lg (GRHS ang guards rhs)]
+      [L lg (GRHS _an guards rhs)] -> [L lg (GRHS ang guards rhs)]
       _ -> fail "mkLams: lambda expression can only have a single grhs!"
   matches <- mkLocA (SameLine 0) [L l (Match anm ctxt pats (GRHSs cs grhs' binds))]
   let
@@ -183,7 +178,7 @@ mkLams vs e = do
 #else
       mkMatchGroup (Generated OtherExpansion SkipPmc) matches
 #endif
-  mkLocA (SameLine 1) $ HsLam 
+  mkLocA (SameLine 1) $ HsLam
 #if __GLASGOW_HASKELL__ >= 910
                               []
                               LamSingle
@@ -204,8 +199,8 @@ mkLet lbs e = do
   le <- mkLocA (SameLine 1) $ HsLet an lbs e
   return le
 #else
-  an <- mkEpAnn (DifferentLine 1 5) NoEpAnns
 #if __GLASGOW_HASKELL__ < 910
+  an <- mkEpAnn (DifferentLine 1 5) NoEpAnns
   let tokLet = L (TokenLoc (EpaDelta (SameLine 0) [])) HsTok
       tokIn = L (TokenLoc (EpaDelta (DifferentLine 1 1) [])) HsTok
   le <- mkLocA (SameLine 1) $ HsLet an tokLet lbs tokIn e
@@ -240,23 +235,19 @@ mkTyVar :: Monad m => LocatedN RdrName -> TransformT m (LHsType GhcPs)
 mkTyVar nm = do
   tv <- mkLocA (SameLine 1) (HsTyVar noAnn NotPromoted nm)
   -- _ <- setAnnsFor nm [(G AnnVal, DP (0,0))]
-  (tv', nm') <- swapEntryDPT tv nm
+  (tv', _nm') <- swapEntryDPT tv nm
   return tv'
 
 mkVarPat :: Monad m => LocatedN RdrName -> TransformT m (LPat GhcPs)
 mkVarPat nm = cLPat <$> mkLocA (SameLine 1) (VarPat noExtField nm)
 
--- type HsConPatDetails p = HsConDetails (HsPatSigType (NoGhcTc p)) (LPat p) (HsRecFields p (LPat p))
-
 mkConPatIn
   :: Monad m
   => LocatedN RdrName
   -> HsConPatDetails GhcPs
-  -- -> HsConDetails Void (LocatedN RdrName) [RecordPatSynField GhcPs]
   -> TransformT m (LPat GhcPs)
 mkConPatIn patName params = do
   p <- mkLocA (SameLine 0) $ ConPat noAnn patName params
-  -- setEntryDPT p (DP (0,0))
   return p
 
 -------------------------------------------------------------------------------
@@ -284,18 +275,14 @@ newWildVar = do
 wildSupply :: [RdrName] -> [RdrName]
 wildSupply used = wildSupplyP (`notElem` used)
 
-wildSupplyAlphaEnv :: AlphaEnv -> [RdrName]
-wildSupplyAlphaEnv env = wildSupplyP (\ nm -> isNothing (lookupAlphaEnv nm env))
+-- wildSupplyAlphaEnv :: AlphaEnv -> [RdrName]
+-- wildSupplyAlphaEnv env = wildSupplyP (\ nm -> isNothing (lookupAlphaEnv nm env))
 
 wildSupplyP :: (RdrName -> Bool) -> [RdrName]
 wildSupplyP p =
   [ r | i <- [0..]
       , let r = mkVarUnqual (mkFastString ('w' : show (i :: Int)))
       , p r ]
-
--- patToExprA :: AlphaEnv -> AnnotatedPat -> AnnotatedHsExpr
--- patToExprA env pat = runIdentity $ transformA pat $ \ p ->
---   fst <$> runStateT (patToExpr $ cLPat p) (wildSupplyAlphaEnv env, [])
 
 patToExpr :: MonadIO m => LPat GhcPs -> PatQ m (LHsExpr GhcPs)
 patToExpr orig = case dLPat orig of
@@ -329,7 +316,6 @@ patToExpr orig = case dLPat orig of
 #else
         el <- mkLocA (SameLine 1) $ ExplicitList al ps'
 #endif
-        -- setAnnsFor el [(G AnnOpenS, DP (0,0)), (G AnnCloseS, DP (0,0))]
         return el
     go (LitPat _ lit) = lift $ do
       -- lit' <- cloneT lit
@@ -341,7 +327,6 @@ patToExpr orig = case dLPat orig of
 #endif
                               lit
     go (NPat _ llit mbNeg _) = lift $ do
-      -- L _ lit <- cloneT llit
       e <- mkLocA (SameLine 1) $ HsOverLit
 #if __GLASGOW_HASKELL__ >= 910
                                    NoExtField
@@ -350,7 +335,6 @@ patToExpr orig = case dLPat orig of
 #endif
                                    (unLoc llit)
       negE <- maybe (return e) (mkLocA (SameLine 0) . NegApp noAnn e) mbNeg
-      -- addAllAnnsT llit negE
       return negE
 #if __GLASGOW_HASKELL__ < 904
     go (ParPat an p') = do
@@ -363,7 +347,7 @@ patToExpr orig = case dLPat orig of
           tokRP = L (TokenLoc (EpaDelta (SameLine 0) [])) HsTok
       lift $ mkLocA (SameLine 1) (HsPar an tokLP p tokRP)
 #else
-    go (ParPat an p') = do
+    go (ParPat _an p') = do
       p <- patToExpr p'
       let tokLP = EpTok (EpaDelta (SameLine 0) [])
           tokRP = EpTok (EpaDelta (SameLine 0) [])
@@ -398,7 +382,7 @@ conPatHelper con (InfixCon x y) =
                          <*> patToExpr x
                          <*> lift (mkLocatedHsVar con)
                          <*> patToExpr y
-conPatHelper con (PrefixCon tyargs xs) = do
+conPatHelper con (PrefixCon _tyargs xs) = do
   f <- lift $ mkLocatedHsVar con
   as <- mapM patToExpr xs
   -- lift $ lift $ liftIO $ debugPrint Loud "conPatHelper:f="  [showAst f]
@@ -410,7 +394,9 @@ conPatHelper _ _ = error "conPatHelper RecCon"
 grhsToExpr :: LGRHS GhcPs (LHsExpr GhcPs) -> LHsExpr GhcPs
 grhsToExpr (L _ (GRHS _ [] e)) = e
 grhsToExpr (L _ (GRHS _ (_:_) e)) = e -- not sure about this
+#if __GLASGOW_HASKELL__ < 910
 grhsToExpr _ = error "grhsToExpr"
+#endif
 
 -------------------------------------------------------------------------------
 
@@ -438,7 +424,7 @@ parenify Context{..} le@(L _ e)
   | needed ctxtParentPrec (precedence ctxtFixityEnv e) && needsParens e = do
     let tokLP = EpTok (EpaDelta (SameLine 0) [])
         tokRP = EpTok (EpaDelta (SameLine 0) [])
-     in mkParen' (getEntryDP le) (\an -> HsPar (tokLP, tokRP) (setEntryDP le (SameLine 0)))
+     in mkParen' (getEntryDP le) (\_an -> HsPar (tokLP, tokRP) (setEntryDP le (SameLine 0)))
 #endif
   | otherwise = return le
   where
@@ -470,20 +456,21 @@ unparen expr = case expr of
 needsParens :: HsExpr GhcPs -> Bool
 needsParens = hsExprNeedsParens (PprPrec 10)
 
-mkParen :: (Data x, Monad m
-#if __GLASGOW_HASKELL__ >= 910
-           , NoAnn an
-#else
-           , Monoid an
-#endif
-           , Typeable an)
-  => (LocatedAn an x -> x) -> LocatedAn an x -> TransformT m (LocatedAn an x)
-mkParen k e = do
-  pe <- mkLocA (SameLine 1) (k e)
-  -- _ <- setAnnsFor pe [(G AnnOpenP, DP (0,0)), (G AnnCloseP, DP (0,0))]
-  (e0,pe0) <- swapEntryDPT e pe
-  return pe0
+-- mkParen :: (Data x, Monad m
+-- #if __GLASGOW_HASKELL__ >= 910
+--            , NoAnn an
+-- #else
+--            , Monoid an
+-- #endif
+--            , Typeable an)
+--   => (LocatedAn an x -> x) -> LocatedAn an x -> TransformT m (LocatedAn an x)
+-- mkParen k e = do
+--   pe <- mkLocA (SameLine 1) (k e)
+--   -- _ <- setAnnsFor pe [(G AnnOpenP, DP (0,0)), (G AnnCloseP, DP (0,0))]
+--   (e0,pe0) <- swapEntryDPT e pe
+--   return pe0
 
+-- TODO: rename mkParen' to mkParen
 #if __GLASGOW_HASKELL__ < 904
 mkParen' :: (Data x, Monad m, Monoid an)
          => DeltaPos -> (EpAnn AnnParen -> x) -> TransformT m (LocatedAn an x)
@@ -503,8 +490,8 @@ mkParen' :: (Data x, Monad m
          => DeltaPos -> (EpAnn NoEpAnns -> x) -> TransformT m (LocatedAn an x)
 mkParen' dp k = do
   let an = NoEpAnns
-  l <- uniqueSrcSpanT
 #if __GLASGOW_HASKELL__ < 910
+  l <- uniqueSrcSpanT
   let anc = Anchor (realSrcSpan l) (MovedAnchor (SameLine 0))
 #else
   let anc = EpaDelta (SameLine 0) []
@@ -521,8 +508,8 @@ mkParenTy :: (Data x, Monad m
          => DeltaPos -> (EpAnn AnnParen -> x) -> TransformT m (LocatedAn an x)
 mkParenTy dp k = do
   let an = AnnParen AnnParens d0 d0
-  l <- uniqueSrcSpanT
 #if __GLASGOW_HASKELL__ < 910
+  l <- uniqueSrcSpanT
   let anc = Anchor (realSrcSpan l) (MovedAnchor (SameLine 0))
 #else
   let anc = EpaDelta (SameLine 0) []
@@ -551,7 +538,7 @@ parenifyP Context{..} p@(L _ pat)
 #else
     let tokLP = EpTok (EpaDelta (SameLine 0) [])
         tokRP = EpTok (EpaDelta (SameLine 0) [])
-     in mkParen' (getEntryDP p) (\an -> ParPat (tokLP, tokRP) (setEntryDP p (SameLine 0)))
+     in mkParen' (getEntryDP p) (\_an -> ParPat (tokLP, tokRP) (setEntryDP p (SameLine 0)))
 #endif
 #endif
   | otherwise = return p

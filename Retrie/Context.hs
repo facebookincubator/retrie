@@ -18,7 +18,9 @@ import Control.Monad.IO.Class
 import Data.Char (isDigit)
 import Data.Either (partitionEithers)
 import Data.Generics hiding (Fixity)
+#if __GLASGOW_HASKELL__ < 910
 import Data.List
+#endif
 import Data.Maybe
 
 import Retrie.AlphaEnv

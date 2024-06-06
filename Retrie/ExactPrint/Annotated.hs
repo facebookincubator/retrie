@@ -36,19 +36,18 @@ module Retrie.ExactPrint.Annotated
   , unsafeMkA
   ) where
 
-import Control.Monad.State.Lazy hiding (fix)
+import Control.Monad.State.Lazy
+#if __GLASGOW_HASKELL__ < 910
+     hiding (fix)
+#endif
 import Data.Default as D
 
 import Data.Functor.Identity
 
 import Language.Haskell.GHC.ExactPrint hiding
-  ( -- cloneT
-    -- setEntryDP
-  -- , setEntryDPT
-  -- , transferEntryDPT
+  (
     transferEntryDP
   )
--- import Language.Haskell.GHC.ExactPrint.ExactPrint (ExactPrint(..))
 import Language.Haskell.GHC.ExactPrint.Utils
 
 import Retrie.GHC

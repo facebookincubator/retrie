@@ -17,7 +17,9 @@ import Retrie.GHC
 import Retrie.Substitution
 import Retrie.SYB
 import Retrie.Types
+#if __GLASGOW_HASKELL__ < 910
 import Retrie.Util
+#endif
 
 ------------------------------------------------------------------------
 
@@ -56,9 +58,9 @@ substExpr ctxt e@(L l1 (HsVar x (L l2 v))) =
       -- lift $ liftIO $ debugPrint Loud "substExpr:HoleExpr:e" [showAst e]
       -- lift $ liftIO $ debugPrint Loud "substExpr:HoleExpr:eA" [showAst eA]
       e0 <- graftA (unparen <$> eA)
-      let comments = hasComments e0
+      let hasCs = hasComments e0
       -- unless comments $ transferEntryDPT e e'
-      e1 <- if comments
+      e1 <- if hasCs
                then return e0
                else transferEntryDP e e0
       e2 <- transferAnnsT isComma e e1

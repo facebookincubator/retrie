@@ -3,6 +3,7 @@
 -- This source code is licensed under the MIT license found in the
 -- LICENSE file in the root directory of this source tree.
 --
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections #-}
@@ -19,7 +20,9 @@ module Retrie.Run
   ) where
 
 import Control.Monad
+#if __GLASGOW_HASKELL__ < 910
 import Control.Monad.State.Strict
+#endif
 import Data.Char
 import Data.List
 import Data.Monoid
