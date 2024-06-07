@@ -26,9 +26,7 @@ import Retrie.GHC
 import Retrie.Subst
 import Retrie.Types
 import Retrie.Universe
-#if __GLASGOW_HASKELL__ < 910
 import Retrie.Util
-#endif
 
 ------------------------------------------------------------------------
 

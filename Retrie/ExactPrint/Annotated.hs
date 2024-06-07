@@ -125,6 +125,7 @@ transformA (Annotated ast seed) f = do
 -- >     return [d1, d2]
 --
 graftA :: (Data ast, Monad m) => Annotated ast -> TransformT m ast
+-- TODO: this is a no-op, remove it
 graftA (Annotated x _) = return x
 
 -- | Encapsulate something in the current transformation into an 'Annotated'
@@ -152,7 +153,7 @@ trimA = runIdentity . transformA nil . const . graftA
     nil :: Annotated ()
     nil = mempty
 
-setEntryDPA :: 
+setEntryDPA ::
 #if __GLASGOW_HASKELL__ < 910
             (Default an) =>
 #endif

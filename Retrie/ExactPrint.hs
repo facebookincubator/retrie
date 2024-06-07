@@ -69,9 +69,9 @@ import Retrie.ExactPrint.Annotated
 import Retrie.Fixity
 import Retrie.GHC
 import Retrie.SYB hiding (ext1)
-#if __GLASGOW_HASKELL__ < 910
+-- #if __GLASGOW_HASKELL__ < 910
 import Retrie.Util
-#endif
+-- #endif
 
 import GHC.Stack
 import Debug.Trace
@@ -105,12 +105,12 @@ fixOneExpr
   -> TransformT m (LHsExpr GhcPs)
 fixOneExpr env (L l2 (OpApp x2 ap1@(L _l1 (OpApp x1 x op1 y)) op2 z))
   | associatesRight (lookupOp op1 env) (lookupOp op2 env) = do
-    -- lift $ liftIO $ debugPrint Loud "fixOneExpr:(l1,l2)="  [showAst (l1,l2)]
+    lift $ liftIO $ debugPrint Loud "fixOneExpr:(l1,l2)="  [showAst (_l1,l2)]
     let ap2' = L (stripComments l2) $ OpApp x2 y op2 z
     (_ap1_0, ap2'_0) <- swapEntryDPT ap1 ap2'
-    -- lift $ liftIO $ debugPrint Loud "fixOneExpr:recursing"  []
+    lift $ liftIO $ debugPrint Loud "fixOneExpr:recursing"  []
     rhs <- fixOneExpr env ap2'_0
-    -- lift $ liftIO $ debugPrint Loud "fixOneExpr:returning"  [showAst (L l2 $ OpApp x1 x op1 rhs)]
+    lift $ liftIO $ debugPrint Loud "fixOneExpr:returning"  [showAst (L l2 $ OpApp x1 x op1 rhs)]
     return $ L l2 $ OpApp x1 x op1 rhs
 fixOneExpr _ e = return e
 
@@ -154,10 +154,10 @@ fixOneEntry e x = do
   let ec = deltaColumn edp
   case xdp of
     SameLine _n -> do
-      -- lift $ liftIO $ debugPrint Loud "fixOneEntry:(xdp,edp)="  [showAst (xdp,edp)]
-      -- lift $ liftIO $ debugPrint Loud "fixOneEntry:(dpx,dpe)="  [showAst ((deltaPos er (xc + ec)),(deltaPos xr 0))]
-      -- lift $ liftIO $ debugPrint Loud "fixOneEntry:e'="  [showAst e]
-      -- lift $ liftIO $ debugPrint Loud "fixOneEntry:e'="  [showAst (setEntryDP e (deltaPos er (xc + ec)))]
+      lift $ liftIO $ debugPrint Loud "fixOneEntry:(xdp,edp)="  [showAst (xdp,edp)]
+      lift $ liftIO $ debugPrint Loud "fixOneEntry:(dpx,dpe)="  [showAst ((deltaPos er (xc + ec)),(deltaPos xr 0))]
+      lift $ liftIO $ debugPrint Loud "fixOneEntry:e'="  [showAst e]
+      lift $ liftIO $ debugPrint Loud "fixOneEntry:e'="  [showAst (setEntryDP e (deltaPos er (xc + ec)))]
       return ( setEntryDP e (deltaPos er (xc + ec))
              , setEntryDP x (deltaPos xr 0))
     _ -> return (e,x)
@@ -176,24 +176,25 @@ entryDP (L (SrcSpanAnn (EpAnn anc _ _) _) _)
 
 
 fixOneEntryExpr :: MonadIO m => LHsExpr GhcPs -> TransformT m (LHsExpr GhcPs)
-fixOneEntryExpr e@(L _l (OpApp a x b c)) = do
-  -- lift $ liftIO $ debugPrint Loud "fixOneEntryExpr:(e,x)="  [showAst (e,x)]
-  (e',x') <- fixOneEntry e x
-  -- lift $ liftIO $ debugPrint Loud "fixOneEntryExpr:(e',x')="  [showAst (e',x')]
-  -- lift $ liftIO $ debugPrint Loud "fixOneEntryExpr:returning="  [showAst (L (getLoc e') (OpApp a x' b c))]
-  return (L (getLoc e') (OpApp a x' b c))
+-- fixOneEntryExpr e@(L _l (OpApp a x b c)) = do
+--   lift $ liftIO $ debugPrint Loud "fixOneEntryExpr:(e,x)="  [showAst (e,x)]
+--   (e',x') <- fixOneEntry e x
+--   lift $ liftIO $ debugPrint Loud "fixOneEntryExpr:(e',x')="  [showAst (e',x')]
+--   lift $ liftIO $ debugPrint Loud "fixOneEntryExpr:returning="  [showAst (L (getLoc e') (OpApp a x' b c))]
+--   return (L (getLoc e') (OpApp a x' b c))
 fixOneEntryExpr e = return e
 
 fixOneEntryPat :: MonadIO m => LPat GhcPs -> TransformT m (LPat GhcPs)
-fixOneEntryPat pat
-#if __GLASGOW_HASKELL__ < 900
-  | Just p@(L l (ConPatIn a (InfixCon x b))) <- dLPat pat = do
-#else
-  | Just p@(L _l (ConPat a b (InfixCon x c))) <- dLPat pat = do
-#endif
-    (p', x') <- fixOneEntry p (dLPatUnsafe x)
-    return (cLPat $ (L (getLoc p') (ConPat a b (InfixCon x' c))))
-  | otherwise = return pat
+-- fixOneEntryPat pat
+-- #if __GLASGOW_HASKELL__ < 900
+--   | Just p@(L l (ConPatIn a (InfixCon x b))) <- dLPat pat = do
+-- #else
+--   | Just p@(L _l (ConPat a b (InfixCon x c))) <- dLPat pat = do
+-- #endif
+--     (p', x') <- fixOneEntry p (dLPatUnsafe x)
+--     return (cLPat $ (L (getLoc p') (ConPat a b (InfixCon x' c))))
+--   | otherwise = return pat
+fixOneEntryPat pat = return pat
 
 -------------------------------------------------------------------------------
 
