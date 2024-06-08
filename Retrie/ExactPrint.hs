@@ -103,14 +103,37 @@ fixOneExpr
   => FixityEnv
   -> LHsExpr GhcPs
   -> TransformT m (LHsExpr GhcPs)
-fixOneExpr env (L l2 (OpApp x2 ap1@(L _l1 (OpApp x1 x op1 y)) op2 z))
+fixOneExpr env (L l2 (OpApp x2 ap1@(L l1 (OpApp x1 x op1 y)) op2 z))
+{-
+  pre
+  x   is [print]   4:8-12
+  op1 is [$]       4:14
+  y   is [foo]     4:16-18
+  op2 is [`bar`]   4:20-24
+  z   is [[1..10]] 4:26-32
+
+  (L l2 (OpApp _
+          (L l1 (OpApp _ x op1 y))
+          op2
+          z))
+  -- post
+  (L l2 (OpApp _
+          x
+          op1
+          (L new_loc (OpApp _ y op2 z)))
+-}
+
   | associatesRight (lookupOp op1 env) (lookupOp op2 env) = do
-    lift $ liftIO $ debugPrint Loud "fixOneExpr:(l1,l2)="  [showAst (_l1,l2)]
-    let ap2' = L (stripComments l2) $ OpApp x2 y op2 z
-    (_ap1_0, ap2'_0) <- swapEntryDPT ap1 ap2'
-    lift $ liftIO $ debugPrint Loud "fixOneExpr:recursing"  []
-    rhs <- fixOneExpr env ap2'_0
-    lift $ liftIO $ debugPrint Loud "fixOneExpr:returning"  [showAst (L l2 $ OpApp x1 x op1 rhs)]
+    -- lift $ liftIO $ debugPrint Loud "fixOneExpr:(l1,l2)="  [showAst (l1,l2)]
+    -- We need a location from start of y to end of z
+    -- let ap2' = L (stripComments l2) $ OpApp x2 y op2 z
+    let ap2' :: LHsExpr GhcPs = L (noAnnSrcSpan (combineSrcSpans (locA y) (locA z)) ) $ OpApp x2 y op2 z
+    -- (_ap1_0, ap2'_0) <- swapEntryDPT ap1 ap2'
+    (_ap1_0, ap2'_0) <- return (ap1, ap2')
+    -- lift $ liftIO $ debugPrint Loud "fixOneExpr:recursing"  []
+    -- rhs <- fixOneExpr env ap2'_0
+    rhs <- return ap2'_0
+    -- lift $ liftIO $ debugPrint Loud "fixOneExpr:returning"  [showAst (L l2 $ OpApp x1 x op1 rhs)]
     return $ L l2 $ OpApp x1 x op1 rhs
 fixOneExpr _ e = return e
 
@@ -176,25 +199,31 @@ entryDP (L (SrcSpanAnn (EpAnn anc _ _) _) _)
 
 
 fixOneEntryExpr :: MonadIO m => LHsExpr GhcPs -> TransformT m (LHsExpr GhcPs)
--- fixOneEntryExpr e@(L _l (OpApp a x b c)) = do
---   lift $ liftIO $ debugPrint Loud "fixOneEntryExpr:(e,x)="  [showAst (e,x)]
---   (e',x') <- fixOneEntry e x
---   lift $ liftIO $ debugPrint Loud "fixOneEntryExpr:(e',x')="  [showAst (e',x')]
---   lift $ liftIO $ debugPrint Loud "fixOneEntryExpr:returning="  [showAst (L (getLoc e') (OpApp a x' b c))]
---   return (L (getLoc e') (OpApp a x' b c))
+#if __GLASGOW_HASKELL__ >= 910
 fixOneEntryExpr e = return e
+#else
+fixOneEntryExpr e@(L _l (OpApp a x b c)) = do
+  -- lift $ liftIO $ debugPrint Loud "fixOneEntryExpr:(e,x)="  [showAst (e,x)]
+  (e',x') <- fixOneEntry e x
+  -- lift $ liftIO $ debugPrint Loud "fixOneEntryExpr:(e',x')="  [showAst (e',x')]
+  -- lift $ liftIO $ debugPrint Loud "fixOneEntryExpr:returning="  [showAst (L (getLoc e') (OpApp a x' b c))]
+  return (L (getLoc e') (OpApp a x' b c))
+#endif
 
 fixOneEntryPat :: MonadIO m => LPat GhcPs -> TransformT m (LPat GhcPs)
--- fixOneEntryPat pat
--- #if __GLASGOW_HASKELL__ < 900
---   | Just p@(L l (ConPatIn a (InfixCon x b))) <- dLPat pat = do
--- #else
---   | Just p@(L _l (ConPat a b (InfixCon x c))) <- dLPat pat = do
--- #endif
---     (p', x') <- fixOneEntry p (dLPatUnsafe x)
---     return (cLPat $ (L (getLoc p') (ConPat a b (InfixCon x' c))))
---   | otherwise = return pat
+#if __GLASGOW_HASKELL__ >= 910
 fixOneEntryPat pat = return pat
+#else
+fixOneEntryPat pat
+#if __GLASGOW_HASKELL__ < 900
+  | Just p@(L l (ConPatIn a (InfixCon x b))) <- dLPat pat = do
+#else
+  | Just p@(L _l (ConPat a b (InfixCon x c))) <- dLPat pat = do
+#endif
+    (p', x') <- fixOneEntry p (dLPatUnsafe x)
+    return (cLPat $ (L (getLoc p') (ConPat a b (InfixCon x' c))))
+  | otherwise = return pat
+#endif
 
 -------------------------------------------------------------------------------
 

@@ -47,9 +47,9 @@ import Retrie.Fixity
 import Retrie.GHC
 import Retrie.SYB
 import Retrie.Types
-#if __GLASGOW_HASKELL__ < 910
+-- #if __GLASGOW_HASKELL__ < 910
 import Retrie.Util
-#endif
+-- #endif
 
 -------------------------------------------------------------------------------
 
@@ -410,8 +410,8 @@ precedence fixities (OpApp _ _ op _) = Just $ lookupOp op fixities
 precedence _        _                = Nothing
 
 parenify
-  :: Monad m => Context -> LHsExpr GhcPs -> TransformT m (LHsExpr GhcPs)
-parenify Context{..} le@(L _ e)
+  :: MonadIO m => Context -> LHsExpr GhcPs -> TransformT m (LHsExpr GhcPs)
+parenify Context{..} le@(L ll e)
 #if __GLASGOW_HASKELL__ < 904
   | needed ctxtParentPrec (precedence ctxtFixityEnv e) && needsParens e =
     mkParen' (getEntryDP le) (\an -> HsPar an (setEntryDP le (SameLine 0)))
@@ -419,12 +419,14 @@ parenify Context{..} le@(L _ e)
   | needed ctxtParentPrec (precedence ctxtFixityEnv e) && needsParens e = do
     let tokLP = L (TokenLoc (EpaDelta (SameLine 0) [])) HsTok
         tokRP = L (TokenLoc (EpaDelta (SameLine 0) [])) HsTok
-     in mkParen' (getEntryDP le) (\an -> HsPar an tokLP (setEntryDP le (SameLine 0)) tokRP)
+    in mkParen' (getEntryDP le) (\an -> HsPar an tokLP (setEntryDP le (SameLine 0)) tokRP)
 #else
   | needed ctxtParentPrec (precedence ctxtFixityEnv e) && needsParens e = do
     let tokLP = EpTok (EpaDelta (SameLine 0) [])
         tokRP = EpTok (EpaDelta (SameLine 0) [])
-     in mkParen' (getEntryDP le) (\_an -> HsPar (tokLP, tokRP) (setEntryDP le (SameLine 0)))
+    let le' = setEntryDP le (SameLine 0) :: LHsExpr GhcPs
+    let r = L ll (HsPar (tokLP, tokRP) le') :: LHsExpr GhcPs
+    return r
 #endif
   | otherwise = return le
   where
@@ -434,6 +436,7 @@ parenify Context{..} le@(L _ e)
     needed NeverParen _ = False
     needed _ Nothing = True
     needed _ _ = False
+
 
 getUnparened :: Data k => k -> k
 getUnparened = mkT unparen `extT` unparenT `extT` unparenP
