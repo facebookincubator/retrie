@@ -64,8 +64,10 @@ matchToRewrites
   -> Direction
   -> LMatch GhcPs (LHsExpr GhcPs)
   -> TransformT IO [Rewrite (LHsExpr GhcPs)]
-matchToRewrites e imps dir (L _ alt) = do
+matchToRewrites e imps dir (L _ alt') = do
   -- lift $ debugPrint Loud "matchToRewrites:e="  [showAst e]
+  -- lift $ debugPrint Loud "matchToRewrites:alt="  [showAst alt']
+  let alt = makeDeltaAst alt'
   let
     pats = m_pats alt
     grhss = m_grhss alt
@@ -113,6 +115,8 @@ makeFunctionQuery e imps dir grhss mkAppFn (argpats, bndpats)
     -- See Note [Wildcards]
     (es,(_,bs')) <- runStateT (mapM patToExpr argpats) (wildSupply bs, bs)
     -- lift $ debugPrint Loud "makeFunctionQuery:e="  [showAst e]
+    -- lift $ debugPrint Loud "makeFunctionQuery:argpats="  [showAst argpats]
+    -- lift $ debugPrint Loud "makeFunctionQuery:es="  [showAst es]
     lhs <- mkAppFn e es
     for rhss $ \ grhs -> do
       le <- mkLet lbs (grhsToExpr grhs)
