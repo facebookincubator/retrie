@@ -22,9 +22,7 @@ import Retrie.Expr
 import Retrie.GHC
 import Retrie.Quantifiers
 import Retrie.Types
-#if __GLASGOW_HASKELL__ < 910
 import Retrie.Util
-#endif
 
 dfnsToRewrites
   :: LibDir
@@ -40,6 +38,7 @@ dfnsToRewrites libdir specs am = fmap astA $ transformA am $ \ (L _ m) -> do
         fe <- mkLocatedHsVar fRdrName
         -- lift $ debugPrint Loud "dfnsToRewrites:ef="  [showAst fe]
         imps <- getImports libdir dir (hsmodName m)
+        -- lift $ debugPrint Loud "dfnsToRewrites:imps="  [showAst imps]
         (fName,) . concat <$>
           forM (unLoc $ mg_alts $ fun_matches f) (matchToRewrites fe imps dir)
     | L _ (ValD _ f@FunBind{}) <- hsmodDecls m
@@ -66,11 +65,12 @@ matchToRewrites
   -> TransformT IO [Rewrite (LHsExpr GhcPs)]
 matchToRewrites e imps dir (L _ alt') = do
   -- lift $ debugPrint Loud "matchToRewrites:e="  [showAst e]
-  -- lift $ debugPrint Loud "matchToRewrites:alt="  [showAst alt']
   let alt = makeDeltaAst alt'
+  -- lift $ debugPrint Loud "matchToRewrites:alt="  [showAst alt]
   let
     pats = m_pats alt
     grhss = m_grhss alt
+  -- lift $ debugPrint Loud "matchToRewrites:pats="  [showAst pats]
   qss <- for (zip (inits pats) (tails pats)) $
     makeFunctionQuery e imps dir grhss mkApps
   qs <- backtickRules e imps dir grhss pats

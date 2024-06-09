@@ -87,6 +87,7 @@ replaceImpl c e = do
       r <- subst sub c t'
       -- copy appropriate annotations from old expression to template
       r0 <- addAllAnnsT e r
+      -- let r0 = r
       -- add parens to template if needed
       res' <- (mkM (parenify c) `extM` parenifyT c `extM` parenifyP c) r0
       -- Make sure the replacement has the same anchor as the thing
@@ -110,6 +111,7 @@ replaceImpl c e = do
       -- lift $ liftIO $ debugPrint Loud "replaceImpl:r0="  [showAst r0]
       -- lift $ liftIO $ debugPrint Loud "replaceImpl:t'=" [showAst t']
       -- lift $ liftIO $ debugPrint Loud "replaceImpl:res=" [showAst res]
+      -- lift $ liftIO $ debugPrint Loud "replaceImpl:res=" [showAst res']
 
       let replacement = Replacement (getLocA e) orig repl
       TransformT $ lift $ tell $ Change [replacement] [tImports]

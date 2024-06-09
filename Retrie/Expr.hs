@@ -413,6 +413,7 @@ parenify Context{..} le@(L ll e)
   | needed ctxtParentPrec (precedence ctxtFixityEnv e) && needsParens e = do
     let tokLP = EpTok (EpaDelta (SameLine 0) [])
         tokRP = EpTok (EpaDelta (SameLine 0) [])
+     -- in mkParen' (getEntryDP le) (\_an -> HsPar (tokLP, tokRP) (setEntryDP le (SameLine 0)))
     let le' = setEntryDP le (SameLine 0) :: LHsExpr GhcPs
     let r = L ll (HsPar (tokLP, tokRP) le') :: LHsExpr GhcPs
     return r
