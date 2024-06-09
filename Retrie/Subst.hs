@@ -64,7 +64,6 @@ substExpr ctxt e@(L l1 (HsVar x (L l2 v))) =
                then return e0
                else transferEntryDP e e0
       e2 <- transferAnnsT isComma e e1
-      -- let e'' = setEntryDP e' (SameLine 1)
       -- lift $ liftIO $ debugPrint Loud "substExpr:HoleExpr:e2" [showAst e2]
       parenify ctxt e2
     Just (HoleRdr rdr) ->

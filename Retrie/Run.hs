@@ -119,10 +119,6 @@ runOneModule writeFn Options{..} r cpp = do
       let cpp'' = addImportsCPP (additionalImports:imports) cpp'
       writeFn repls (printCPP repls cpp'') cpp'' x
 
--- isCpp :: CPP AnnotatedModule -> String
--- isCpp (NoCPP m) = "NoCPP:" ++ showAstA m
--- isCpp (CPP{}) = "CPP"
-
 -- | Write action which counts changed lines using 'diff'
 writeCountLines :: FilePath -> WriteFn a (Sum Int)
 writeCountLines fp reps str _ _ = do

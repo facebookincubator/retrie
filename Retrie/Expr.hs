@@ -54,16 +54,8 @@ import Retrie.Util
 -------------------------------------------------------------------------------
 
 mkLocatedHsVar :: Monad m => LocatedN RdrName -> TransformT m (LHsExpr GhcPs)
-mkLocatedHsVar (L l n) = do
-  -- This special casing for [] is gross, but this is apparently how the
-  -- annotations work.
-  -- let anns =
-  --       case occNameString (occName (unLoc v)) of
-  --         "[]" -> [(G AnnOpenS, DP (0,0)), (G AnnCloseS, DP (0,0))]
-  --         _    -> [(G AnnVal, DP (0,0))]
-  -- r <- setAnnsFor v anns
-  -- return (L (moveAnchor l)  (HsVar noExtField n))
-  mkLocA (SameLine 0)  (HsVar noExtField (L (setMoveAnchor (SameLine 0) l) n))
+mkLocatedHsVar (L l n)
+  = mkLocA (SameLine 0)  (HsVar noExtField (L (setMoveAnchor (SameLine 0) l) n))
 
 -- TODO: move to ghc-exactprint
 #if __GLASGOW_HASKELL__ < 910
@@ -274,9 +266,6 @@ newWildVar = do
 
 wildSupply :: [RdrName] -> [RdrName]
 wildSupply used = wildSupplyP (`notElem` used)
-
--- wildSupplyAlphaEnv :: AlphaEnv -> [RdrName]
--- wildSupplyAlphaEnv env = wildSupplyP (\ nm -> isNothing (lookupAlphaEnv nm env))
 
 wildSupplyP :: (RdrName -> Bool) -> [RdrName]
 wildSupplyP p =
