@@ -116,6 +116,7 @@ runOneModule writeFn Options{..} r cpp = do
     NoChange -> return mempty
     Change repls imports -> do
       -- debugPrint Loud "runOneModule" ["change", show repls]
+      -- debugPrint Loud "runOneModule" ["additionalImports", showAst additionalImports]
       let cpp'' = addImportsCPP (additionalImports:imports) cpp'
       writeFn repls (printCPP repls cpp'') cpp'' x
 
