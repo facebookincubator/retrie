@@ -17,9 +17,7 @@ import Retrie.GHC
 import Retrie.Substitution
 import Retrie.SYB
 import Retrie.Types
-#if __GLASGOW_HASKELL__ < 910
 import Retrie.Util
-#endif
 
 ------------------------------------------------------------------------
 
@@ -54,7 +52,9 @@ substExpr
   -> TransformT m (LHsExpr GhcPs)
 substExpr ctxt e@(L l1 (HsVar x (L l2 v))) =
   case lookupHoleVar v ctxt of
-    Just (HoleExpr eA) -> do
+    Just (HoleExpr eA') -> do
+      let eA = fmap makeDeltaAst eA'
+      -- let eA = eA'
       -- lift $ liftIO $ debugPrint Loud "substExpr:HoleExpr:e" [showAst e]
       -- lift $ liftIO $ debugPrint Loud "substExpr:HoleExpr:eA" [showAst eA]
       e0 <- graftA (unparen <$> eA)
@@ -64,7 +64,6 @@ substExpr ctxt e@(L l1 (HsVar x (L l2 v))) =
                then return e0
                else transferEntryDP e e0
       e2 <- transferAnnsT isComma e e1
-      -- lift $ liftIO $ debugPrint Loud "substExpr:HoleExpr:e2" [showAst e2]
       parenify ctxt e2
     Just (HoleRdr rdr) ->
       return $ L l1 $ HsVar x $ L l2 rdr
