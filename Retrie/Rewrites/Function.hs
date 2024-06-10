@@ -126,7 +126,8 @@ makeFunctionQuery e imps dir grhss mkAppFn (argpats, bndpats)
           case dir of
             LeftToRight -> (lhs,rhs)
             RightToLeft -> (rhs,lhs)
-      p <- pruneA (setEntryDP (makeDeltaAst pat) (SameLine 1))
+      -- p <- pruneA (setEntryDP (makeDeltaAst pat) (SameLine 1))
+      p <- pruneA pat
       t <- pruneA (setEntryDP (makeDeltaAst temp) (SameLine 1))
       return $ addRewriteImports imps $ mkRewrite (mkQs bs') p t
 

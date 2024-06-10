@@ -47,7 +47,8 @@ mkRuleRewrite
 mkRuleRewrite RightToLeft (RuleInfo name qs lhs rhs) =
   mkRuleRewrite LeftToRight (RuleInfo name qs rhs lhs)
 mkRuleRewrite _ RuleInfo{..} = do
-  p <- pruneA (setEntryDP (makeDeltaAst riLHS) (SameLine 1))
+  -- p <- pruneA (setEntryDP (makeDeltaAst riLHS) (SameLine 1))
+  p <- pruneA riLHS
   t <- pruneA (setEntryDP (makeDeltaAst riRHS) (SameLine 1))
   -- lift $ debugPrint Loud "mkRuleRewrite" [showAstA p, showAstA t]
   return (riName, mkRewrite (mkQs riQuantifiers) p t)

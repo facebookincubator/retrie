@@ -17,7 +17,7 @@ import Retrie.GHC
 import Retrie.Substitution
 import Retrie.SYB
 import Retrie.Types
--- import Retrie.Util
+import Retrie.Util
 
 ------------------------------------------------------------------------
 
