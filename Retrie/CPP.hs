@@ -333,9 +333,12 @@ insertImports
   -> TransformT m (Located (HsModule GhcPs))
 #endif
 insertImports is (L l m') = do
-  imps <- graftA $ filterAndFlatten (unLoc <$> hsmodName m') is
+  imps' <- graftA $ filterAndFlatten (unLoc <$> hsmodName m') is
   let
     (L _ m) = makeDeltaAst (L l m')
+    imps = case imps' of
+             [] -> []
+             (h:t) -> (setEntryDP h (DifferentLine 1 1):t)
     deduped = nubBy (eqImportDecl `on` unLoc) $ hsmodImports m ++ imps
   return $ L l m { hsmodImports = deduped }
 
