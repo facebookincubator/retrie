@@ -54,7 +54,6 @@ substExpr ctxt e@(L l1 (HsVar x (L l2 v))) =
   case lookupHoleVar v ctxt of
     Just (HoleExpr eA') -> do
       let eA = fmap makeDeltaAst eA'
-      -- let eA = eA'
       -- lift $ liftIO $ debugPrint Loud "substExpr:HoleExpr:e" [showAst e]
       -- lift $ liftIO $ debugPrint Loud "substExpr:HoleExpr:eA" [showAst eA]
       e0 <- graftA (unparen <$> eA)
@@ -77,7 +76,8 @@ substPat
   -> TransformT m (LPat GhcPs)
 substPat ctxt (dLPat -> Just p@(L l1 (VarPat x _vl@(L l2 v)))) = fmap cLPat $
   case lookupHoleVar v ctxt of
-    Just (HolePat pA) -> do
+    Just (HolePat pA') -> do
+      let pA = fmap makeDeltaAst pA'
       -- lift $ liftIO $ debugPrint Loud "substPat:HolePat:p" [showAst p]
       -- lift $ liftIO $ debugPrint Loud "substPat:HolePat:pA" [showAst pA]
       p' <- graftA (unparenP <$> pA)
@@ -100,7 +100,8 @@ substType
   -> TransformT m (LHsType GhcPs)
 substType ctxt ty
   | Just (L _ v) <- tyvarRdrName (unLoc ty)
-  , Just (HoleType tyA) <- lookupHoleVar v ctxt = do
+  , Just (HoleType tyA') <- lookupHoleVar v ctxt = do
+    let tyA = fmap makeDeltaAst tyA'
     -- lift $ liftIO $ debugPrint Loud "substType:HoleType:ty" [showAst ty]
     -- lift $ liftIO $ debugPrint Loud "substType:HoleType:tyA" [showAst tyA]
     ty' <- graftA (unparenT <$> tyA)
