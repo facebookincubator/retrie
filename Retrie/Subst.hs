@@ -17,7 +17,7 @@ import Retrie.GHC
 import Retrie.Substitution
 import Retrie.SYB
 import Retrie.Types
-import Retrie.Util
+-- import Retrie.Util
 
 ------------------------------------------------------------------------
 
@@ -58,7 +58,6 @@ substExpr ctxt e@(L l1 (HsVar x (L l2 v))) =
       -- lift $ liftIO $ debugPrint Loud "substExpr:HoleExpr:eA" [showAst eA]
       e0 <- graftA (unparen <$> eA)
       let hasCs = hasComments e0
-      -- unless comments $ transferEntryDPT e e'
       e1 <- if hasCs
                then return e0
                else transferEntryDP e e0
@@ -104,9 +103,13 @@ substType ctxt ty
     let tyA = fmap makeDeltaAst tyA'
     -- lift $ liftIO $ debugPrint Loud "substType:HoleType:ty" [showAst ty]
     -- lift $ liftIO $ debugPrint Loud "substType:HoleType:tyA" [showAst tyA]
-    ty' <- graftA (unparenT <$> tyA)
-    ty0 <- transferEntryAnnsT isComma ty ty'
-    parenifyT ctxt ty0
+    ty0 <- graftA (unparenT <$> tyA)
+    let hasCs = hasComments ty0
+    ty1 <- if hasCs
+             then return ty0
+             else transferEntryDP ty ty0
+    ty2 <- transferEntryAnnsT isComma ty ty1
+    parenifyT ctxt ty2
 substType _ ty = return ty
 
 -- You might reasonably think that we would replace the RdrName in FunBind...

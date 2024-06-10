@@ -65,8 +65,9 @@ mkPatRewrite dir imports patName params rhs = do
       let lhs'' = setEntryDPTunderConPatIn lhs' (SameLine 0)
       return (rhs, lhs'')
 
-  p <- pruneA pat
-  t <- pruneA temp
+  -- TODO: make this a common function instead of pruneA
+  p <- pruneA (setEntryDP (makeDeltaAst pat) (SameLine 1))
+  t <- pruneA (setEntryDP (makeDeltaAst temp) (SameLine 1))
   let bs = collectPatBinders CollNoDictBinders (cLPat temp)
   return $ addRewriteImports imports $ mkRewrite (mkQs bs) p t
 

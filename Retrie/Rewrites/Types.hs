@@ -64,6 +64,6 @@ mkTypeRewrite d (lhsName, vars, rhs) = do
     (pat, tmp) = case d of
       LeftToRight -> (lhsApps, rhs)
       RightToLeft -> (rhs, lhsApps)
-  p <- pruneA pat
-  t <- pruneA tmp
+  p <- pruneA (setEntryDP (makeDeltaAst pat) (SameLine 1))
+  t <- pruneA (setEntryDP (makeDeltaAst tmp) (SameLine 1))
   return $ mkRewrite (mkQs $ map unLoc lvs) p t
