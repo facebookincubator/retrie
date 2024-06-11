@@ -103,7 +103,7 @@ fixOneExpr
   => FixityEnv
   -> LHsExpr GhcPs
   -> TransformT m (LHsExpr GhcPs)
-fixOneExpr env (L l2 (OpApp x2 ap1@(L l1 (OpApp x1 x op1 y)) op2 z))
+fixOneExpr env (L l2 (OpApp x2 ap1@(L _l1 (OpApp x1 x op1 y)) op2 z))
 {-
   pre
   x   is [print]   4:8-12
@@ -140,10 +140,13 @@ fixOneExpr _ e = return e
 fixOnePat :: Monad m => FixityEnv -> LPat GhcPs -> TransformT m (LPat GhcPs)
 fixOnePat env (dLPat -> Just (L l2 (ConPat x2 op2 (InfixCon (dLPat -> Just ap1@(L l1 (ConPat ext1 op1 (InfixCon x y)))) z))))
   | associatesRight (lookupOpRdrName op1 env) (lookupOpRdrName op2 env) = do
-    let ap2' = L l2 (ConPat x2 op2 (InfixCon y z))
-    (_ap1_0, ap2'_0) <- swapEntryDPT ap1 ap2'
-    rhs <- fixOnePat env (cLPat ap2'_0)
-    return $ cLPat $ L l1 (ConPat ext1 op1 (InfixCon x rhs))
+    -- let ap2' = L l2 (ConPat x2 op2 (InfixCon y z))
+    let ap2' = L (noAnnSrcSpan (combineSrcSpans (locA y) (locA z))) (ConPat x2 op2 (InfixCon y z))
+    -- (_ap1_0, ap2'_0) <- swapEntryDPT ap1 ap2'
+    (_ap1_0, ap2'_0) <- return (ap1, ap2')
+    -- rhs <- fixOnePat env (cLPat ap2'_0)
+    rhs <- return (cLPat ap2'_0)
+    return $ cLPat $ L l2 (ConPat ext1 op1 (InfixCon x rhs))
 fixOnePat _ e = return e
 
 -- TODO: move to ghc-exactprint
