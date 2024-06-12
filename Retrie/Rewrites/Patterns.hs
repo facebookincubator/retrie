@@ -70,7 +70,7 @@ mkPatRewrite dir imports patName params rhs = do
   p <- pruneA pat
   t <- pruneA (setEntryDP (makeDeltaAst temp) (SameLine 1))
   let bs = collectPatBinders CollNoDictBinders (cLPat temp)
-  return $ addRewriteImports imports $ mkRewrite (mkQs bs) p t
+  return $ addRewriteImports imports $ mkRewrite (mkQs bs) p (getHasLoc p) t
 
   where
     setEntryDPTunderConPatIn :: LPat GhcPs -> DeltaPos -> LPat GhcPs
@@ -133,8 +133,10 @@ mkExpRewrite
   -> HsPatSynDir GhcPs
   -> TransformT IO [Rewrite (LHsExpr GhcPs)]
 mkExpRewrite dir imports patName params rhs patDir = do
+  lift $ debugPrint Loud "mkExpRewrite:params="  [showAst params]
+  lift $ debugPrint Loud "mkExpRewrite:rhs="  [showAst rhs]
   fe <- mkLocatedHsVar patName
-  -- lift $ debugPrint Loud "mkExpRewrite:fe="  [showAst fe]
+  lift $ debugPrint Loud "mkExpRewrite:fe="  [showAst fe]
   let altsFromParams = case params of
         PrefixCon _tyargs names -> buildMatch names rhs
         InfixCon a1 a2 -> buildMatch [a1, a2] rhs

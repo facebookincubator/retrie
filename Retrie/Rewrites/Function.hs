@@ -129,7 +129,7 @@ makeFunctionQuery e imps dir grhss mkAppFn (argpats, bndpats)
       -- p <- pruneA (setEntryDP (makeDeltaAst pat) (SameLine 1))
       p <- pruneA pat
       t <- pruneA (setEntryDP (makeDeltaAst temp) (SameLine 1))
-      return $ addRewriteImports imps $ mkRewrite (mkQs bs') p t
+      return $ addRewriteImports imps $ mkRewrite (mkQs bs') p (getHasLoc p) t
 
 backtickRules
   :: LHsExpr GhcPs

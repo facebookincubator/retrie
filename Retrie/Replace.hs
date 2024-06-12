@@ -61,6 +61,7 @@ replaceImpl c e = do
           fmap (fmap (check rrOrigin rrQuantifiers)) <$> rrTransformer
       }
     check origin quantifiers match
+      -- if e loc is inside origin loc
       | getLocA e `overlaps` origin = NoMatch
       | MatchResult _ Template{..} <- match
       , fvs <- freeVars quantifiers (astA tTemplate)
@@ -106,7 +107,7 @@ replaceImpl c e = do
       lift $ liftIO $ debugPrint Loud "replaceImpl:orig="  [orig]
       lift $ liftIO $ debugPrint Loud "replaceImpl:repl="  [repl]
 
-      -- lift $ liftIO $ debugPrint Loud "replaceImpl:e="  [showAst e]
+      lift $ liftIO $ debugPrint Loud "replaceImpl:e="  [showAst e]
       -- lift $ liftIO $ debugPrint Loud "replaceImpl:r="  [showAst r]
       -- lift $ liftIO $ debugPrint Loud "replaceImpl:r0="  [showAst r0]
       -- lift $ liftIO $ debugPrint Loud "replaceImpl:t'=" [showAst t']

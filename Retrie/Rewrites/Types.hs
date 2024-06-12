@@ -66,4 +66,4 @@ mkTypeRewrite d (lhsName, vars, rhs) = do
       RightToLeft -> (rhs, lhsApps)
   p <- pruneA pat
   t <- pruneA (setEntryDP (makeDeltaAst tmp) (SameLine 1))
-  return $ mkRewrite (mkQs $ map unLoc lvs) p t
+  return $ mkRewrite (mkQs $ map unLoc lvs) p (getHasLoc p) t

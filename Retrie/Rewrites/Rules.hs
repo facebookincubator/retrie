@@ -51,4 +51,4 @@ mkRuleRewrite _ RuleInfo{..} = do
   p <- pruneA riLHS
   t <- pruneA (setEntryDP (makeDeltaAst riRHS) (SameLine 1))
   -- lift $ debugPrint Loud "mkRuleRewrite" [showAstA p, showAstA t]
-  return (riName, mkRewrite (mkQs riQuantifiers) p t)
+  return (riName, mkRewrite (mkQs riQuantifiers) p (getHasLoc p) t)

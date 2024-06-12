@@ -78,6 +78,9 @@ data Annotated ast = Annotated
   }
 deriving instance (Data ast) => Data (Annotated ast)
 
+instance (HasLoc ast) => HasLoc (Annotated ast) where
+    getHasLoc a = getHasLoc (astA a)
+
 instance Functor Annotated where
   fmap f Annotated{..} = Annotated{astA = f astA, ..}
 
