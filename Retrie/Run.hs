@@ -110,14 +110,23 @@ runOneModule
   -> CPP AnnotatedModule
   -> IO b
 runOneModule writeFn Options{..} r cpp = do
-  -- debugPrint Loud "runOneModule" ["enter"]
+  debugPrint Loud "runOneModule" ["enter"]
+  -- case cpp of
+  --     NoCPP m -> debugPrint Loud "runOneModule:cpp" [showAst m]
+  --     _ -> error "wtf"
   (x, cpp', changed) <- runRetrie fixityEnv r cpp
+  -- case cpp' of
+  --     NoCPP m -> debugPrint Loud "runOneModule:cpp'" [showAst m]
+  --     _ -> error "wtf"
   case changed of
     NoChange -> return mempty
     Change repls imports -> do
       -- debugPrint Loud "runOneModule" ["change", show repls]
       -- debugPrint Loud "runOneModule" ["additionalImports", showAst additionalImports]
       let cpp'' = addImportsCPP (additionalImports:imports) cpp'
+      -- case cpp' of
+      --     NoCPP m'' -> debugPrint Loud "runOneModule:cpp''" [showAst m'']
+      --     _ -> error "wtf"
       writeFn repls (printCPP repls cpp'') cpp'' x
 
 -- | Write action which counts changed lines using 'diff'

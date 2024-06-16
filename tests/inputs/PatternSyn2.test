@@ -15,16 +15,16 @@
  pattern JustUnit = Some ()
  pattern SomeUnit <- JustUnit
 
- foo :: Maybe () -> Maybe ()
+ foo1 :: Maybe () -> Maybe ()
 
--foo (Just ()) = Just ()
-+foo (Some ()) = Some ()
+-foo2 (Just ()) = Just ()
++foo2 (Some ()) = Some ()
 
--foo (id -> Just ()) = Just ()
-+foo (id -> Some ()) = Some ()
+-foo3 (id -> Just ()) = Just ()
++foo3 (id -> Some ()) = Some ()
 
--foo (Some ()) = Some ()
-+foo JustUnit = JustUnit
+-foo4 (Some ()) = Some ()
++foo4 JustUnit = JustUnit
 
--foo JustUnit = JustUnit
-+foo SomeUnit = JustUnit
+-foo5 JustUnit = JustUnit
++foo5 SomeUnit = JustUnit

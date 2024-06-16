@@ -54,23 +54,39 @@ mkPatRewrite
   -> LPat GhcPs
   -> TransformT IO (Rewrite (LPat GhcPs))
 mkPatRewrite dir imports patName params rhs = do
+  -- lift $ debugPrint Loud "mkPatRewrite:patName="  [showAst patName]
+  -- lift $ debugPrint Loud "mkPatRewrite:params="  [showAst params]
+  -- lift $ debugPrint Loud "mkPatRewrite:rhs="  [showAst rhs]
   lhs <- asPat patName params
+  -- lift $ debugPrint Loud "mkPatRewrite:lhs="  [showAst lhs]
 
-  (pat, temp) <- case dir of
-    LeftToRight -> return (lhs, rhs)
+  let lhs_loc = case params of
+        PrefixCon _tyargs names -> case names of
+            [] -> getHasLoc patName
+            (lp:_) -> combineSrcSpans (getHasLoc patName) (getHasLoc lp)
+        InfixCon a1 a2 -> combineSrcSpans (getHasLoc a1) (getHasLoc a2)
+        RecCon fs -> case fs of
+            [] -> getHasLoc patName
+            (lp:_) -> combineSrcSpans (getHasLoc patName) (getHasLoc (foLabel $ recordPatSynField lp))
+
+  lift $ debugPrint Loud "mkPatRewrite:lhs_loc="  [showGhc lhs_loc]
+  lift $ debugPrint Loud "mkPatRewrite:rhs_loc="  [showGhc (getHasLoc rhs)]
+
+  (pat, pat_loc, temp) <- case dir of
+    LeftToRight -> return (lhs, lhs_loc, rhs)
     RightToLeft -> do
       let lhs' = setEntryDP lhs (SameLine 0)
       -- Patterns from lhs have wonky annotations,
       -- the space will be attached to the name, not to the ConPatIn ast node
       let lhs'' = setEntryDPTunderConPatIn lhs' (SameLine 0)
-      return (rhs, lhs'')
+      return (rhs, getHasLoc rhs, lhs'')
 
   -- TODO: make this a common function instead of pruneA
   -- p <- pruneA (setEntryDP (makeDeltaAst pat) (SameLine 1))
   p <- pruneA pat
   t <- pruneA (setEntryDP (makeDeltaAst temp) (SameLine 1))
   let bs = collectPatBinders CollNoDictBinders (cLPat temp)
-  return $ addRewriteImports imports $ mkRewrite (mkQs bs) p (getHasLoc p) t
+  return $ addRewriteImports imports $ mkRewrite (mkQs bs) p pat_loc t
 
   where
     setEntryDPTunderConPatIn :: LPat GhcPs -> DeltaPos -> LPat GhcPs
@@ -133,10 +149,10 @@ mkExpRewrite
   -> HsPatSynDir GhcPs
   -> TransformT IO [Rewrite (LHsExpr GhcPs)]
 mkExpRewrite dir imports patName params rhs patDir = do
-  lift $ debugPrint Loud "mkExpRewrite:params="  [showAst params]
-  lift $ debugPrint Loud "mkExpRewrite:rhs="  [showAst rhs]
+  -- lift $ debugPrint Loud "mkExpRewrite:params="  [showAst params]
+  -- lift $ debugPrint Loud "mkExpRewrite:rhs="  [showAst rhs]
   fe <- mkLocatedHsVar patName
-  lift $ debugPrint Loud "mkExpRewrite:fe="  [showAst fe]
+  -- lift $ debugPrint Loud "mkExpRewrite:fe="  [showAst fe]
   let altsFromParams = case params of
         PrefixCon _tyargs names -> buildMatch names rhs
         InfixCon a1 a2 -> buildMatch [a1, a2] rhs

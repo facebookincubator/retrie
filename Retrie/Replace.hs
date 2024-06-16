@@ -58,7 +58,10 @@ replaceImpl c e = do
     -- match under a binding of something that appears in the template.
     f result@RewriterResult{..} = result
       { rrTransformer =
-          fmap (fmap (check rrOrigin rrQuantifiers)) <$> rrTransformer
+          -- fmap (fmap (check rrOrigin rrQuantifiers)) <$> rrTransformer
+          fmap (fmap ((check rrOrigin rrQuantifiers)
+                     `debug` ("replaceImpl::(rrOrigin, getLocA e )=" ++ showGhc (rrOrigin, getLocA e) ))
+               ) <$> rrTransformer
       }
     check origin quantifiers match
       -- if e loc is inside origin loc
@@ -107,7 +110,7 @@ replaceImpl c e = do
       lift $ liftIO $ debugPrint Loud "replaceImpl:orig="  [orig]
       lift $ liftIO $ debugPrint Loud "replaceImpl:repl="  [repl]
 
-      lift $ liftIO $ debugPrint Loud "replaceImpl:e="  [showAst e]
+      -- lift $ liftIO $ debugPrint Loud "replaceImpl:e="  [showAst e]
       -- lift $ liftIO $ debugPrint Loud "replaceImpl:r="  [showAst r]
       -- lift $ liftIO $ debugPrint Loud "replaceImpl:r0="  [showAst r0]
       -- lift $ liftIO $ debugPrint Loud "replaceImpl:t'=" [showAst t']
