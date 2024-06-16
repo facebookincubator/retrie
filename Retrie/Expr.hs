@@ -71,8 +71,8 @@ dpAnchor l dp = Anchor (realSrcSpan l) (MovedAnchor dp)
 
 #else
 setMoveAnchor :: DeltaPos -> EpAnn an -> EpAnn an
-setMoveAnchor dp (EpAnn (EpaSpan _) an cs)
-  = (EpAnn (EpaDelta dp []) an cs)
+setMoveAnchor _dp ep@(EpAnn (EpaSpan _) _an _cs)
+  = ep
 setMoveAnchor dp (EpAnn (EpaDelta _ cs1) an cs)
   = (EpAnn (EpaDelta dp cs1) an cs)
 #endif
