@@ -130,9 +130,9 @@ fixOneExpr env (L l2 (OpApp x2 ap1@(L _l1 (OpApp x1 x op1 y)) op2 z))
     let ap2' :: LHsExpr GhcPs = L (noAnnSrcSpan (combineSrcSpans (locA y) (locA z)) ) $ OpApp x2 y op2 z
     -- (_ap1_0, ap2'_0) <- swapEntryDPT ap1 ap2'
     (_ap1_0, ap2'_0) <- return (ap1, ap2')
-    -- lift $ liftIO $ debugPrint Loud "fixOneExpr:recursing"  []
-    -- rhs <- fixOneExpr env ap2'_0
-    rhs <- return ap2'_0
+    -- Even though we process bottom-up, we need to recurse because we
+    -- have changed the structure at this level
+    rhs <- fixOneExpr env ap2'_0
     -- lift $ liftIO $ debugPrint Loud "fixOneExpr:returning"  [showAst (L l2 $ OpApp x1 x op1 rhs)]
     return $ L l2 $ OpApp x1 x op1 rhs
 fixOneExpr _ e = return e
@@ -144,8 +144,9 @@ fixOnePat env (dLPat -> Just (L l2 (ConPat x2 op2 (InfixCon (dLPat -> Just ap1@(
     let ap2' = L (noAnnSrcSpan (combineSrcSpans (locA y) (locA z))) (ConPat x2 op2 (InfixCon y z))
     -- (_ap1_0, ap2'_0) <- swapEntryDPT ap1 ap2'
     (_ap1_0, ap2'_0) <- return (ap1, ap2')
-    -- rhs <- fixOnePat env (cLPat ap2'_0)
-    rhs <- return (cLPat ap2'_0)
+    -- Even though we process bottom-up, we need to recurse because we
+    -- have changed the structure at this level
+    rhs <- fixOnePat env (cLPat ap2'_0)
     return $ cLPat $ L l2 (ConPat ext1 op1 (InfixCon x rhs))
 fixOnePat _ e = return e
 

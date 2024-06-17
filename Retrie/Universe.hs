@@ -12,6 +12,7 @@
 module Retrie.Universe
   ( Universe
   , printU
+  , getLocU
   , Matchable(..)
   , UMap(..)
   ) where
@@ -46,6 +47,12 @@ exactPrintU (ULHsExpr e) = exactPrint e
 exactPrintU (ULStmt s) = exactPrint s
 exactPrintU (ULType t) = exactPrint t
 exactPrintU (ULPat p) = exactPrint p
+
+getLocU :: Universe -> SrcSpan
+getLocU (ULHsExpr e) = getLocA e
+getLocU (ULStmt s) = getLocA s
+getLocU (ULType t) = getLocA t
+getLocU (ULPat p) = getLocA p
 
 -------------------------------------------------------------------------------
 
