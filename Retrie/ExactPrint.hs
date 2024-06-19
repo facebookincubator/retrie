@@ -38,10 +38,11 @@ module Retrie.ExactPrint
     -- * Annotated AST
   , module Retrie.ExactPrint.Annotated
     -- * ghc-exactprint re-exports
-  , module Language.Haskell.GHC.ExactPrint
+  -- , module Language.Haskell.GHC.ExactPrint
   , module Language.Haskell.GHC.ExactPrint.Types
-  , module Language.Haskell.GHC.ExactPrint.Utils
-  , module Language.Haskell.GHC.ExactPrint.Transform
+  -- , module Language.Haskell.GHC.ExactPrint.Utils
+  -- , module Language.Haskell.GHC.ExactPrint.Transform
+  , module Retrie.ExactPrint.Compat
   ) where
 
 import Control.Exception
@@ -53,17 +54,18 @@ import Control.Monad.State.Lazy
 import Data.List (transpose)
 import Text.Printf
 
-import Language.Haskell.GHC.ExactPrint hiding
-  (
-   setEntryDP
-  , transferEntryDP
-  )
-import Language.Haskell.GHC.ExactPrint.Utils hiding (debug)
+-- import Language.Haskell.GHC.ExactPrint hiding
+--   (
+--    setEntryDP
+--   , transferEntryDP
+--   )
+-- import Language.Haskell.GHC.ExactPrint.Utils hiding (debug)
+import Retrie.ExactPrint.Compat
 import qualified Language.Haskell.GHC.ExactPrint.Parsers as Parsers
 import Language.Haskell.GHC.ExactPrint.Types
   ( showGhc
   )
-import Language.Haskell.GHC.ExactPrint.Transform
+-- import Language.Haskell.GHC.ExactPrint.Transform
 
 import Retrie.ExactPrint.Annotated
 import Retrie.Fixity
@@ -124,7 +126,7 @@ fixOneExpr env (L l2 (OpApp x2 ap1@(L _l1 (OpApp x1 x op1 y)) op2 z))
 -}
 
   | associatesRight (lookupOp op1 env) (lookupOp op2 env) = do
-    -- lift $ liftIO $ debugPrint Loud "fixOneExpr:(l1,l2)="  [showAst (l1,l2)]
+    -- lift $ liftIO $ debugPrint Loud "fixOneExpr:(l1,l2)="  [showAst (_l1,l2)]
     -- We need a location from start of y to end of z
     -- let ap2' = L (stripComments l2) $ OpApp x2 y op2 z
     let ap2' :: LHsExpr GhcPs = L (noAnnSrcSpan (combineSrcSpans (locA y) (locA z)) ) $ OpApp x2 y op2 z
@@ -368,7 +370,6 @@ addAllAnnsT
      , Data a, Data b, MonadIO m, Typeable an)
   => LocatedAn an a -> LocatedAn an b -> TransformT m (LocatedAn an b)
 addAllAnnsT a b = do
-  -- AZ: to start with, just transfer the entry DP from a to b
   transferEntryDP a b
 
 
@@ -384,10 +385,6 @@ transferAnchor (L (SrcSpanAnn (EpAnn anc _ _) _) _) lb = setAnchorAn lb anc     
 isComma :: TrailingAnn -> Bool
 isComma (AddCommaAnn _) = True
 isComma _ = False
-
--- isCommentKeyword :: AnnKeywordId -> Bool
--- isCommentKeyword _ = False
-
 
 hasComments :: LocatedAn an a -> Bool
 #if __GLASGOW_HASKELL__ >= 910
