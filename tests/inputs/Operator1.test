@@ -1,0 +1,17 @@
+# Copyright (c) Facebook, Inc. and its affiliates.
+#
+# This source code is licensed under the MIT license found in the
+# LICENSE file in the root directory of this source tree.
+#
+-l Operator1.print
+===
+ module Operator1 where
+
+ main :: IO ()
+ main = do
+-  putStrLn $ show $ {- c1 -} foo || bar
++  print $  {- c1 -} foo || bar
+
+
+
+ {-# RULES "print" forall x. putStrLn $ show $ x = print $ x #-}

@@ -7,20 +7,20 @@
 --type-forward Types2.MyMaybe
 ===
  module Types2 where
- 
+
 -bleh :: HashMap Foo Foo
 +bleh :: HashMap (Either String Bar) (Either String Bar)
  bleh = HashMap.empty
- 
+
 -blech :: Maybe Foo
 +blech :: Maybe (Either String Bar)
  blech = Just 54
- 
+
 -blech2 :: MyMaybe Bar
 +blech2 :: Maybe Bar
  blech2 = blech
- 
+
  type Foo = Either String Bar
  type Bar = Int
- 
+
  type MyMaybe a = Maybe a

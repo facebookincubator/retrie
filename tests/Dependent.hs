@@ -24,7 +24,7 @@ dependentStmtTest libdir rtDir p rtVerbosity =
           stmt <- parseStmt libdir "y <- bar 54"
           let
             rr = toURewrite $
-              Query emptyQs stmt
+              Query emptyQs stmt (getHasLoc stmt)
                 (Template stmt mempty (Just rrs), defaultTransformer)
 
           return $ apply [rr]

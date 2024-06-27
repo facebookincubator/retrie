@@ -6,14 +6,14 @@
 -u Backticks.foo
 ===
  module Backticks where
- 
+
  main :: IO ()
 -main = print $ foo `bar` [1..10]
 +main = print $ (baz `div` quux 10) `bar` [1..10]
- 
+
  foo :: Int
  foo = baz `div` quux 10
- 
+
  bar :: Int -> [Int] -> Int
  bar x xs = x + sum xs
 

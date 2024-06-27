@@ -3,6 +3,7 @@
 -- This source code is licensed under the MIT license found in the
 -- LICENSE file in the root directory of this source tree.
 --
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -106,17 +107,21 @@ data Direction = LeftToRight | RightToLeft
 data Query ast v = Query
   { qQuantifiers  :: Quantifiers
   , qPattern      :: Annotated ast
+  , qOrigin       :: SrcSpan -- ^ The original location in the AST of
+                             -- the query. Equivalent to `getLocA
+                             -- qPattern` of the AST before calling
+                             -- `makeDelta` on it.
   , qResult       :: v
   }
 
 instance Functor (Query ast) where
-  fmap f (Query qs ast v) = Query qs ast (f v)
+  fmap f (Query qs ast l v) = Query qs ast l (f v)
 
 instance Bifunctor Query where
-  bimap f g (Query qs ast v) = Query qs (fmap f ast) (g v)
+  bimap f g (Query qs ast l v) = Query qs (fmap f ast) l (g v)
 
 instance (Data (Annotated ast), Show ast, Show v) => Show (Query ast v) where
-  show (Query q p r) = "Query " ++ show q ++ " " ++ showAst p ++ " " ++ show r
+  show (Query q p l r) = "Query " ++ show q ++ " " ++ showAst p ++ showGhc l ++ " " ++ show r
 
 
 ------------------------------------------------------------------------
@@ -129,11 +134,17 @@ newtype Matcher a = Matcher (I.IntMap (UMap a))
 -- See Note [AlphaEnv Offset] for details.
 
 instance Semigroup (Matcher a) where
+#if __GLASGOW_HASKELL__ < 910
   (<>) = mappend
+#else
+  (Matcher m1) <> (Matcher m2) = Matcher (I.unionWith mUnion m1 m2)
+#endif
 
 instance Monoid (Matcher a) where
   mempty = Matcher I.empty
+#if __GLASGOW_HASKELL__ < 910
   mappend (Matcher m1) (Matcher m2) = Matcher (I.unionWith mUnion m1 m2)
+#endif
 
 -- | Compile a 'Query' into a 'Matcher'.
 mkMatcher :: Matchable ast => Query ast v -> Matcher v
@@ -182,8 +193,8 @@ runMatcher Context{..} (Matcher m) ast = do
 type Rewrite ast = Query ast (Template ast, MatchResultTransformer)
 
 -- | Make a 'Rewrite' from given quantifiers and left- and right-hand sides.
-mkRewrite :: Quantifiers -> Annotated ast -> Annotated ast -> Rewrite ast
-mkRewrite qQuantifiers qPattern tTemplate = Query{..}
+mkRewrite :: Quantifiers -> Annotated ast -> SrcSpan -> Annotated ast -> Rewrite ast
+mkRewrite qQuantifiers qPattern qOrigin tTemplate = Query{..}
   where
     tImports = mempty
     tDependents = Nothing
@@ -216,7 +227,7 @@ mkLocalRewriter :: Matchable ast => AlphaEnv -> Rewrite ast -> Rewriter
 mkLocalRewriter env q@Query{..} =
   mkLocalMatcher env q { qResult = RewriterResult{..} }
   where
-    rrOrigin = getOrigin $ astA qPattern
+    rrOrigin = qOrigin
     rrQuantifiers = qQuantifiers
     (rrTemplate, rrTransformer) = first (fmap inject) qResult
 

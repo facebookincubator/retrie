@@ -36,19 +36,18 @@ module Retrie.ExactPrint.Annotated
   , unsafeMkA
   ) where
 
-import Control.Monad.State.Lazy hiding (fix)
+import Control.Monad.State.Lazy
+#if __GLASGOW_HASKELL__ < 910
+     hiding (fix)
+#endif
 import Data.Default as D
 
 import Data.Functor.Identity
 
 import Language.Haskell.GHC.ExactPrint hiding
-  ( -- cloneT
-    -- setEntryDP
-  -- , setEntryDPT
-  -- , transferEntryDPT
+  (
     transferEntryDP
   )
--- import Language.Haskell.GHC.ExactPrint.ExactPrint (ExactPrint(..))
 import Language.Haskell.GHC.ExactPrint.Utils
 
 import Retrie.GHC
@@ -78,6 +77,9 @@ data Annotated ast = Annotated
   -- ^ Name supply used by ghc-exactprint to generate unique locations.
   }
 deriving instance (Data ast) => Data (Annotated ast)
+
+instance (HasLoc ast) => HasLoc (Annotated ast) where
+    getHasLoc a = getHasLoc (astA a)
 
 instance Functor Annotated where
   fmap f Annotated{..} = Annotated{astA = f astA, ..}
@@ -126,6 +128,7 @@ transformA (Annotated ast seed) f = do
 -- >     return [d1, d2]
 --
 graftA :: (Data ast, Monad m) => Annotated ast -> TransformT m ast
+-- TODO: this is a no-op, remove it
 graftA (Annotated x _) = return x
 
 -- | Encapsulate something in the current transformation into an 'Annotated'
@@ -153,8 +156,11 @@ trimA = runIdentity . transformA nil . const . graftA
     nil :: Annotated ()
     nil = mempty
 
-setEntryDPA :: (Default an)
-            => Annotated (LocatedAn an ast) -> DeltaPos -> Annotated (LocatedAn an ast)
+setEntryDPA ::
+#if __GLASGOW_HASKELL__ < 910
+            (Default an) =>
+#endif
+            Annotated (LocatedAn an ast) -> DeltaPos -> Annotated (LocatedAn an ast)
 setEntryDPA (Annotated ast s) dp = Annotated (setEntryDP ast dp) s
 
 -- | Exactprint an 'Annotated' thing.

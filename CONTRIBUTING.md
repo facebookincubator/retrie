@@ -3,8 +3,8 @@ We want to make contributing to this project as easy and transparent as
 possible.
 
 ## Our Development Process
-retrie is developed internally at Facebook and then exported to GitHub by an 
-automated tool. Pull requests will first be imported to our internal 
+retrie is developed internally at Facebook and then exported to GitHub by an
+automated tool. Pull requests will first be imported to our internal
 repository, then synced back to GitHub.
 
 ## Pull Requests
@@ -30,7 +30,7 @@ Facebook has a [bounty program](https://www.facebook.com/whitehat/) for the safe
 disclosure of security bugs. In those cases, please go through the process
 outlined on that page and do not file a public issue.
 
-## Coding Style  
+## Coding Style
 * 2 spaces for indentation rather than tabs
 * 80 character line length
 * Avoid using whitespace to vertically align things unnecessarily.

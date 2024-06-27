@@ -3,6 +3,7 @@
 -- This source code is licensed under the MIT license found in the
 -- LICENSE file in the root directory of this source tree.
 --
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections #-}
@@ -19,7 +20,9 @@ module Retrie.Run
   ) where
 
 import Control.Monad
+#if __GLASGOW_HASKELL__ < 910
 import Control.Monad.State.Strict
+#endif
 import Data.Char
 import Data.List
 import Data.Monoid
@@ -107,18 +110,24 @@ runOneModule
   -> CPP AnnotatedModule
   -> IO b
 runOneModule writeFn Options{..} r cpp = do
-  -- debugPrint Loud "runOneModule" ["enter"]
+  debugPrint Loud "runOneModule" ["enter"]
+  -- case cpp of
+  --     NoCPP m -> debugPrint Loud "runOneModule:cpp" [showAst m]
+  --     _ -> error "wtf"
   (x, cpp', changed) <- runRetrie fixityEnv r cpp
+  -- case cpp' of
+  --     NoCPP m -> debugPrint Loud "runOneModule:cpp'" [showAst m]
+  --     _ -> error "wtf"
   case changed of
     NoChange -> return mempty
     Change repls imports -> do
       -- debugPrint Loud "runOneModule" ["change", show repls]
+      -- debugPrint Loud "runOneModule" ["additionalImports", showAst additionalImports]
       let cpp'' = addImportsCPP (additionalImports:imports) cpp'
+      -- case cpp' of
+      --     NoCPP m'' -> debugPrint Loud "runOneModule:cpp''" [showAst m'']
+      --     _ -> error "wtf"
       writeFn repls (printCPP repls cpp'') cpp'' x
-
--- isCpp :: CPP AnnotatedModule -> String
--- isCpp (NoCPP m) = "NoCPP:" ++ showAstA m
--- isCpp (CPP{}) = "CPP"
 
 -- | Write action which counts changed lines using 'diff'
 writeCountLines :: FilePath -> WriteFn a (Sum Int)

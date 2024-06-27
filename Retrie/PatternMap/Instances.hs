@@ -363,10 +363,14 @@ instance PatternMap EMap where
                           (toA (mAlter env vs fl f)))) (emIf m) }
       go (HsIPVar _ (HsIPName ip)) = m { emIPVar = mAlter env vs ip f (emIPVar m) }
       go (HsLit _ l) = m { emLit   = mAlter env vs l f (emLit m) }
+#if __GLASGOW_HASKELL__ >= 910
+      go (HsLam _ _variant mg) = m { emLam   = mAlter env vs mg f (emLam m) }
+#else
       go (HsLam _ mg) = m { emLam   = mAlter env vs mg f (emLam m) }
+#endif
       go (HsOverLit _ ol) = m { emOverLit = mAlter env vs (ol_val ol) f (emOverLit m) }
       go (NegApp _ e' _) = m { emNegApp = mAlter env vs e' f (emNegApp m) }
-#if __GLASGOW_HASKELL__ < 904
+#if __GLASGOW_HASKELL__ < 904 || __GLASGOW_HASKELL__ >= 910
       go (HsPar _ e') = m { emPar  = mAlter env vs e' f (emPar m) }
 #else
       go (HsPar _ _ e' _) = m { emPar  = mAlter env vs e' f (emPar m) }
@@ -386,7 +390,7 @@ instance PatternMap EMap where
         m { emSecL = mAlter env vs o (toA (mAlter env vs lhs f)) (emSecL m) }
       go (SectionR _ o rhs) =
         m { emSecR = mAlter env vs o (toA (mAlter env vs rhs f)) (emSecR m) }
-#if __GLASGOW_HASKELL__ < 904
+#if __GLASGOW_HASKELL__ < 904 || __GLASGOW_HASKELL__ >= 910
       go (HsLet _ lbs e') =
 #else
       go (HsLet _ _ lbs _ e') =
@@ -396,7 +400,9 @@ instance PatternMap EMap where
           env' = foldr extendAlphaEnvInternal env bs
           vs' = vs `exceptQ` bs
         in m { emLet = mAlter env vs lbs (toA (mAlter env' vs' e' f)) (emLet m) }
+#if __GLASGOW_HASKELL__ < 910
       go HsLamCase{} = missingSyntax "HsLamCase"
+#endif
       go HsMultiIf{} = missingSyntax "HsMultiIf"
       go (ExplicitList _ es) = m { emExplicitList = mAlter env vs es f (emExplicitList m) }
       go ArithSeq{} = missingSyntax "ArithSeq"
@@ -466,10 +472,14 @@ instance PatternMap EMap where
 #endif
         mapFor emIf >=> mMatch env c >=> mMatch env tr >=> mMatch env fl
       go (HsIPVar _ (HsIPName ip)) = mapFor emIPVar >=> mMatch env ip
+#if __GLASGOW_HASKELL__ >= 910
+      go (HsLam _ _variant mg) = mapFor emLam >=> mMatch env mg
+#else
       go (HsLam _ mg) = mapFor emLam >=> mMatch env mg
+#endif
       go (HsLit _ l) = mapFor emLit >=> mMatch env l
       go (HsOverLit _ ol) = mapFor emOverLit >=> mMatch env (ol_val ol)
-#if __GLASGOW_HASKELL__ < 904
+#if __GLASGOW_HASKELL__ < 904 || __GLASGOW_HASKELL__ >= 910
       go (HsPar _ e') = mapFor emPar >=> mMatch env e'
 #else
       go (HsPar _ _ e' _) = mapFor emPar >=> mMatch env e'
@@ -489,7 +499,7 @@ instance PatternMap EMap where
         mapFor emRecordUpd >=> mMatch env e' >=> mMatch env (fieldsToRdrNamesUpd fs)
       go (SectionL _ lhs o) = mapFor emSecL >=> mMatch env o >=> mMatch env lhs
       go (SectionR _ o rhs) = mapFor emSecR >=> mMatch env o >=> mMatch env rhs
-#if __GLASGOW_HASKELL__ < 904
+#if __GLASGOW_HASKELL__ < 904 || __GLASGOW_HASKELL__ >= 910
       go (HsLet _ lbs e') =
 #else
       go (HsLet _ _ lbs _ e') =
@@ -701,7 +711,7 @@ instance PatternMap CDMap where
   mAlter env vs d f CDEmpty   = mAlter env vs d f emptyCDMapWrapper
   mAlter env vs d f m@CDMap{} = go d
     where
-      go (PrefixCon tyargs ps) = m { cdPrefixCon = mAlter env vs ps f (cdPrefixCon m) }
+      go (PrefixCon _tyargs ps) = m { cdPrefixCon = mAlter env vs ps f (cdPrefixCon m) }
       go (RecCon _) = missingSyntax "RecCon"
       go (InfixCon p1 p2) = m { cdInfixCon = mAlter env vs p1
                                               (toA (mAlter env vs p2 f))
@@ -711,7 +721,7 @@ instance PatternMap CDMap where
   mMatch _   _ (_ ,CDEmpty)   = []
   mMatch env d (hs,m@CDMap{}) = go d (hs,m)
     where
-      go (PrefixCon tyargs ps) = mapFor cdPrefixCon >=> mMatch env ps
+      go (PrefixCon _tyargs ps) = mapFor cdPrefixCon >=> mMatch env ps
       go (InfixCon p1 p2) = mapFor cdInfixCon >=> mMatch env p1 >=> mMatch env p2
       go _ = const [] -- TODO
 
@@ -785,7 +795,7 @@ instance PatternMap PatMap where
       go LitPat{} = missingSyntax "LitPat"
       go NPat{} = missingSyntax "NPat"
       go NPlusKPat{} = missingSyntax "NPlusKPat"
-#if __GLASGOW_HASKELL__ < 904
+#if __GLASGOW_HASKELL__ < 904 || __GLASGOW_HASKELL__ >= 910
       go (ParPat _ p) = m { pmParPat = mAlter env vs p f (pmParPat m) }
 #else
       go (ParPat _ _ p _) = m { pmParPat = mAlter env vs p f (pmParPat m) }
@@ -804,7 +814,7 @@ instance PatternMap PatMap where
       hss lp = extendResult (pmHole m) (HolePat $ mePruneA env lp) hs
 
       go (WildPat _) = mapFor pmWild >=> mMatch env ()
-#if __GLASGOW_HASKELL__ < 904
+#if __GLASGOW_HASKELL__ < 904 || __GLASGOW_HASKELL__ >= 910
       go (ParPat _ p) = mapFor pmParPat >=> mMatch env p
 #else
       go (ParPat _ _ p _) = mapFor pmParPat >=> mMatch env p
@@ -1393,10 +1403,17 @@ fieldsToRdrNamesUpd (RegularRecUpdFields _ xs) = map go xs
        in L l (HsFieldBind a (L l2 f') arg pun)
 fieldsToRdrNamesUpd (OverloadedRecUpdFields _ xs) = map go xs
   where
-    go (L l (HsFieldBind a (L l2 _f) arg pun)) =
+#if __GLASGOW_HASKELL__ < 910
+    go (L l (HsFieldBind a (L l2  _f) arg pun)) =
       let lrdrName = error "TBD" -- same as GHC 9.2
           f' = FieldOcc NoExtField lrdrName
        in L l (HsFieldBind a (L l2 f') arg pun)
+#else
+    go (L l (HsFieldBind a (L (EpAnn e _ c)  _f) arg pun)) =
+      let lrdrName = error "TBD" -- same as GHC 9.2
+          f' = FieldOcc NoExtField lrdrName
+       in L l (HsFieldBind a (L (EpAnn e noAnn c) f') arg pun)
+#endif
 #endif
 
 #if __GLASGOW_HASKELL__ < 904
@@ -1437,17 +1454,11 @@ instance PatternMap TupleSortMap where
   mAlter :: AlphaEnv -> Quantifiers -> Key TupleSortMap -> A a -> TupleSortMap a -> TupleSortMap a
   mAlter env vs HsUnboxedTuple f m =
     m { tsUnboxed = mAlter env vs () f (tsUnboxed m) }
-  -- mAlter env vs HsBoxedOrConstraintTuple f m =
-  --   m { tsBoxed = mAlter env vs () f (tsBoxed m) }
-  -- mAlter env vs HsConstraintTuple f m =
-  --   m { tsConstraint = mAlter env vs () f (tsConstraint m) }
   mAlter env vs HsBoxedOrConstraintTuple f m =
     m { tsBoxedOrConstraint = mAlter env vs () f (tsBoxedOrConstraint m) }
 
   mMatch :: MatchEnv -> Key TupleSortMap -> (Substitution, TupleSortMap a) -> [(Substitution, a)]
   mMatch env HsUnboxedTuple = mapFor tsUnboxed >=> mMatch env ()
-  -- mMatch env HsBoxedTuple = mapFor tsBoxed >=> mMatch env ()
-  -- mMatch env HsConstraintTuple = mapFor tsConstraint >=> mMatch env ()
   mMatch env HsBoxedOrConstraintTuple = mapFor tsBoxedOrConstraint >=> mMatch env ()
 
 ------------------------------------------------------------------------

@@ -18,7 +18,9 @@ import Control.Monad.IO.Class
 import Data.Char (isDigit)
 import Data.Either (partitionEithers)
 import Data.Generics hiding (Fixity)
+#if __GLASGOW_HASKELL__ < 910
 import Data.List
+#endif
 import Data.Maybe
 
 import Retrie.AlphaEnv
@@ -60,7 +62,7 @@ updateContext c i =
     updExp (OpApp _ _ op _)
       | Fixity source prec dir <- lookupOp op $ ctxtFixityEnv c =
           withPrec c source prec dir i
-#if __GLASGOW_HASKELL__ < 904
+#if __GLASGOW_HASKELL__ < 904 || __GLASGOW_HASKELL__ >= 910
     updExp (HsLet _ lbs _) = addInScope neverParen $ collectLocalBinders CollNoDictBinders lbs
 #else
     updExp (HsLet _ _ lbs _ _) = addInScope neverParen $ collectLocalBinders CollNoDictBinders lbs

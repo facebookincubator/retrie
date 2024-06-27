@@ -115,6 +115,7 @@ writeFileDumpAst fp _locs res cpp _ = do
   case cpp of
     NoCPP m -> do
       let outname = fp <.> "out"
+      putStrLn $ "outfile: " ++ outname
       writeFile outname res
       appendFile outname "\n===============================================\n"
       appendFile outname (showAstA m)

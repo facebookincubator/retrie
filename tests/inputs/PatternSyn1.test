@@ -25,28 +25,28 @@
 
  foo :: Maybe () -> Maybe ()
 
--foo JustUnit = JustUnit
-+foo (Just ()) = Just ()
+-foo1 JustUnit = JustUnit
++foo1 (Just ()) = Just ()
 
--foo (id -> JustUnit) = JustUnit
-+foo (id -> Just ()) = Just ()
+-foo2 (id -> JustUnit) = JustUnit
++foo2 (id -> Just ()) = Just ()
 
--foo (Some ()) = Some ()
-+foo (Just ()) = Just ()
+-foo3 (Some ()) = Some ()
++foo3 (Just ()) = Just ()
 
--foo (SomeUni ()) = Just ()
-+foo (Just ()) = Just ()
+-foo4 (SomeUni ()) = Just ()
++foo4 (Just ()) = Just ()
 
--foo (Some x) = let x = Some () in x
-+foo (Just x) = let x = Just () in x
+-foo5 (Some x) = let x = Some () in x
++foo5 (Just x) = let x = Just () in x
 
--foo (SomeAdhoc ()) = SomeAdhoc ()
-+foo (Just ()) = Just ()
+-foo6 (SomeAdhoc ()) = SomeAdhoc ()
++foo6 (Just ()) = Just ()
 
--foo (SomeAdhoc2 ()) = SomeAdhoc2 ()
-+foo (Just ()) = SomeAdhoc2 ()
+-foo7 (SomeAdhoc2 ()) = SomeAdhoc2 ()
++foo7 (Just ()) = SomeAdhoc2 ()
 
- fooBool :: Maybe Bool -> MaybeBool
+ fooBool :: Maybe Bool -> Maybe Bool
 -fooBool (JustNot x) = JustNot x
 +fooBool (Just (not -> x)) = Just (not x)
 

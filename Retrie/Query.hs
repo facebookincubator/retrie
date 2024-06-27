@@ -35,6 +35,7 @@ parseQuerySpecs
 parseQuerySpecs libdir' fixityEnv =
   mapM $ \(qQuantifiers, querySpec, qResult) -> do
     qPattern <- parse libdir' querySpec
+    let qOrigin = getLocU (astA qPattern)
     return Query{..}
   where
     parse libdir (QExpr s) = do
