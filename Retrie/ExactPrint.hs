@@ -29,6 +29,8 @@ module Retrie.ExactPrint
   , transferEntryAnnsT
   , transferEntryDPT
   , transferAnchor
+  , deltaComments
+  , stripCommentsA
     -- * Utils
   , debugDump
   , debugParse
@@ -89,13 +91,27 @@ debug c s = trace s c
 fix :: (Data ast, MonadIO m) => FixityEnv -> ast -> TransformT m ast
 fix env = fixAssociativity >=> fixEntryDP
   where
-    fixAssociativity = everywhereM (mkM (fixOneExpr env) `extM` fixOnePat env)
+    fixAssociativity = everywhereM (mkM (fixOneExpr' env) `extM` fixOnePat env)
     fixEntryDP = everywhereM (mkM fixOneEntryExpr `extM` fixOneEntryPat)
 
 -- Should (x op1 y) op2 z be reassociated as x op1 (y op2 z)?
 associatesRight :: Fixity -> Fixity -> Bool
 associatesRight (Fixity _ p1 a1) (Fixity _ p2 _a2) =
   p2 > p1 || p1 == p2 && a1 == InfixR
+
+
+fixOneExpr'
+  :: MonadIO m
+  => FixityEnv
+  -> LHsExpr GhcPs
+  -> TransformT m (LHsExpr GhcPs)
+fixOneExpr' env ll@(L _l2 (OpApp _x2 (L _l1 (OpApp _x1 _x op1 _y)) op2 _z)) = do
+    ll' <- fixOneExpr env ll
+    -- if (associatesRight (lookupOp op1 env) (lookupOp op2 env))
+    --    then lift $ liftIO $ debugPrint Loud "fixOneExpr':(ll,ll')"  [showAst (ll,ll')]
+    --    else return ()
+    return ll'
+fixOneExpr' env ll = fixOneExpr env ll
 
 -- We know GHC produces left-associated chains, so 'z' is never an
 -- operator application. We also know that this will be applied bottom-up
@@ -105,7 +121,7 @@ fixOneExpr
   => FixityEnv
   -> LHsExpr GhcPs
   -> TransformT m (LHsExpr GhcPs)
-fixOneExpr env (L l2 (OpApp x2 ap1@(L _l1 (OpApp x1 x op1 y)) op2 z))
+fixOneExpr env (L l2 (OpApp x2 ap1@(L l1 (OpApp x1 x op1 y)) op2 z))
 {-
   pre
   x   is [print]   4:8-12
@@ -113,12 +129,15 @@ fixOneExpr env (L l2 (OpApp x2 ap1@(L _l1 (OpApp x1 x op1 y)) op2 z))
   y   is [foo]     4:16-18
   op2 is [`bar`]   4:20-24
   z   is [[1..10]] 4:26-32
+  l1 carries comments that immediately precede or follow op1
+  l2 carries comments that immediately precede or follow op2
 
   (L l2 (OpApp _
           (L l1 (OpApp _ x op1 y))
           op2
           z))
   -- post
+  Comments mut move from l2 to new_loc
   (L l2 (OpApp _
           x
           op1
@@ -126,17 +145,22 @@ fixOneExpr env (L l2 (OpApp x2 ap1@(L _l1 (OpApp x1 x op1 y)) op2 z))
 -}
 
   | associatesRight (lookupOp op1 env) (lookupOp op2 env) = do
-    -- lift $ liftIO $ debugPrint Loud "fixOneExpr:(l1,l2)="  [showAst (_l1,l2)]
+    -- lift $ liftIO $ debugPrint Loud "fixOneExpr:(l1,l2)="  [showAst (l1,l2)]
     -- We need a location from start of y to end of z
     -- let ap2' = L (stripComments l2) $ OpApp x2 y op2 z
-    let ap2' :: LHsExpr GhcPs = L (noAnnSrcSpan (combineSrcSpans (locA y) (locA z)) ) $ OpApp x2 y op2 z
+    let ap2' :: LHsExpr GhcPs = L (transferComments l2 op2 $ noAnnSrcSpan (combineSrcSpans (locA y) (locA z)))
+                                  $ OpApp x2 y op2 z
+    -- lift $ liftIO $ debugPrint Loud "fixOneExpr:ap2'"  [showAst ap2']
     -- (_ap1_0, ap2'_0) <- swapEntryDPT ap1 ap2'
     (_ap1_0, ap2'_0) <- return (ap1, ap2')
     -- Even though we process bottom-up, we need to recurse because we
     -- have changed the structure at this level
+    -- lift $ liftIO $ debugPrint Loud "fixOneExpr:recursing rhs"  [showAst (getLoc ap2'_0)]
     rhs <- fixOneExpr env ap2'_0
-    -- lift $ liftIO $ debugPrint Loud "fixOneExpr:returning"  [showAst (L l2 $ OpApp x1 x op1 rhs)]
-    return $ L l2 $ OpApp x1 x op1 rhs
+    let l2' = transferComments l1 op1 (stripComments l2)
+    -- lift $ liftIO $ debugPrint Loud "fixOneExpr:l2'"  [showAst l2']
+    -- lift $ liftIO $ debugPrint Loud "fixOneExpr:returning"  [showAst (L l2' $ OpApp x1 x op1 rhs)]
+    return $ L l2' $ OpApp x1 x op1 rhs
 fixOneExpr _ e = return e
 
 fixOnePat :: Monad m => FixityEnv -> LPat GhcPs -> TransformT m (LPat GhcPs)
@@ -160,6 +184,15 @@ stripComments (EpAnn anc an _) = EpAnn anc an emptyComments
 stripComments :: SrcAnn an -> SrcAnn an
 stripComments (SrcSpanAnn EpAnnNotUsed l) = SrcSpanAnn EpAnnNotUsed l
 stripComments (SrcSpanAnn (EpAnn anc an _) l) = SrcSpanAnn (EpAnn anc an emptyComments) l
+#endif
+
+#if __GLASGOW_HASKELL__ >= 910
+transferComments :: EpAnn an -> LocatedAn aa b -> EpAnn an -> EpAnn an
+transferComments (EpAnn _anc _an cs0) (L (EpAnn anc0 _ _) _) (EpAnn anc an cs1) = EpAnn anc an (addCommentOrigDeltas cs')
+    where
+      cs' = case anc0 of
+          EpaSpan (RealSrcSpan r _) -> splitCommentsStart r (cs0 <> cs1)
+          _ -> cs0 <> cs1
 #endif
 
 -- Move leading whitespace from the left child of an operator application
@@ -381,6 +414,13 @@ transferAnchor (L (SrcSpanAnn EpAnnNotUsed l)    _) lb = setAnchorAn lb (spanAsA
 transferAnchor (L (SrcSpanAnn (EpAnn anc _ _) _) _) lb = setAnchorAn lb anc              emptyComments
 #endif
 
+#if __GLASGOW_HASKELL__ >= 910
+deltaComments :: LocatedAn a b -> LocatedAn a b
+deltaComments (L (EpAnn anc an cs) a) = L (EpAnn anc an (addCommentOrigDeltas cs)) a
+
+stripCommentsA :: LocatedAn a b -> LocatedAn a b
+stripCommentsA (L (EpAnn anc an _cs) a) = L (EpAnn anc an emptyComments) a
+#endif
 
 isComma :: TrailingAnn -> Bool
 isComma (AddCommaAnn _) = True

@@ -47,6 +47,7 @@ library
     Retrie.Elaborate,
     Retrie.ExactPrint,
     Retrie.ExactPrint.Annotated,
+    Retrie.ExactPrint.Compat
     Retrie.Expr,
     Retrie.Fixity,
     Retrie.FreeVars,

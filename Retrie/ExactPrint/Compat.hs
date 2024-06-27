@@ -12,7 +12,10 @@ module Retrie.ExactPrint.Compat
     , E.d0
     , E.uniqueSrcSpanT
 #if __GLASGOW_HASKELL__ >= 910
+    , E.addCommentOrigDeltas
     , transferEntryDP
+    , E.splitCommentsStart
+    , E.splitCommentsEnd
 #else
     , E.transferEntryDP
 #endif

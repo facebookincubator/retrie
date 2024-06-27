@@ -55,7 +55,7 @@ substExpr ctxt e@(L l1 (HsVar x (L l2 v))) =
     Just (HoleExpr eA') -> do
       let eA = fmap makeDeltaAst eA'
       lift $ liftIO $ debugPrint Loud "substExpr:HoleExpr:e" [showAst e]
-      lift $ liftIO $ debugPrint Loud "substExpr:HoleExpr:eA" [showAst eA]
+      lift $ liftIO $ debugPrint Loud "substExpr:HoleExpr:eA" [showAst eA']
       e0 <- graftA (unparen <$> eA)
       let hasCs = hasComments e0
       e1 <- if hasCs

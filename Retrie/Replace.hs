@@ -90,12 +90,14 @@ replaceImpl c e = do
       -- substitute for quantifiers in grafted template
       r <- subst sub c t'
       -- copy appropriate annotations from old expression to template
-      r0 <- addAllAnnsT e r
+      -- r0 <- addAllAnnsT e r
+      r0 <- pure $ transferAnchor e r
       -- add parens to template if needed
       res' <- (mkM (parenify c) `extM` parenifyT c `extM` parenifyP c) r0
       -- Make sure the replacement has the same anchor as the thing
       -- being replaced
       res <- transferEntryDP e res'
+      let res2 = stripCommentsA res
 
       -- prune the resulting expression and log it with location
       orig <- printNoLeadingSpaces <$> pruneA e
@@ -105,17 +107,21 @@ replaceImpl c e = do
       lift $ liftIO $ debugPrint Loud "replaceImpl:orig="  [orig]
       lift $ liftIO $ debugPrint Loud "replaceImpl:repl="  [repl]
 
-      -- lift $ liftIO $ debugPrint Loud "replaceImpl:e="  [showAst e]
-      -- lift $ liftIO $ debugPrint Loud "replaceImpl:r="  [showAst r]
+      lift $ liftIO $ debugPrint Loud "replaceImpl:e="  [showAst e]
+      lift $ liftIO $ debugPrint Loud "replaceImpl:r="  [showAst r]
       -- lift $ liftIO $ debugPrint Loud "replaceImpl:r0="  [showAst r0]
       -- lift $ liftIO $ debugPrint Loud "replaceImpl:t'=" [showAst t']
       -- lift $ liftIO $ debugPrint Loud "replaceImpl:res=" [showAst res]
+      lift $ liftIO $ debugPrint Loud "replaceImpl:res2=" [showAst res2]
       -- lift $ liftIO $ debugPrint Loud "replaceImpl:res=" [showAst res']
+      -- lift $ liftIO $ debugPrint Loud "replaceImpl:(e)=" [showAst (getLoc e)]
+      -- lift $ liftIO $ debugPrint Loud "replaceImpl:(r0,r)=" [showAst (getLoc r0, getLoc r)]
+      -- lift $ liftIO $ debugPrint Loud "replaceImpl:(res,res')=" [showAst (getLoc res, getLoc res')]
 
       let replacement = Replacement (getLocA e) orig repl
       TransformT $ lift $ tell $ Change [replacement] [tImports]
       -- make the actual replacement
-      return res
+      return res2
 
 
 -- | Records a replacement made. In cases where we cannot use ghc-exactprint
