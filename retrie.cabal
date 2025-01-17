@@ -75,7 +75,7 @@ library
     Retrie.Util
   GHC-Options: -Wall
   build-depends:
-    ansi-terminal >= 0.10.3 && < 1.1,
+    ansi-terminal >= 0.10.3 && < 1.2,
     async >= 2.2.2 && < 2.3,
     base >= 4.11 && < 4.20,
     bytestring >= 0.10.8 && < 0.13,
