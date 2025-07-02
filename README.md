@@ -1,3 +1,11 @@
+# Repository Archived
+
+This repository was archived on July 1st, 2025 and is now read-only.
+
+Development of retrie is continuing at https://github.com/xich/retrie
+
+===
+
 Retrie is a powerful, easy-to-use codemodding tool for Haskell. 
 
 # Install
