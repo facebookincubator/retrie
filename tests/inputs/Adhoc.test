@@ -11,14 +11,14 @@
 --adhoc "forall x. MyJust x = Just x"
 ===
  module Adhoc where
- 
+
  main :: IO ()
 -main = print $ foo (bar [1..10])
 +main = print $ bar [1..10] - 2
- 
+
  foo :: Int -> Int
  foo x = x - 2
- 
+
  bar :: [Int] -> Int
 -bar ys = length (filter even zs)
 +bar ys = count even zs
@@ -28,7 +28,7 @@
 
  data MyMaybe a = MyNothing | MyJust a
 
--baz :: Maybe a -> MyMaybe a 
+-baz :: Maybe a -> MyMaybe a
 +baz :: Maybe a -> Maybe a
 -baz Nothing = MyNothing
 +baz Nothing = Nothing

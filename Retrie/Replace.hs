@@ -3,6 +3,7 @@
 -- This source code is licensed under the MIT license found in the
 -- LICENSE file in the root directory of this source tree.
 --
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -57,9 +58,13 @@ replaceImpl c e = do
     -- match under a binding of something that appears in the template.
     f result@RewriterResult{..} = result
       { rrTransformer =
-          fmap (fmap (check rrOrigin rrQuantifiers)) <$> rrTransformer
+          -- fmap (fmap (check rrOrigin rrQuantifiers)) <$> rrTransformer
+          fmap (fmap ((check rrOrigin rrQuantifiers)
+                     `debug` ("replaceImpl::(rrOrigin, getLocA e )=" ++ showGhc (rrOrigin, getLocA e) ))
+               ) <$> rrTransformer
       }
     check origin quantifiers match
+      -- if e loc is inside origin loc
       | getLocA e `overlaps` origin = NoMatch
       | MatchResult _ Template{..} <- match
       , fvs <- freeVars quantifiers (astA tTemplate)
@@ -71,7 +76,11 @@ replaceImpl c e = do
   -- resulting expression, but we need to know the entry location
   -- of the parens, not the inner expression, so we have to
   -- keep both expressions around.
+#if __GLASGOW_HASKELL__ < 910
+  match <- runRewriter f c (ctxtRewriter c) (getUnparened $ makeDeltaAst e)
+#else
   match <- runRewriter f c (ctxtRewriter c) (getUnparened e)
+#endif
 
   case match of
     NoMatch -> return e
@@ -81,35 +90,38 @@ replaceImpl c e = do
       -- substitute for quantifiers in grafted template
       r <- subst sub c t'
       -- copy appropriate annotations from old expression to template
-      r0 <- addAllAnnsT e r
+      -- r0 <- addAllAnnsT e r
+      r0 <- pure $ transferAnchor e r
       -- add parens to template if needed
       res' <- (mkM (parenify c) `extM` parenifyT c `extM` parenifyP c) r0
       -- Make sure the replacement has the same anchor as the thing
       -- being replaced
-      let res = transferAnchor e res'
+      res <- transferEntryDP e res'
+      let res2 = stripCommentsA res
 
       -- prune the resulting expression and log it with location
       orig <- printNoLeadingSpaces <$> pruneA e
-      -- orig <- printA' <$> pruneA e
 
       repl <- printNoLeadingSpaces <$> pruneA res
-      -- repl <- printA' <$> pruneA r
-      -- repl <- printA' <$> pruneA res
-      -- repl <- return $ showAst t'
 
-      -- lift $ liftIO $ debugPrint Loud "replaceImpl:orig="  [orig]
-      -- lift $ liftIO $ debugPrint Loud "replaceImpl:repl="  [repl]
+      lift $ liftIO $ debugPrint Loud "replaceImpl:orig="  [orig]
+      lift $ liftIO $ debugPrint Loud "replaceImpl:repl="  [repl]
 
-      -- lift $ liftIO $ debugPrint Loud "replaceImpl:e="  [showAst e]
-      -- lift $ liftIO $ debugPrint Loud "replaceImpl:r="  [showAst r]
+      lift $ liftIO $ debugPrint Loud "replaceImpl:e="  [showAst e]
+      lift $ liftIO $ debugPrint Loud "replaceImpl:r="  [showAst r]
       -- lift $ liftIO $ debugPrint Loud "replaceImpl:r0="  [showAst r0]
       -- lift $ liftIO $ debugPrint Loud "replaceImpl:t'=" [showAst t']
       -- lift $ liftIO $ debugPrint Loud "replaceImpl:res=" [showAst res]
+      lift $ liftIO $ debugPrint Loud "replaceImpl:res2=" [showAst res2]
+      -- lift $ liftIO $ debugPrint Loud "replaceImpl:res=" [showAst res']
+      -- lift $ liftIO $ debugPrint Loud "replaceImpl:(e)=" [showAst (getLoc e)]
+      -- lift $ liftIO $ debugPrint Loud "replaceImpl:(r0,r)=" [showAst (getLoc r0, getLoc r)]
+      -- lift $ liftIO $ debugPrint Loud "replaceImpl:(res,res')=" [showAst (getLoc res, getLoc res')]
 
       let replacement = Replacement (getLocA e) orig repl
       TransformT $ lift $ tell $ Change [replacement] [tImports]
       -- make the actual replacement
-      return res'
+      return res2
 
 
 -- | Records a replacement made. In cases where we cannot use ghc-exactprint
@@ -126,14 +138,23 @@ data Replacement = Replacement
 data Change = NoChange | Change [Replacement] [AnnotatedImports]
 
 instance Semigroup Change where
+#if __GLASGOW_HASKELL__ < 910
   (<>) = mappend
+#else
+  NoChange         <> other            = other
+  other            <> NoChange         = other
+  (Change rs1 is1) <> (Change rs2 is2) =
+    Change (rs1 <> rs2) (is1 <> is2)
+#endif
 
 instance Monoid Change where
   mempty = NoChange
+#if __GLASGOW_HASKELL__ < 910
   mappend NoChange     other        = other
   mappend other        NoChange     = other
   mappend (Change rs1 is1) (Change rs2 is2) =
     Change (rs1 <> rs2) (is1 <> is2)
+#endif
 
 -- The location of 'e' accurately points to the first non-space character
 -- of 'e', but when we exactprint 'e', we might get some leading spaces (if

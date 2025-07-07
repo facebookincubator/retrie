@@ -11,10 +11,10 @@
 ===
  module Recursion where
 
- -- Goal of these tests is to make sure rewriting doesn't introduce unintended 
+ -- Goal of these tests is to make sure rewriting doesn't introduce unintended
  -- recursion. It doesn't protect against infinite mutual recursion, but we can
  -- at least spot self-recursion.
- 
+
  -- foo should not be rewritten
  foo :: Int -> Int
  foo = foldr bar baz

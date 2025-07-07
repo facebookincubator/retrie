@@ -14,11 +14,6 @@ import Retrie.ExactPrint
 import Retrie.GHC
 import Retrie.Quantifiers
 import Retrie.Types
-import Retrie.Util
-import Retrie.Monad
-import Control.Monad
-import Control.Monad.IO.Class
-import Control.Monad.Trans.Class
 
 rulesToRewrites
   :: [(FastString, Direction)]
@@ -47,7 +42,9 @@ mkRuleRewrite
 mkRuleRewrite RightToLeft (RuleInfo name qs lhs rhs) =
   mkRuleRewrite LeftToRight (RuleInfo name qs rhs lhs)
 mkRuleRewrite _ RuleInfo{..} = do
-  p <- pruneA (setEntryDP riLHS (SameLine 1))
-  t <- pruneA (setEntryDP riRHS (SameLine 1))
-  -- lift $ debugPrint Loud "mkRuleRewrite" [showAstA p, showAstA t]
-  return (riName, mkRewrite (mkQs riQuantifiers) p t)
+  p <- pruneA (setEntryDP (makeDeltaAst riLHS) (SameLine 1))
+  p <- pruneA riLHS
+  t <- pruneA (setEntryDP (makeDeltaAst riRHS) (SameLine 1))
+  -- lift $ debugPrint Loud "mkRuleRewrite:p,t" [showAstA p, showAstA t]
+  -- lift $ debugPrint Loud "mkRuleRewrite:riQuantifiers" [showGhc riQuantifiers]
+  return (riName, mkRewrite (mkQs riQuantifiers) p (getHasLoc p) t)

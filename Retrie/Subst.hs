@@ -52,18 +52,16 @@ substExpr
   -> TransformT m (LHsExpr GhcPs)
 substExpr ctxt e@(L l1 (HsVar x (L l2 v))) =
   case lookupHoleVar v ctxt of
-    Just (HoleExpr eA) -> do
-      -- lift $ liftIO $ debugPrint Loud "substExpr:HoleExpr:e" [showAst e]
-      -- lift $ liftIO $ debugPrint Loud "substExpr:HoleExpr:eA" [showAst eA]
+    Just (HoleExpr eA') -> do
+      let eA = fmap makeDeltaAst eA'
+      lift $ liftIO $ debugPrint Loud "substExpr:HoleExpr:e" [showAst e]
+      lift $ liftIO $ debugPrint Loud "substExpr:HoleExpr:eA" [showAst eA']
       e0 <- graftA (unparen <$> eA)
-      let comments = hasComments e0
-      -- unless comments $ transferEntryDPT e e'
-      e1 <- if comments
+      let hasCs = hasComments e0
+      e1 <- if hasCs
                then return e0
                else transferEntryDP e e0
       e2 <- transferAnnsT isComma e e1
-      -- let e'' = setEntryDP e' (SameLine 1)
-      -- lift $ liftIO $ debugPrint Loud "substExpr:HoleExpr:e2" [showAst e2]
       parenify ctxt e2
     Just (HoleRdr rdr) ->
       return $ L l1 $ HsVar x $ L l2 rdr
@@ -77,7 +75,8 @@ substPat
   -> TransformT m (LPat GhcPs)
 substPat ctxt (dLPat -> Just p@(L l1 (VarPat x _vl@(L l2 v)))) = fmap cLPat $
   case lookupHoleVar v ctxt of
-    Just (HolePat pA) -> do
+    Just (HolePat pA') -> do
+      let pA = fmap makeDeltaAst pA'
       -- lift $ liftIO $ debugPrint Loud "substPat:HolePat:p" [showAst p]
       -- lift $ liftIO $ debugPrint Loud "substPat:HolePat:pA" [showAst pA]
       p' <- graftA (unparenP <$> pA)
@@ -100,12 +99,17 @@ substType
   -> TransformT m (LHsType GhcPs)
 substType ctxt ty
   | Just (L _ v) <- tyvarRdrName (unLoc ty)
-  , Just (HoleType tyA) <- lookupHoleVar v ctxt = do
+  , Just (HoleType tyA') <- lookupHoleVar v ctxt = do
+    let tyA = fmap makeDeltaAst tyA'
     -- lift $ liftIO $ debugPrint Loud "substType:HoleType:ty" [showAst ty]
     -- lift $ liftIO $ debugPrint Loud "substType:HoleType:tyA" [showAst tyA]
-    ty' <- graftA (unparenT <$> tyA)
-    ty0 <- transferEntryAnnsT isComma ty ty'
-    parenifyT ctxt ty0
+    ty0 <- graftA (unparenT <$> tyA)
+    let hasCs = hasComments ty0
+    ty1 <- if hasCs
+             then return ty0
+             else transferEntryDP ty ty0
+    ty2 <- transferEntryAnnsT isComma ty ty1
+    parenifyT ctxt ty2
 substType _ ty = return ty
 
 -- You might reasonably think that we would replace the RdrName in FunBind...
@@ -117,9 +121,12 @@ substHsMatchContext
 #if __GLASGOW_HASKELL__ < 900
   -> HsMatchContext RdrName
   -> TransformT m (HsMatchContext RdrName)
-#else
+#elif __GLASGOW_HASKELL__ < 910
   -> HsMatchContext GhcPs
   -> TransformT m (HsMatchContext GhcPs)
+#else
+  -> HsMatchContext (LIdP GhcPs)
+  -> TransformT m (HsMatchContext (LIdP GhcPs))
 #endif
 substHsMatchContext ctxt (FunRhs (L l v) f s)
   | Just (HoleRdr rdr) <- lookupHoleVar v ctxt =
